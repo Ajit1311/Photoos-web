@@ -28,6 +28,9 @@ import SystemStatus from "@/components/dashboard/command/SystemStatus";
 import ProductivityPanel from "@/components/dashboard/productivity/ProductivityPanel";
 import TeamPerformance from "@/components/dashboard/productivity/TeamPerformance";
 import RevenueGoalTracker from "@/components/dashboard/productivity/RevenueGoalTracker";
+import AIRecommendationEngine from "@/components/dashboard/intelligence/AIRecommendationEngine";
+import ActiveProjects from "@/components/dashboard/intelligence/ActiveProjects";
+import ClientFollowups from "@/components/dashboard/intelligence/ClientFollowups";
 
 export default function DashboardPage() {
   return (
@@ -66,6 +69,15 @@ export default function DashboardPage() {
         <TeamPerformance />
         <RevenueGoalTracker />
       </section>
+      <section className="grid gap-6 xl:grid-cols-3">
+
+        <AIRecommendationEngine />
+
+        <ActiveProjects />
+
+        <ClientFollowups />
+
+      </section>
 
       <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
         <StatCard title="Total Assets" value="24,582" subtitle="+312 this month" icon={<Images size={24} />} />
@@ -73,7 +85,7 @@ export default function DashboardPage() {
         <StatCard title="Clients" value="842" subtitle="+24 new clients" icon={<Users size={24} />} />
         <StatCard title="AI Jobs" value="32" subtitle="Workers healthy" icon={<Sparkles size={24} />} />
       </section>
-       
+
       <section className="grid gap-6 xl:grid-cols-3">
         <div className="xl:col-span-2"><RevenueCard /></div>
         <AIInsights />
