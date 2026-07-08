@@ -12,10 +12,9 @@ export default function Logo({
   };
 
   return (
-    <h1
-      className={`font-bold tracking-tight text-white ${sizes[size]}`}
-    >
-      Photo<span className="text-orange-500">OS</span>
+    <h1 className={`${sizes[size]} font-bold tracking-tight`}>
+      <span className="text-slate-900">Photo</span>
+      <span className="text-[#0A3F61]">OS</span>
     </h1>
   );
 }
