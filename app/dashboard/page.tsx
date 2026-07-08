@@ -24,7 +24,6 @@ import LiveCalendar from "@/components/dashboard/overview/LiveCalendar";
 import ActivityTimeline from "@/components/dashboard/overview/ActivityTimeline";
 import StudioCommandCenter from "@/components/dashboard/command/StudioCommandCenter";
 import QuickMetrics from "@/components/dashboard/command/QuickMetrics";
-import SystemStatus from "@/components/dashboard/command/SystemStatus";
 import ProductivityPanel from "@/components/dashboard/productivity/ProductivityPanel";
 import TeamPerformance from "@/components/dashboard/productivity/TeamPerformance";
 import RevenueGoalTracker from "@/components/dashboard/productivity/RevenueGoalTracker";
@@ -58,11 +57,6 @@ export default function DashboardPage() {
         </div>
         <QuickMetrics />
       </section>
-
-      <section>
-        <SystemStatus />
-      </section>
-
       {/* System Status च्या खाली नवीन जोडलेला सेक्शन */}
       <section className="grid gap-6 xl:grid-cols-3">
         <ProductivityPanel />
