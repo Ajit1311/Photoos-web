@@ -1,13 +1,14 @@
+import Logo from "@/components/logo/Logo";
+import { APP_DESCRIPTION } from "@/constants/app";
+
 export default function HomePage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-950">
-      <div className="text-center">
-        <h1 className="text-5xl font-bold text-white">
-          Welcome to PhotoOS
-        </h1>
+      <div className="space-y-4 text-center">
+        <Logo size="lg" />
 
-        <p className="mt-4 text-lg text-slate-400">
-          Enterprise AI Photography Platform
+        <p className="text-xl text-slate-400">
+          {APP_DESCRIPTION}
         </p>
       </div>
     </main>
