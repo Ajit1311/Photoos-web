@@ -1,121 +1,159 @@
 import {
-    Images,
-    FolderOpen,
-    Users,
-    Sparkles,
+  Images,
+  FolderOpen,
+  Users,
+  Sparkles,
 } from "lucide-react";
 
 import StatCard from "@/components/dashboard/StatCard";
+
 import BusinessHealthCard from "@/components/dashboard/analytics/BusinessHealthCard";
 import RevenueCard from "@/components/dashboard/analytics/RevenueCard";
 import AIInsights from "@/components/dashboard/analytics/AIInsights";
+import StorageHealth from "@/components/dashboard/analytics/StorageHealth";
+import AIQueue from "@/components/dashboard/analytics/AIQueue";
 
+import RevenueChart from "@/components/dashboard/charts/RevenueChart";
+import BusinessHeatmap from "@/components/dashboard/charts/BusinessHeatmap";
+
+import OverviewStats from "@/components/dashboard/overview/OverviewStats";
 import QuickActions from "@/components/dashboard/overview/QuickActions";
 import RecentActivity from "@/components/dashboard/overview/RecentActivity";
 import TodaysEvents from "@/components/dashboard/overview/TodaysEvents";
-import OverviewStats from "@/components/dashboard/overview/OverviewStats";
 import UpcomingDeadlines from "@/components/dashboard/overview/UpcomingDeadlines";
-import StorageHealth from "@/components/dashboard/analytics/StorageHealth";
-import AIQueue from "@/components/dashboard/analytics/AIQueue";
 import NotificationCenter from "@/components/dashboard/overview/NotificationCenter";
 
 export default function DashboardPage() {
-    return (
-        <main className="space-y-8">
+  return (
+    <main className="space-y-8">
 
-            <section className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+      {/* Hero */}
 
-                <div>
+      <section className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
 
-                    <p className="text-sm font-semibold uppercase tracking-widest text-[#0A3F61]">
-                        Dashboard
-                    </p>
+        <div>
 
-                    <h1 className="mt-2 text-4xl font-bold text-slate-900">
-                        Good Evening, Parashuram 👋
-                    </h1>
+          <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[#0A3F61]">
+            Enterprise Dashboard
+          </p>
 
-                    <p className="mt-3 text-slate-500">
-                        Welcome back. Your studio is performing exceptionally well today.
-                    </p>
+          <h1 className="mt-2 text-4xl font-bold tracking-tight text-slate-900">
+            Good Evening, Parashuram 👋
+          </h1>
 
-                </div>
+          <p className="mt-3 max-w-2xl text-slate-500">
+            Welcome back. Here's a complete overview of your studio,
+            revenue, production pipeline and AI processing.
+          </p>
 
-                <BusinessHealthCard />
+        </div>
 
-            </section>
+        <BusinessHealthCard />
 
-            <OverviewStats />
+      </section>
 
-            <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+      {/* Overview */}
 
-                <StatCard
-                    title="Total Assets"
-                    value="24,582"
-                    subtitle="+312 this month"
-                    icon={<Images size={24} />}
-                />
+      <OverviewStats />
 
-                <StatCard
-                    title="Galleries"
-                    value="186"
-                    subtitle="12 pending publish"
-                    icon={<FolderOpen size={24} />}
-                />
+      {/* KPI */}
 
-                <StatCard
-                    title="Clients"
-                    value="842"
-                    subtitle="+24 new clients"
-                    icon={<Users size={24} />}
-                />
+      <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
 
-                <StatCard
-                    title="AI Jobs"
-                    value="32"
-                    subtitle="Workers healthy"
-                    icon={<Sparkles size={24} />}
-                />
+        <StatCard
+          title="Total Assets"
+          value="24,582"
+          subtitle="+312 this month"
+          icon={<Images size={24} />}
+        />
 
-            </section>
+        <StatCard
+          title="Galleries"
+          value="186"
+          subtitle="12 waiting"
+          icon={<FolderOpen size={24} />}
+        />
 
-            <section className="grid gap-6 xl:grid-cols-3">
+        <StatCard
+          title="Clients"
+          value="842"
+          subtitle="+24 new"
+          icon={<Users size={24} />}
+        />
 
-                <div className="xl:col-span-2">
-                    <RevenueCard />
-                </div>
+        <StatCard
+          title="AI Jobs"
+          value="32"
+          subtitle="Healthy Queue"
+          icon={<Sparkles size={24} />}
+        />
 
-                <AIInsights />
+      </section>
 
-            </section>
+      {/* Revenue */}
 
-            <section className="grid gap-6 xl:grid-cols-3">
+      <section className="grid gap-6 xl:grid-cols-3">
 
-                <div className="xl:col-span-2">
-                    <RecentActivity />
-                </div>
+        <div className="xl:col-span-2">
 
-                <QuickActions />
+          <RevenueCard />
 
-            </section>
+        </div>
 
-            <section className="grid gap-6 xl:grid-cols-2">
+        <AIInsights />
 
-                <TodaysEvents />
+      </section>
 
-                <UpcomingDeadlines />
+      {/* Charts */}
 
-            </section>
-            <section className="grid gap-6 xl:grid-cols-3">
+      <section className="grid gap-6 xl:grid-cols-3">
 
-                <StorageHealth />
+        <div className="xl:col-span-2">
 
-                <AIQueue />
+          <RevenueChart />
 
-                <NotificationCenter />
+        </div>
 
-            </section>
+        <BusinessHeatmap />
 
-        </main>
-    );
+      </section>
+
+      {/* Activity */}
+
+      <section className="grid gap-6 xl:grid-cols-3">
+
+        <div className="xl:col-span-2">
+
+          <RecentActivity />
+
+        </div>
+
+        <QuickActions />
+
+      </section>
+
+      {/* Events */}
+
+      <section className="grid gap-6 xl:grid-cols-2">
+
+        <TodaysEvents />
+
+        <UpcomingDeadlines />
+
+      </section>
+
+      {/* Analytics */}
+
+      <section className="grid gap-6 xl:grid-cols-3">
+
+        <StorageHealth />
+
+        <AIQueue />
+
+        <NotificationCenter />
+
+      </section>
+
+    </main>
+  );
 }
