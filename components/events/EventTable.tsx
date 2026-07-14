@@ -1,222 +1,267 @@
+"use client";
+
+import { useState } from "react";
+
 import {
-  Eye,
-  Pencil,
-  QrCode,
-  Sparkles,
-  MoreHorizontal,
+  Activity,
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  CreditCard,
+  History,
+  Images,
+  LayoutDashboard,
+  Search,
+  Settings,
 } from "lucide-react";
 
-const events = [
+import { useEvents } from "@/hooks/useEvents";
+
+import EventOverviewWorkspace from "@/components/events/overview/EventOverviewWorkspace";
+import GalleryWorkspace from "@/components/events/gallery/GalleryWorkspace";
+
+const tabs = [
   {
-    id: "EVT-240701",
-    name: "Rahul & Priya Wedding",
-    client: "Rahul Patil",
-    date: "09 Jul 2026",
-    photographer: "Akshay",
-    payment: "Paid",
-    gallery: "Published",
-    ai: "Completed",
+    id: "overview",
+    label: "Overview",
+    icon: LayoutDashboard,
   },
   {
-    id: "EVT-240702",
-    name: "ABC Industries",
-    client: "ABC Pvt Ltd",
-    date: "10 Jul 2026",
-    photographer: "Rahul",
-    payment: "Pending",
-    gallery: "Draft",
-    ai: "Running",
+    id: "gallery",
+    label: "Gallery",
+    icon: Images,
   },
   {
-    id: "EVT-240703",
-    name: "Birthday Event",
-    client: "Sneha Kulkarni",
-    date: "11 Jul 2026",
-    photographer: "Om",
-    payment: "Advance",
-    gallery: "Processing",
-    ai: "Queued",
+    id: "albums",
+    label: "Albums",
+    icon: BookOpen,
+  },
+  {
+    id: "payments",
+    label: "Payments",
+    icon: CreditCard,
+  },
+  {
+    id: "timeline",
+    label: "Timeline",
+    icon: History,
+  },
+  {
+    id: "activity",
+    label: "Activity",
+    icon: Activity,
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    icon: Settings,
   },
 ];
 
-function badge(status: string) {
-  switch (status) {
-    case "Paid":
-    case "Published":
-    case "Completed":
-      return "bg-green-100 text-green-700";
+export default function EventTabs() {
 
-    case "Pending":
-    case "Queued":
-      return "bg-orange-100 text-orange-700";
+  const {
+    events,
+    search,
+    setSearch,
+    page,
+    pagination,
+    nextPage,
+    previousPage,
+    loading,
+    error,
+    reload,
+  } = useEvents();
 
-    case "Running":
-    case "Processing":
-      return "bg-blue-100 text-[#0A3F61]";
+  const [activeTab, setActiveTab] =
+    useState("overview");
 
-    case "Advance":
-      return "bg-purple-100 text-purple-700";
+  if (loading) {
 
-    default:
-      return "bg-slate-100 text-slate-700";
+    return (
+      <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center">
+        Loading events...
+      </div>
+    );
+
   }
-}
 
-export default function EventTable() {
-  return (
-    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+  if (error) {
 
-      <div className="border-b border-slate-100 px-6 py-5">
+    return (
+      <div className="rounded-3xl border border-red-200 bg-white p-12 text-center">
 
-        <h2 className="text-xl font-bold text-slate-900">
-          Events
+        <h2 className="text-2xl font-bold text-red-600">
+          Unable to load events
         </h2>
 
-        <p className="mt-1 text-sm text-slate-500">
-          Manage your photography workflow
+        <p className="mt-3 text-slate-500">
+          {error}
         </p>
 
+        <button
+          onClick={reload}
+          className="mt-6 rounded-xl bg-[#0A3F61] px-6 py-3 text-white"
+        >
+          Retry
+        </button>
+
       </div>
+    );
 
-      <div className="overflow-x-auto">
+  }
 
-        <table className="min-w-full">
+  return (
 
-          <thead className="bg-slate-50">
+    <section className="space-y-6">
 
-            <tr>
+      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
 
-              <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Event
-              </th>
+        <div className="relative mb-4">
 
-              <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Client
-              </th>
+          <Search
+            size={18}
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+          />
 
-              <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Date
-              </th>
+          <input
+            value={search}
+            onChange={(e) =>
+              setSearch(e.target.value)
+            }
+            placeholder="Search events..."
+            className="w-full rounded-xl border border-slate-200 py-3 pl-11 pr-4 outline-none focus:border-[#0A3F61]"
+          />
 
-              <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Photographer
-              </th>
+        </div>
 
-              <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Payment
-              </th>
+        <div className="flex flex-wrap gap-3">
 
-              <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Gallery
-              </th>
+          {tabs.map((tab) => {
 
-              <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                AI
-              </th>
+            const Icon = tab.icon;
 
-              <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Actions
-              </th>
+            return (
 
-            </tr>
-
-          </thead>
-
-          <tbody>
-
-            {events.map((event) => (
-
-              <tr
-                key={event.id}
-                className="border-t border-slate-100 transition hover:bg-slate-50"
+              <button
+                key={tab.id}
+                onClick={() =>
+                  setActiveTab(tab.id)
+                }
+                className={`flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-medium transition ${
+                  activeTab === tab.id
+                    ? "bg-[#0A3F61] text-white"
+                    : "hover:bg-slate-100"
+                }`}
               >
+                <Icon size={18} />
+                {tab.label}
+              </button>
 
-                <td className="px-6 py-5">
+            );
 
-                  <p className="font-semibold text-slate-900">
-                    {event.name}
-                  </p>
+          })}
 
-                  <p className="mt-1 text-sm text-slate-500">
-                    {event.id}
-                  </p>
-
-                </td>
-
-                <td className="px-6 py-5 text-sm">
-                  {event.client}
-                </td>
-
-                <td className="px-6 py-5 text-sm">
-                  {event.date}
-                </td>
-
-                <td className="px-6 py-5 text-sm">
-                  {event.photographer}
-                </td>
-
-                <td className="px-6 py-5">
-
-                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${badge(event.payment)}`}>
-                    {event.payment}
-                  </span>
-
-                </td>
-
-                <td className="px-6 py-5">
-
-                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${badge(event.gallery)}`}>
-                    {event.gallery}
-                  </span>
-
-                </td>
-
-                <td className="px-6 py-5">
-
-                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${badge(event.ai)}`}>
-                    {event.ai}
-                  </span>
-
-                </td>
-
-                <td className="px-6 py-5">
-
-                  <div className="flex justify-center gap-2">
-
-                    <button className="rounded-xl border p-2 hover:bg-slate-100">
-                      <Eye size={16} />
-                    </button>
-
-                    <button className="rounded-xl border p-2 hover:bg-slate-100">
-                      <Pencil size={16} />
-                    </button>
-
-                    <button className="rounded-xl border p-2 hover:bg-slate-100">
-                      <QrCode size={16} />
-                    </button>
-
-                    <button className="rounded-xl border p-2 hover:bg-slate-100">
-                      <Sparkles size={16} />
-                    </button>
-
-                    <button className="rounded-xl border p-2 hover:bg-slate-100">
-                      <MoreHorizontal size={16} />
-                    </button>
-
-                  </div>
-
-                </td>
-
-              </tr>
-
-            ))}
-
-          </tbody>
-
-        </table>
+        </div>
 
       </div>
 
-    </div>
+      <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-6 py-4">
+
+        <div className="text-sm text-slate-500">
+
+          Showing page{" "}
+          <strong>{page}</strong>
+          {" "}of{" "}
+          <strong>
+            {pagination.totalPages}
+          </strong>
+
+          {" • "}
+
+          Total Events{" "}
+          <strong>
+            {pagination.total}
+          </strong>
+
+        </div>
+
+        <div className="flex items-center gap-3">
+
+          <button
+            onClick={previousPage}
+            disabled={page === 1}
+            className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <ChevronLeft size={18} />
+            Previous
+          </button>
+
+          <button
+            onClick={nextPage}
+            disabled={
+              page >= pagination.totalPages
+            }
+            className="flex items-center gap-2 rounded-xl bg-[#0A3F61] px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Next
+            <ChevronRight size={18} />
+          </button>
+
+        </div>
+
+      </div>
+
+      {events.length === 0 && (
+
+        <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-16 text-center">
+
+          <h2 className="text-2xl font-bold">
+            No Events Found
+          </h2>
+
+          <p className="mt-3 text-slate-500">
+            No events matched your search.
+          </p>
+
+        </div>
+
+      )}
+
+      {events.length > 0 &&
+        activeTab === "overview" && (
+          <EventOverviewWorkspace />
+        )}
+
+      {events.length > 0 &&
+        activeTab === "gallery" && (
+          <GalleryWorkspace />
+        )}
+
+      {events.length > 0 &&
+        !["overview", "gallery"].includes(activeTab) && (
+
+          <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-16 text-center">
+
+            <h2 className="text-2xl font-bold">
+              {
+                tabs.find(
+                  (tab) =>
+                    tab.id === activeTab,
+                )?.label
+              }
+            </h2>
+
+            <p className="mt-3 text-slate-500">
+              Coming Soon
+            </p>
+
+          </div>
+
+      )}
+
+    </section>
+
   );
+
 }

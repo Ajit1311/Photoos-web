@@ -1,115 +1,147 @@
-import {
-  Images,
-  FolderOpen,
-  Users,
-  Sparkles,
-} from "lucide-react";
+import { CalendarDays } from "lucide-react";
 
-import StatCard from "@/components/dashboard/StatCard";
-import BusinessHealthCard from "@/components/dashboard/analytics/BusinessHealthCard";
-import RevenueCard from "@/components/dashboard/analytics/RevenueCard";
-import AIInsights from "@/components/dashboard/analytics/AIInsights";
-import StorageHealth from "@/components/dashboard/analytics/StorageHealth";
-import AIQueue from "@/components/dashboard/analytics/AIQueue";
-import PerformanceScorecards from "@/components/dashboard/analytics/PerformanceScorecards";
-import RevenueChart from "@/components/dashboard/charts/RevenueChart";
-import BusinessHeatmap from "@/components/dashboard/charts/BusinessHeatmap";
-import OverviewStats from "@/components/dashboard/overview/OverviewStats";
+import CommandCenter from "@/components/dashboard/overview/CommandCenter";
 import QuickActions from "@/components/dashboard/overview/QuickActions";
+import TodaysFocus from "@/components/dashboard/overview/TodaysFocus";
+import StudioSnapshot from "@/components/dashboard/overview/StudioSnapshot";
+import ActiveProjects from "@/components/dashboard/overview/ActiveProjects";
 import RecentActivity from "@/components/dashboard/overview/RecentActivity";
-import TodaysEvents from "@/components/dashboard/overview/TodaysEvents";
-import UpcomingDeadlines from "@/components/dashboard/overview/UpcomingDeadlines";
-import NotificationCenter from "@/components/dashboard/overview/NotificationCenter";
-import LiveCalendar from "@/components/dashboard/overview/LiveCalendar";
-import ActivityTimeline from "@/components/dashboard/overview/ActivityTimeline";
-import StudioCommandCenter from "@/components/dashboard/command/StudioCommandCenter";
-import QuickMetrics from "@/components/dashboard/command/QuickMetrics";
-import ProductivityPanel from "@/components/dashboard/productivity/ProductivityPanel";
-import TeamPerformance from "@/components/dashboard/productivity/TeamPerformance";
-import RevenueGoalTracker from "@/components/dashboard/productivity/RevenueGoalTracker";
-import AIRecommendationEngine from "@/components/dashboard/intelligence/AIRecommendationEngine";
-import ActiveProjects from "@/components/dashboard/intelligence/ActiveProjects";
-import ClientFollowups from "@/components/dashboard/intelligence/ClientFollowups";
+
+import RevenueAnalytics from "@/components/dashboard/analytics/RevenueAnalytics";
+import TodaysOperations from "@/components/dashboard/analytics/TodaysOperations";
+import RevenueGoal from "@/components/dashboard/analytics/RevenueGoal";
+import MiniAIInsights from "@/components/dashboard/analytics/MiniAIInsights";
+
+import PendingPayments from "@/components/dashboard/finance/PendingPayments";
+import ClientFollowups from "@/components/dashboard/crm/ClientFollowups";
+
+import BusinessHeatmap from "@/components/dashboard/charts/BusinessHeatmap";
+import AIRecommendations from "@/components/dashboard/intelligence/AIRecommendations";
+
+function getGreeting() {
+  const hour = new Date().getHours();
+
+  if (hour >= 5 && hour < 12) return "Good Morning";
+  if (hour >= 12 && hour < 17) return "Good Afternoon";
+  if (hour >= 17 && hour < 21) return "Good Evening";
+
+  return "Good Night";
+}
 
 export default function DashboardPage() {
   return (
     <main className="space-y-8">
-      <section className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
+
+      {/* Hero */}
+
+      <section className="flex flex-col gap-6 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[#0A3F61]">Enterprise Dashboard</p>
-          <h1 className="mt-2 text-4xl font-bold tracking-tight text-slate-900">
-            Good Evening, Parashuram 👋
+
+          <h1 className="text-4xl font-bold text-slate-900">
+
+            {getGreeting()}, Parashuram 👋
+
           </h1>
-          <p className="mt-3 max-w-2xl text-slate-500">
-            Welcome back. Here is your studio command center.
+
+          <div className="mt-4 flex items-center gap-3 text-slate-500">
+
+            <CalendarDays size={18} />
+
+            <span>
+              Wednesday • Studio Performance Excellent
+            </span>
+
+          </div>
+
+        </div>
+
+        <div className="rounded-3xl bg-[#0A3F61] px-8 py-6 text-white shadow-lg">
+
+          <p className="text-sm text-white/80">
+            Business Health
           </p>
+
+          <h2 className="mt-2 text-5xl font-bold">
+            92%
+          </h2>
+
         </div>
-        <BusinessHealthCard />
+
       </section>
 
-      <OverviewStats />
-      <PerformanceScorecards />
+      {/* Top Dashboard */}
 
-      {/* नवीन ॲड केलेले Sections - Hero / Scorecards नंतर */}
       <section className="grid gap-6 xl:grid-cols-3">
-        <div className="xl:col-span-2">
-          <StudioCommandCenter />
+
+        {/* Left */}
+
+        <div className="space-y-6 xl:col-span-2">
+
+          <CommandCenter />
+
+          <TodaysFocus />
+
         </div>
-        <QuickMetrics />
-      </section>
-      {/* System Status च्या खाली नवीन जोडलेला सेक्शन */}
-      <section className="grid gap-6 xl:grid-cols-3">
-        <ProductivityPanel />
-        <TeamPerformance />
-        <RevenueGoalTracker />
-      </section>
-      <section className="grid gap-6 xl:grid-cols-3">
 
-        <AIRecommendationEngine />
+        {/* Right */}
+
+        <div className="space-y-6">
+
+          <QuickActions />
+
+          <StudioSnapshot />
+
+          <MiniAIInsights />
+
+        </div>
+
+      </section>
+
+      {/* Analytics */}
+
+      <section className="grid gap-6 xl:grid-cols-2">
+
+        <RevenueAnalytics />
+
+        <TodaysOperations />
+
+      </section>
+
+      {/* Revenue */}
+
+      <section className="grid gap-6 xl:grid-cols-2">
+
+        <RevenueGoal />
 
         <ActiveProjects />
+
+      </section>
+
+      {/* Finance */}
+
+      <section className="grid gap-6 xl:grid-cols-2">
+
+        <PendingPayments />
 
         <ClientFollowups />
 
       </section>
 
-      <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard title="Total Assets" value="24,582" subtitle="+312 this month" icon={<Images size={24} />} />
-        <StatCard title="Galleries" value="186" subtitle="12 pending publish" icon={<FolderOpen size={24} />} />
-        <StatCard title="Clients" value="842" subtitle="+24 new clients" icon={<Users size={24} />} />
-        <StatCard title="AI Jobs" value="32" subtitle="Workers healthy" icon={<Sparkles size={24} />} />
-      </section>
+      {/* Bottom */}
 
-      <section className="grid gap-6 xl:grid-cols-3">
-        <div className="xl:col-span-2"><RevenueCard /></div>
-        <AIInsights />
-      </section>
+      <section className="grid gap-6 xl:grid-cols-2">
 
-      <section className="grid gap-6 xl:grid-cols-3">
-        <div className="xl:col-span-2"><RevenueChart /></div>
         <BusinessHeatmap />
+
+        <RecentActivity />
+
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-2">
-        <LiveCalendar />
-        <ActivityTimeline />
-      </section>
+      {/* AI */}
 
-      <section className="grid gap-6 xl:grid-cols-3">
-        <div className="xl:col-span-2"><RecentActivity /></div>
-        <QuickActions />
-      </section>
+      <AIRecommendations />
 
-      <section className="grid gap-6 xl:grid-cols-2">
-        <TodaysEvents />
-        <UpcomingDeadlines />
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-3">
-        <StorageHealth />
-        <AIQueue />
-        <NotificationCenter />
-      </section>
     </main>
   );
 }
