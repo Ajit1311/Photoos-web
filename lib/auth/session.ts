@@ -1,6 +1,8 @@
 import { supabase } from "@/lib/supabase/client";
 
 export async function getAccessToken() {
+  
+
   const {
     data,
     error,

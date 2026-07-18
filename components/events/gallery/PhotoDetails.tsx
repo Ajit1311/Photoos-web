@@ -52,14 +52,12 @@ export default function PhotoDetails() {
         {/* Preview */}
 
         <div className="relative aspect-square overflow-hidden rounded-2xl bg-slate-100">
-          {/* २. इथे <<NextImage मधील एक < काढून दुरुस्त केले आहे */}
-          <NextImage
-            src="https://picsum.photos/700"
-            alt="Photo preview"
-            fill
-            sizes="(max-width:768px) 100vw, 33vw"
-            className="object-cover"
-          />
+          {/* जुना NextImage टॅग काढून हा साधा img टॅग टाका */}
+<img
+  src="https://picsum.photos/700"
+  alt="Photo preview"
+  className="w-full h-full object-cover"
+/>
         </div>
 
         {/* Rating */}

@@ -15,7 +15,6 @@ const BOOTSTRAP_QUERY_KEY = [
 ];
 
 export function useBootstrap() {
-
   const query =
     useQuery<BootstrapResponse, Error>({
       queryKey:
@@ -24,15 +23,14 @@ export function useBootstrap() {
       queryFn: () =>
         bootstrapRepository.load(),
 
-      staleTime:
-        1000 * 60,
+      staleTime: 1000 * 60 * 5,
 
       gcTime:
         1000 *
         60 *
         10,
 
-      retry: 2,
+      retry: 1,
 
       refetchOnWindowFocus:
         false,

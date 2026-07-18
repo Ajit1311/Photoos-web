@@ -16,29 +16,62 @@ export async function getProjects(
   limit = 25,
   search = "",
 ): Promise<GetProjectsResponse> {
-  const query = new URLSearchParams();
 
-  query.set("page", page.toString());
-  query.set("limit", limit.toString());
+  const query =
+    new URLSearchParams();
+
+  query.set(
+    "page",
+    page.toString(),
+  );
+
+  query.set(
+    "limit",
+    limit.toString(),
+  );
 
   if (search.trim()) {
-    query.set("search", search.trim());
+
+    query.set(
+      "search",
+      search.trim(),
+    );
+
   }
 
-  const endpoint = `${FUNCTION_NAME}?${query.toString()}`;
+  const endpoint =
+    `${FUNCTION_NAME}?${query.toString()}`;
 
-  const { data, error } = await supabase.functions.invoke(endpoint, {
-    method: "GET",
-    headers: {
-      "x-studio-id": studioId,
-    },
-  });
+  const {
+    data,
+    error,
+  } =
+    await supabase.functions.invoke(
+      endpoint,
+      {
+        method: "GET",
+
+        headers: {
+          "x-studio-id":
+            studioId,
+        },
+      },
+    );
 
   if (error) {
     throw error;
   }
 
-  return data as GetProjectsResponse;
+  if (!data?.success) {
+
+    throw new Error(
+      "Failed to load projects.",
+    );
+
+  }
+
+  return data.data as GetProjectsResponse;
+
 }
 
 /**
@@ -62,7 +95,15 @@ export async function getProject(
     throw error;
   }
 
-  return data as ProjectDto;
+  if (!data?.success) {
+
+    throw new Error(
+      "Failed to load project.",
+    );
+
+  }
+
+  return data.data as ProjectDto;
 }
 
 /**
@@ -84,5 +125,13 @@ export async function createProject(
     throw error;
   }
 
-  return data as ProjectDto;
+  if (!data?.success) {
+
+    throw new Error(
+      "Failed to create project.",
+    );
+
+  }
+
+  return data.data as ProjectDto;
 }

@@ -1,114 +1,100 @@
-import {
-  ArrowRight,
-  Camera,
-  FolderPlus,
-  Image,
-  QrCode,
-  Send,
-  Sparkles,
+'use client';
+
+import { 
+  Camera, 
+  Sparkles, 
+  QrCode, 
+  FolderPlus, 
+  Globe, 
+  Share2,
+  ArrowRight
 } from "lucide-react";
 
 const actions = [
   {
+    id: "upload",
     title: "Upload Photos",
-    description: "Upload RAW or edited photos",
-    icon: Camera,
-    color: "bg-[#0A3F61]",
+    desc: "RAW or edited photos",
+    icon: <Camera size={20} />,
+    color: "bg-blue-500",
   },
   {
+    id: "ai",
     title: "Run AI",
-    description: "Start AI face recognition",
-    icon: Sparkles,
-    color: "bg-purple-600",
+    desc: "Face recognition",
+    icon: <Sparkles size={20} />,
+    color: "bg-purple-500",
   },
   {
+    id: "qr",
     title: "Generate QR",
-    description: "Create gallery QR code",
-    icon: QrCode,
-    color: "bg-green-600",
+    desc: "Gallery QR code",
+    icon: <QrCode size={20} />,
+    color: "bg-emerald-500",
   },
   {
+    id: "album",
     title: "Create Album",
-    description: "Design printable album",
-    icon: FolderPlus,
-    color: "bg-orange-500",
+    desc: "Design printable layouts",
+    icon: <FolderPlus size={20} />,
+    color: "bg-amber-500",
   },
   {
+    id: "publish",
     title: "Publish Gallery",
-    description: "Publish client gallery",
-    icon: Image,
-    color: "bg-cyan-600",
+    desc: "Make client gallery live",
+    icon: <Globe size={20} />,
+    color: "bg-cyan-500",
   },
   {
+    id: "share",
     title: "Share Gallery",
-    description: "Send gallery to client",
-    icon: Send,
-    color: "bg-pink-600",
+    desc: "Send link to client",
+    icon: <Share2 size={20} />,
+    color: "bg-pink-500",
   },
 ];
 
 export default function EventQuickActions() {
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white shadow-sm">
-
-      <div className="border-b border-slate-100 p-6">
-
-        <h2 className="text-2xl font-bold text-slate-900">
-          Event Quick Actions
-        </h2>
-
-        <p className="mt-2 text-slate-500">
-          Everything required to manage this event.
-        </p>
-
+    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-5">
+        <h2 className="text-xl font-bold text-slate-900">Event Quick Actions</h2>
+        <p className="text-sm text-slate-500 mt-1">Everything required to manage this event.</p>
       </div>
 
-      <div className="grid gap-5 p-6 md:grid-cols-2 xl:grid-cols-3">
-
-        {actions.map((action) => {
-
-          const Icon = action.icon;
-
-          return (
-
-            <button
-              key={action.title}
-              className="group rounded-2xl border border-slate-200 p-5 text-left transition-all duration-300 hover:-translate-y-1 hover:border-[#0A3F61] hover:shadow-lg"
-            >
-
-              <div
-                className={`mb-5 inline-flex rounded-2xl p-4 text-white ${action.color}`}
-              >
-                <Icon size={22} />
+      {/* Horizontal List View */}
+      <div className="flex flex-col gap-3.5">
+        {actions.map((action) => (
+          <div 
+            key={action.id}
+            className="group relative flex items-center justify-between p-3.5 rounded-2xl border-2 border-[#0A3F61]/20 bg-slate-50/30 hover:border-[#0A3F61] hover:bg-gradient-to-r hover:from-[#0A3F61]/5 hover:to-[#0A3F61]/0 transition-all duration-300 cursor-pointer shadow-sm"
+          >
+            <div className="flex items-center gap-4">
+              {/* Icon Holder */}
+              <div className={`flex items-center justify-center p-3 rounded-xl text-white shadow-sm transition-transform duration-300 group-hover:scale-110 ${action.color}`}>
+                {action.icon}
               </div>
-
-              <h3 className="text-lg font-semibold text-slate-900">
-                {action.title}
-              </h3>
-
-              <p className="mt-2 text-sm leading-6 text-slate-500">
-                {action.description}
-              </p>
-
-              <div className="mt-5 flex items-center gap-2 font-medium text-[#0A3F61]">
-
-                Open
-
-                <ArrowRight
-                  size={18}
-                  className="transition group-hover:translate-x-1"
-                />
-
+              
+              {/* Text Meta */}
+              <div>
+                <h4 className="text-sm font-bold text-[#0A3F61] transition-colors">
+                  {action.title}
+                </h4>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {action.desc}
+                </p>
               </div>
+            </div>
 
-            </button>
-
-          );
-
-        })}
-
+            {/* Action Trigger Link */}
+            <div className="flex items-center gap-1 text-xs font-bold text-[#0A3F61]/70 group-hover:text-[#0A3F61] transition-colors px-3 py-1.5 rounded-xl group-hover:bg-[#0A3F61]/10 border border-transparent group-hover:border-[#0A3F61]/20">
+              <span>Open</span>
+              <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform duration-300" />
+            </div>
+          </div>
+        ))}
       </div>
-
     </section>
   );
 }

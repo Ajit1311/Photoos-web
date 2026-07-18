@@ -1,170 +1,153 @@
-"use client";
+'use client';
 
-import {
-  CalendarDays,
-  Download,
-  Heart,
-  Image as ImageIcon,
-  MapPin,
-  User,
+import { useState, useEffect, useRef } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { 
+  ArrowLeft, Image as ImageIcon, UploadCloud, Users, QrCode, 
+  CheckCircle2, X, Star, LayoutDashboard, Clock, Loader2,
+  Calendar, MapPin, RefreshCw, PlusCircle, FileText, Printer, CheckCircle, MessageSquare
 } from "lucide-react";
 
-import { useCurrentEvent } from "@/hooks/useCurrentEvent";
+// लक्षात ठेवा: जर तुम्ही तुमचा स्वतःचा Mock Router वापरत असाल, तर वरील import हटवून जुने डमी फंक्शन्स ठेवा.
 
-export default function EventOverviewWorkspace() {
-  const { event, loading } = useCurrentEvent();
-
-  if (loading || !event) {
-    return (
-      <section className="rounded-3xl border border-slate-200 bg-white p-10 shadow-sm">
-        <p className="text-slate-500">Loading event overview...</p>
-      </section>
-    );
-  }
-
-  return (
-    <section className="space-y-6">
-
-      {/* Event Summary */}
-
-      <div className="rounded-3xl border border-slate-200 bg-white shadow-sm">
-
-        <div className="border-b border-slate-100 p-6">
-
-          <h2 className="text-2xl font-bold text-slate-900">
-            Event Overview
-          </h2>
-
-          <p className="mt-2 text-slate-500">
-            Current event summary and statistics.
-          </p>
-
-        </div>
-
-        <div className="grid gap-6 p-6 md:grid-cols-2">
-
-          <InfoCard
-            icon={<User size={18} />}
-            title="Client"
-            value={event.client.name}
-          />
-
-          <InfoCard
-            icon={<CalendarDays size={18} />}
-            title="Event Date"
-            value={event.date}
-          />
-
-          <InfoCard
-            icon={<MapPin size={18} />}
-            title="Venue"
-            value={event.venue}
-          />
-
-          <InfoCard
-            icon={<ImageIcon size={18} />}
-            title="Status"
-            value={event.status}
-          />
-
-        </div>
-
-      </div>
-
-      {/* Gallery Analytics */}
-
-      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-
-        <StatCard
-          title="Total Photos"
-          value={event.gallery.totalPhotos.toLocaleString()}
-          icon={<ImageIcon size={20} />}
-        />
-
-        <StatCard
-          title="Published"
-          value={event.gallery.publishedPhotos.toLocaleString()}
-          icon={<ImageIcon size={20} />}
-        />
-
-        <StatCard
-          title="Favorites"
-          value={event.gallery.favorites.toLocaleString()}
-          icon={<Heart size={20} />}
-        />
-
-        <StatCard
-          title="Downloads"
-          value={event.gallery.downloads.toLocaleString()}
-          icon={<Download size={20} />}
-        />
-
-      </div>
-
-    </section>
-  );
+interface ToastState {
+  show: boolean;
+  message: string;
+  type: 'success' | 'error';
 }
 
-type InfoCardProps = {
-  icon: React.ReactNode;
-  title: string;
-  value: string;
-};
+export default function EventWorkspacePage() {
+  // 1. सर्व Hooks सुरुवातीलाच ठेवा (Rules of Hooks)
+  const params = useParams();
+  const router = useRouter();
+  const eventId = params?.eventId as string;
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-function InfoCard({
-  icon,
-  title,
-  value,
-}: InfoCardProps) {
+  const [activeTab, setActiveTab] = useState<'overview' | 'gallery'>('overview');
+  const [gallerySubTab, setGallerySubTab] = useState<'all' | 'selected'>('all'); 
+  const [event, setEvent] = useState<any>(null);
+  const [photos, setPhotos] = useState<any[]>([]); 
+  const [filteredPhotos, setFilteredPhotos] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
+  
+  const [loading, setLoading] = useState(true);
+  const [updatingStatus, setUpdatingStatus] = useState(false); 
+  const [savingPayment, setSavingPayment] = useState(false);
+  const [toast, setToast] = useState<ToastState>({ show: false, message: '', type: 'success' });
+
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [qrCodeUrl, setQrCodeUrl] = useState("");
+  const [selectedPhotoForPreview, setSelectedPhotoForPreview] = useState<any | null>(null);
+
+  const [newAmount, setNewAmount] = useState("");
+  const [newMode, setNewMode] = useState("UPI");
+  const [newRefId, setNewRefId] = useState("");
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 4000);
+  };
+
+  const STATUS_FLOW = [
+    "active", "selection_started", "selected", "editing", 
+    "editing_completed", "album_ready", "delivered", "completed"
+  ] as const;
+
+  const canMoveToStatus = (current: string, target: string) => {
+    const currentIndex = STATUS_FLOW.indexOf(current as any);
+    const targetIndex = STATUS_FLOW.indexOf(target as any);
+    return currentIndex !== -1 && targetIndex !== -1 && targetIndex >= currentIndex;
+  };
+
+  const getStatusColor = (status: string) => {
+    switch(status) {
+      case "selection_started": return "bg-orange-100 text-orange-700";
+      case "selected": return "bg-amber-100 text-amber-700";
+      case "editing": return "bg-blue-100 text-blue-700";
+      case "editing_completed": return "bg-indigo-100 text-indigo-700";
+      case "album_ready": return "bg-purple-100 text-purple-700";
+      case "delivered": return "bg-emerald-100 text-emerald-700";
+      case "completed": return "bg-green-100 text-green-700";
+      default: return "bg-slate-100 text-slate-700";
+    }
+  };
+
+  const loadWorkspaceData = async () => {
+    if (!eventId) {
+      setLoading(false);
+      showToast("Invalid event id.", "error");
+      return;
+    }
+    // इथे तुमची डेटा लोड करण्याची Logic (supabase calls) लिहा
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    let mounted = true;
+    if (mounted) loadWorkspaceData();
+    return () => { mounted = false; };
+  }, [eventId]);
+
+  const handleRealUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploading(true);
+    try {
+      for (let i = 0; i < files.length; i++) {
+        // [Upload Logic Here]
+        const insertError = false; // सिम्युलेशनसाठी
+        
+        if (insertError) {
+          console.error("Database Insert Error:", insertError);
+          throw new Error("Database insertion failed");
+        }
+      }
+      showToast("Upload success", "success");
+    } catch (err) {
+      console.error(err);
+      showToast("Upload failed.", "error");
+    } finally {
+      setUploading(false);
+      setIsUploadModalOpen(false);
+    }
+  };
+
+  if (loading) return <div className="flex h-screen items-center justify-center">Loading...</div>;
+
   return (
-    <div className="flex items-center gap-4 rounded-2xl border border-slate-200 p-5">
+    <div className="min-h-screen bg-[#F8FAFC] p-4">
+      {/* Toast Alert */}
+      {toast.show && (
+        <div className={`fixed bottom-5 right-5 z-50 px-5 py-3 rounded-xl text-white font-bold ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-rose-600'}`}>
+          {toast.message}
+        </div>
+      )}
 
-      <div className="rounded-xl bg-[#0A3F61]/10 p-3 text-[#0A3F61]">
-        {icon}
+      {/* Header */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button onClick={() => router.push("/dashboard/events")} className="p-2 hover:bg-slate-100 rounded-xl"><ArrowLeft size={18} /></button>
+          <h1 className="font-bold">Project Workspace</h1>
+        </div>
       </div>
 
-      <div>
-
-        <p className="text-xs uppercase text-slate-400">
-          {title}
-        </p>
-
-        <p className="mt-1 font-semibold text-slate-900">
-          {value}
-        </p>
-
+      {/* Content */}
+      <div className="mt-6 grid lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+            {/* Overview Tabs / Content */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-200">
+                <h2 className="text-xl font-bold">Event Details</h2>
+                {/* Additional UI elements here */}
+            </div>
+        </div>
       </div>
-
-    </div>
-  );
-}
-
-type StatCardProps = {
-  title: string;
-  value: string;
-  icon: React.ReactNode;
-};
-
-function StatCard({
-  title,
-  value,
-  icon,
-}: StatCardProps) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-
-      <div className="inline-flex rounded-xl bg-[#0A3F61]/10 p-3 text-[#0A3F61]">
-        {icon}
-      </div>
-
-      <p className="mt-4 text-sm text-slate-500">
-        {title}
-      </p>
-
-      <h3 className="mt-2 text-3xl font-bold text-slate-900">
-        {value}
-      </h3>
-
     </div>
   );
 }

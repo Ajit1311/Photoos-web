@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+
 import "./globals.css";
+
+import { Toaster } from "sonner";
 
 import QueryProvider from "@/providers/QueryProvider";
 import { BootstrapProvider } from "@/context/BootstrapContext";
@@ -25,6 +28,15 @@ export default function RootLayout({
           <BootstrapProvider>
 
             {children}
+
+            <Toaster
+              position="top-right"
+              richColors
+              closeButton
+              duration={2000}
+              expand={false}
+              visibleToasts={5}
+            />
 
           </BootstrapProvider>
 

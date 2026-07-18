@@ -32,51 +32,38 @@ type Props = {
 export function BootstrapProvider({
   children,
 }: Props) {
+  const bootstrap = useBootstrap();
 
-  const bootstrap =
-    useBootstrap();
-
-  const value =
-    useMemo(
-      () => ({
-        data: bootstrap.data,
-        loading: bootstrap.loading,
-        error: bootstrap.error,
-        reload: bootstrap.reload,
-      }),
-      [
-        bootstrap.data,
-        bootstrap.loading,
-        bootstrap.error,
-        bootstrap.reload,
-      ],
-    );
+  const value = useMemo(
+    () => ({
+      data: bootstrap.data,
+      loading: bootstrap.loading,
+      error: bootstrap.error,
+      reload: bootstrap.reload,
+    }),
+    [
+      bootstrap.data,
+      bootstrap.loading,
+      bootstrap.error,
+      bootstrap.reload,
+    ],
+  );
 
   return (
-    <BootstrapContext.Provider
-      value={value}
-    >
+    <BootstrapContext.Provider value={value}>
       {children}
     </BootstrapContext.Provider>
   );
-
 }
 
 export function useBootstrapContext() {
-
-  const context =
-    useContext(
-      BootstrapContext,
-    );
+  const context = useContext(BootstrapContext);
 
   if (!context) {
-
     throw new Error(
       "useBootstrapContext must be used inside BootstrapProvider.",
     );
-
   }
 
   return context;
-
 }

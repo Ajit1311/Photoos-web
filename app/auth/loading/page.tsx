@@ -4,30 +4,24 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import { getSession } from "@/lib/auth/auth.service";
-import { getBootstrap } from "@/lib/api/bootstrap";
 
 export default function LoadingPage() {
   const router = useRouter();
 
   useEffect(() => {
-    async function bootstrap() {
+    async function checkAuth() {
       try {
         const {
           data: { session },
         } = await getSession();
 
+        // जर सेशन नसेल, तर सरळ लॉगिन पेजवर पाठवा
         if (!session) {
           router.replace("/login");
           return;
         }
 
-        const data = await getBootstrap();
-
-        if (data.bootstrapRequired) {
-          router.replace("/setup/studio");
-          return;
-        }
-
+        // सेशन असेल तर थेट डॅशबोर्डवर पाठवा (Bootstrap चा भाग काढला आहे)
         router.replace("/dashboard");
       } catch (error) {
         console.error(error);
@@ -35,7 +29,7 @@ export default function LoadingPage() {
       }
     }
 
-    bootstrap();
+    checkAuth();
   }, [router]);
 
   return (

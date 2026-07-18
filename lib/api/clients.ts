@@ -41,22 +41,32 @@ export async function getClients(
   const {
     data,
     error,
-  } = await supabase.functions.invoke(
-    `${FUNCTION_NAME}?${query.toString()}`,
-    {
-      method: "GET",
+  } =
+    await supabase.functions.invoke(
+      `${FUNCTION_NAME}?${query.toString()}`,
+      {
+        method: "GET",
 
-      headers: {
-        "x-studio-id": studioId,
+        headers: {
+          "x-studio-id":
+            studioId,
+        },
       },
-    },
-  );
+    );
 
   if (error) {
     throw error;
   }
 
-  return data as ClientListResponse;
+  if (!data?.success) {
+
+    throw new Error(
+      "Failed to load clients.",
+    );
+
+  }
+
+  return data.data as ClientListResponse;
 
 }
 
@@ -68,22 +78,32 @@ export async function getClient(
   const {
     data,
     error,
-  } = await supabase.functions.invoke(
-    `${FUNCTION_NAME}/${clientId}`,
-    {
-      method: "GET",
+  } =
+    await supabase.functions.invoke(
+      `${FUNCTION_NAME}/${clientId}`,
+      {
+        method: "GET",
 
-      headers: {
-        "x-studio-id": studioId,
+        headers: {
+          "x-studio-id":
+            studioId,
+        },
       },
-    },
-  );
+    );
 
   if (error) {
     throw error;
   }
 
-  return data as ClientDto;
+  if (!data?.success) {
+
+    throw new Error(
+      "Failed to load client.",
+    );
+
+  }
+
+  return data.data as ClientDto;
 
 }
 
@@ -95,24 +115,34 @@ export async function createClient(
   const {
     data,
     error,
-  } = await supabase.functions.invoke(
-    FUNCTION_NAME,
-    {
-      method: "POST",
+  } =
+    await supabase.functions.invoke(
+      FUNCTION_NAME,
+      {
+        method: "POST",
 
-      body: payload,
+        body: payload,
 
-      headers: {
-        "x-studio-id": studioId,
+        headers: {
+          "x-studio-id":
+            studioId,
+        },
       },
-    },
-  );
+    );
 
   if (error) {
     throw error;
   }
 
-  return data as ClientDto;
+  if (!data?.success) {
+
+    throw new Error(
+      "Failed to create client.",
+    );
+
+  }
+
+  return data.data as ClientDto;
 
 }
 
@@ -125,23 +155,33 @@ export async function updateClient(
   const {
     data,
     error,
-  } = await supabase.functions.invoke(
-    `${FUNCTION_NAME}/${clientId}`,
-    {
-      method: "PUT",
+  } =
+    await supabase.functions.invoke(
+      `${FUNCTION_NAME}/${clientId}`,
+      {
+        method: "PATCH",
 
-      body: payload,
+        body: payload,
 
-      headers: {
-        "x-studio-id": studioId,
+        headers: {
+          "x-studio-id":
+            studioId,
+        },
       },
-    },
-  );
+    );
 
   if (error) {
     throw error;
   }
 
-  return data as ClientDto;
+  if (!data?.success) {
+
+    throw new Error(
+      "Failed to update client.",
+    );
+
+  }
+
+  return data.data as ClientDto;
 
 }

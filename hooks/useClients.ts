@@ -1,100 +1,111 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useBootstrapContext } from "@/context/BootstrapContext";
-import { clientRepository } from "@/lib/repositories/client.repository";
-import type { Client } from "@/types/client";
+import { useQuery } from "@tanstack/react-query";
 
-export function useClients() {
-  const { data: bootstrap } = useBootstrapContext();
+import {
+  useBootstrapContext,
+} from "@/context/BootstrapContext";
 
-  const [clients, setClients] = useState<Client[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+import {
+  clientsRepository,
+} from "@/lib/repositories/clients.repository";
 
-  // load फंक्शन तसेच ठेवले आहे कारण हुक बाहेर 'reload' म्हणून ते रिटर्न करतोय
-  const load = useCallback(
-    async (search = "") => {
-      if (!bootstrap) {
-        return;
-      }
+import type {
+  ClientListResponse,
+} from "@/types/api/client";
 
-      setLoading(true);
-      setError(null);
+const CLIENTS_QUERY_KEY = [
+  "clients",
+];
 
-      try {
-        const studioId = bootstrap.workspace.membership.studioId;
-        const result = await clientRepository.getAll(
-          studioId,
-          1,
-          25,
-          search
-        );
-        setClients(result.clients);
-      } catch (err) {
-        console.error(err);
-        if (err instanceof Error) {
-          setError(err.message);
-        } else {
-          setError("Unable to load clients.");
-        }
-      } finally {
-        setLoading(false);
-      }
-    },
-    [bootstrap]
-  );
+type UseClientsOptions = {
+  page?: number;
+  limit?: number;
+  search?: string;
+};
 
-  // तुमच्या सांगण्यानुसार रिप्लेस केलेला नवीन useEffect
-  useEffect(() => {
-    if (!bootstrap) {
-      return;
-    }
+export function useClients(
+  options: UseClientsOptions = {},
+) {
 
-    const studioId = bootstrap.workspace.membership.studioId;
-    let cancelled = false;
+  const {
+    data: bootstrap,
+  } =
+    useBootstrapContext();
 
-    async function fetchClients() {
-      setLoading(true);
-      setError(null);
+  const studioId =
+    bootstrap?.workspace?.studio?.id;
 
-      try {
-        const result = await clientRepository.getAll(
-          studioId,
-          1,
-          25,
-          ""
-        );
+  const page =
+    options.page ?? 1;
 
-        if (!cancelled) {
-          setClients(result.clients);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          if (err instanceof Error) {
-            setError(err.message);
-          } else {
-            setError("Unable to load clients.");
-          }
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
+  const limit =
+    options.limit ?? 25;
 
-    void fetchClients();
+  const search =
+    options.search ?? "";
 
-    return () => {
-      cancelled = true;
-    };
-  }, [bootstrap]);
+  const query =
+    useQuery<ClientListResponse, Error>({
+
+      queryKey: [
+        ...CLIENTS_QUERY_KEY,
+        studioId,
+        page,
+        limit,
+        search,
+      ],
+
+      enabled:
+        !!studioId,
+
+      queryFn: () =>
+        clientsRepository.list(
+          studioId!,
+          page,
+          limit,
+          search,
+        ),
+
+      staleTime:
+        1000 * 60,
+
+      gcTime:
+        1000 *
+        60 *
+        10,
+
+      retry: 2,
+
+      refetchOnWindowFocus:
+        false,
+
+    });
 
   return {
-    clients,
-    loading,
-    error,
-    reload: load, // जर बाहेरून मॅन्युअली रीलोड करायचे असेल तर
+
+    data:
+      query.data ?? null,
+
+    clients:
+      query.data?.clients ?? [],
+
+    pagination:
+      query.data?.pagination ?? null,
+
+    loading:
+      query.isPending,
+
+    error:
+      query.error ?? null,
+
+    reload:
+      async () => {
+
+        await query.refetch();
+
+      },
+
   };
+
 }
