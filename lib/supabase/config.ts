@@ -1,19 +1,28 @@
-export const supabaseUrl: string = (
-  process.env.NEXT_PUBLIC_SUPABASE_URL ||
-  process.env.NEXT_PUBLIC_SUPABASE_PROJECT_URL ||
-  process.env.SUPABASE_URL ||
-  "https://placeholder-project.supabase.co"
-).trim().replace(/\/+$/, "");
+function getFirstNonEmpty(...vals: (string | undefined)[]): string {
+  for (const v of vals) {
+    if (v && typeof v === "string" && v.trim().length > 0 && !v.includes("dummy_static_prerender")) {
+      return v.trim();
+    }
+  }
+  return "";
+}
 
-export const publishableKey: string = (
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_KEY ||
-  process.env.SUPABASE_ANON_KEY ||
-  process.env.SUPABASE_KEY ||
-  // Fallback JWT placeholder for Next.js static prerendering (e.g. /_not-found)
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.dummy_static_prerender_key"
-).trim();
+export const supabaseUrl: string = (
+  getFirstNonEmpty(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_PROJECT_URL,
+    process.env.SUPABASE_URL,
+  ) || "https://placeholder-project.supabase.co"
+).replace(/\/+$/, "");
+
+export const publishableKey: string =
+  getFirstNonEmpty(
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    process.env.NEXT_PUBLIC_SUPABASE_KEY,
+    process.env.SUPABASE_ANON_KEY,
+    process.env.SUPABASE_KEY,
+  ) || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.dummy_static_prerender_key";
 
 export const appUrl: string =
   process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";

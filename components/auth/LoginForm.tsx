@@ -19,6 +19,7 @@ import {
   sendPasswordResetEmail,
   signInWithPassword,
 } from "@/lib/auth/auth.service";
+import { publishableKey, supabaseUrl } from "@/lib/supabase/config";
 import { getSafeRedirectUrl } from "@/lib/security/safe-redirect";
 
 export function LoginForm() {
@@ -44,6 +45,12 @@ export function LoginForm() {
     setMessage("");
 
     try {
+      if (!publishableKey || publishableKey.includes("dummy_static_prerender")) {
+        throw new Error(
+          "Supabase API key is missing. In Vercel (Photoos-web) Settings > Environment Variables, make sure NEXT_PUBLIC_SUPABASE_ANON_KEY is added with Production enabled, then click Redeploy.",
+        );
+      }
+
       const data = await signInWithPassword(
         email,
         password,
