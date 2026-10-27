@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# backups & zip archives
+.backup*
+*.bak
+*.zip
+*.tmp.*
+*.tmp.json
+PhotoOS-branding-pack.zip

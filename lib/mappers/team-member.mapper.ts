@@ -1,47 +1,10 @@
 import type {
   TeamMember,
-  TeamMemberRole,
-  TeamMemberStatus,
 } from "@/types/team-member";
 
 import type {
   TeamMemberDto,
 } from "@/types/api/team-member";
-
-function mapRole(
-  role: string,
-): TeamMemberRole {
-
-  switch (role) {
-
-    case "owner":
-    case "admin":
-    case "manager":
-    case "photographer":
-    case "cinematographer":
-    case "drone_operator":
-    case "editor":
-    case "designer":
-    case "sales":
-    case "assistant":
-      return role;
-
-    default:
-      return "assistant";
-
-  }
-
-}
-
-function mapStatus(
-  status: string,
-): TeamMemberStatus {
-
-  return status === "inactive"
-    ? "inactive"
-    : "active";
-
-}
 
 export function mapTeamMemberDtoToTeamMember(
   dto: TeamMemberDto,
@@ -49,29 +12,47 @@ export function mapTeamMemberDtoToTeamMember(
 
   return {
 
-    id: dto.id,
+    id:
+      dto.member_id,
 
-    fullName:
-      dto.full_name,
+    studioId:
+      dto.studio_id,
+
+    profileId:
+      dto.profile_id,
 
     email:
-      dto.email,
+      dto.email ?? null,
 
-    phone:
-      dto.phone,
+    employeeCode:
+      dto.employee_code ?? null,
 
-    avatarUrl:
-      dto.avatar_url,
+    roleId:
+      dto.role_id,
 
-    role:
-      mapRole(
-        dto.role,
-      ),
+    roleCode:
+      dto.role_code,
 
-    status:
-      mapStatus(
-        dto.status,
-      ),
+    roleName:
+      dto.role_name,
+
+    roleDescription:
+      dto.role_description ?? null,
+
+    roleLevel:
+      dto.role_level,
+
+    roleStatus:
+      dto.role_status ?? null,
+
+    memberStatus:
+      dto.member_status,
+
+    invitationStatus:
+      dto.invitation_status,
+
+    joinedAt:
+      dto.joined_at ?? null,
 
     createdAt:
       dto.created_at,

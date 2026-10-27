@@ -1,0 +1,768 @@
+"use client";
+
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  Box,
+  CheckCircle2,
+  ChevronDown,
+  Crown,
+  Loader2,
+  LogOut,
+  Pencil,
+  UserCircle2,
+} from "lucide-react";
+
+import {
+  useRouter,
+} from "next/navigation";
+
+import {
+  useBootstrapContext,
+} from "@/context/BootstrapContext";
+
+import {
+  usePlatformAdminStatus,
+} from "@/hooks/usePlatformAdminStatus";
+
+import {
+  signOut,
+} from "@/lib/auth/auth.service";
+
+import {
+  getStudioProfile,
+  type StudioProfile,
+} from "@/lib/api/studio-profile";
+
+
+export default function UserProfile() {
+
+  const router =
+    useRouter();
+
+
+  const bootstrap =
+    useBootstrapContext();
+
+
+  const {
+    isPlatformAdmin,
+    loading:
+      platformAdminLoading,
+  } =
+    usePlatformAdminStatus();
+
+
+  const [
+    open,
+    setOpen,
+  ] =
+    useState(
+      false,
+    );
+
+
+  const [
+    signingOut,
+    setSigningOut,
+  ] =
+    useState(
+      false,
+    );
+
+
+  const [
+    studioProfile,
+    setStudioProfile,
+  ] =
+    useState<
+      StudioProfile | null
+    >(
+      null,
+    );
+
+
+  const [
+    loadingStudio,
+    setLoadingStudio,
+  ] =
+    useState(
+      true,
+    );
+
+
+  const studioId =
+    bootstrap.data
+      ?.workspace
+      ?.studio
+      ?.id ??
+    null;
+
+
+  const profile =
+    bootstrap.data?.profile ??
+    null;
+
+
+  const role =
+    bootstrap.data?.workspace.role ??
+    null;
+
+
+  useEffect(
+    () => {
+
+      let active =
+        true;
+
+
+      async function loadStudioProfile() {
+
+        if (!studioId) {
+
+          if (active) {
+
+            setStudioProfile(
+              null,
+            );
+
+            setLoadingStudio(
+              false,
+            );
+
+          }
+
+          return;
+
+        }
+
+
+        try {
+
+          setLoadingStudio(
+            true,
+          );
+
+
+          const data =
+            await getStudioProfile(
+              studioId,
+            );
+
+
+          if (active) {
+
+            setStudioProfile(
+              data,
+            );
+
+          }
+
+        } catch (
+          error
+        ) {
+
+          console.error(
+            "STUDIO PROFILE LOAD ERROR:",
+            error,
+          );
+
+        } finally {
+
+          if (active) {
+
+            setLoadingStudio(
+              false,
+            );
+
+          }
+
+        }
+
+      }
+
+
+      void loadStudioProfile();
+
+
+      function handleStudioProfileUpdated(
+        event:
+          Event,
+      ) {
+
+        const customEvent =
+          event as CustomEvent<
+            StudioProfile
+          >;
+
+
+        if (
+          customEvent.detail
+        ) {
+
+          setStudioProfile(
+            customEvent.detail,
+          );
+
+        }
+
+      }
+
+
+      window.addEventListener(
+        "studio-profile-updated",
+        handleStudioProfileUpdated,
+      );
+
+
+      return () => {
+
+        active =
+          false;
+
+
+        window.removeEventListener(
+          "studio-profile-updated",
+          handleStudioProfileUpdated,
+        );
+
+      };
+
+    },
+    [
+      studioId,
+    ],
+  );
+
+
+  const studioName =
+    studioProfile?.name?.trim() ||
+    bootstrap.data
+      ?.workspace
+      ?.studio
+      ?.name
+      ?.trim() ||
+    "PhotoOS Studio";
+
+
+  const studioInitial =
+    studioName
+      .charAt(
+        0,
+      )
+      .toUpperCase() ||
+    "P";
+
+
+  const studioLogo =
+    studioProfile
+      ?.logo_url
+      ?.trim() ||
+    null;
+
+
+  // HEADER_PROFILE_COMPLETION_START
+
+  const profileCompletionFields = [
+    studioProfile?.name,
+    studioProfile?.owner_name,
+    studioProfile?.description,
+    studioProfile?.contact_email,
+    studioProfile?.contact_phone,
+    studioProfile?.website,
+    studioProfile?.city,
+    studioProfile?.state,
+    studioProfile?.logo_url,
+  ];
+
+  const completedProfileFields =
+    profileCompletionFields.filter(
+      (
+        value,
+      ) => (
+        typeof value === "string"
+          ? value.trim().length > 0
+          : Boolean(
+              value,
+            )
+      ),
+    ).length;
+
+  const profileCompletion =
+    Math.round(
+      (
+        completedProfileFields /
+        profileCompletionFields.length
+      ) * 100,
+    );
+
+  // HEADER_PROFILE_COMPLETION_END
+
+
+
+  const displayName =
+    profile?.full_name?.trim() ||
+    "PhotoOS User";
+
+
+  const roleLabel =
+    isPlatformAdmin
+      ? "PhotoOS Admin"
+      : (
+        role?.name ??
+        "Workspace Member"
+      );
+
+
+  useEffect(
+    () => {
+
+      function handleOutsideClick(
+        event: MouseEvent,
+      ) {
+
+        const target =
+          event.target as HTMLElement;
+
+
+        if (
+          !target.closest(
+            "[data-user-profile]",
+          )
+        ) {
+
+          setOpen(
+            false,
+          );
+
+        }
+
+      }
+
+
+      if (open) {
+
+        document.addEventListener(
+          "mousedown",
+          handleOutsideClick,
+        );
+
+      }
+
+
+      return () => {
+
+        document.removeEventListener(
+          "mousedown",
+          handleOutsideClick,
+        );
+
+      };
+
+    },
+    [
+      open,
+    ],
+  );
+
+
+  async function handleSignOut() {
+
+    try {
+
+      setSigningOut(
+        true,
+      );
+
+
+      await signOut();
+
+
+      router.replace(
+        "/login",
+      );
+
+
+    } catch (
+      error
+    ) {
+
+      console.error(
+        "SIGN OUT ERROR:",
+        error,
+      );
+
+
+      setSigningOut(
+        false,
+      );
+
+    }
+
+  }
+
+
+  function handleEditProfile() {
+
+    setOpen(
+      false,
+    );
+
+
+    router.push(
+      "/dashboard/profile",
+    );
+
+  }
+
+
+  function handlePackages() {
+
+    setOpen(
+      false,
+    );
+
+
+    router.push(
+      "/dashboard/packages",
+    );
+
+  }
+
+
+  return (
+
+    <div
+      className="relative"
+      data-user-profile
+    >
+
+      <button
+        type="button"
+        onClick={
+          () =>
+            setOpen(
+              (current) =>
+                !current,
+            )
+        }
+        className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 transition hover:bg-slate-50"
+      >
+
+        <div className="relative flex h-11 w-11 shrink-0 items-center justify-center">
+
+                    {/* HEADER_PROFILE_RING_START */}
+
+          <div
+            className="absolute -inset-1 rounded-full"
+            style={{
+              background: `conic-gradient(#22C55E ${profileCompletion}%, #E2E8F0 0)`,
+            }}
+          />
+
+          <div
+            className="absolute inset-[3px] rounded-full bg-white"
+          />
+
+          {/* HEADER_PROFILE_RING_END */}
+
+          <div
+            className="relative z-10 flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-[#0A3F61] text-sm font-bold text-white"
+          >
+            {studioLogo
+              ? (
+                <img
+                  key={studioLogo}
+                  src={studioLogo}
+                  alt={studioName}
+                  className="h-full w-full object-cover"
+                  onError={(event) => {
+                    event.currentTarget.style.display = "none";
+
+                    const fallback =
+                      event.currentTarget
+                        .nextElementSibling as HTMLElement | null;
+
+                    if (fallback) {
+                      fallback.style.display = "flex";
+                    }
+                  }}
+                />
+              )
+              : null}
+
+            <span
+              className="absolute inset-0 items-center justify-center bg-[#0A3F61]"
+              style={{
+                display:
+                  studioLogo
+                    ? "none"
+                    : "flex",
+              }}
+            >
+              {studioInitial}
+            </span>
+          </div>
+
+        </div>
+
+
+        <div className="hidden min-w-0 text-left xl:block">
+
+          <h3 className="max-w-[180px] truncate text-sm font-semibold text-slate-900">
+
+            {loadingStudio
+              ? "Loading studio..."
+              : studioName}
+
+          </h3>
+
+
+          <p className="max-w-[180px] truncate text-xs text-slate-500">
+
+            {platformAdminLoading
+              ? "Checking access..."
+              : roleLabel}
+
+          </p>
+
+        </div>
+
+
+        <ChevronDown
+          size={18}
+          className={`text-slate-500 transition-transform ${
+            open
+              ? "rotate-180"
+              : ""
+          }`}
+        />
+
+      </button>
+
+
+      {open && (
+
+        <div className="absolute right-0 top-full z-50 mt-3 w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+
+          <div className="border-b border-slate-100 px-5 py-5">
+
+            <div className="flex items-center gap-4">
+
+              <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#0A3F61] text-lg font-bold text-white">
+
+                {studioLogo
+                  ? (
+                    <img
+                      key={studioLogo}
+                      src={studioLogo}
+                      alt={studioName}
+                      className="h-full w-full object-cover"
+                      onError={(event) => {
+                        event.currentTarget.style.display = "none";
+
+                        const fallback =
+                          event.currentTarget
+                            .nextElementSibling as HTMLElement | null;
+
+                        if (fallback) {
+                          fallback.style.display = "flex";
+                        }
+                      }}
+                    />
+                  )
+                  : null}
+
+                <span
+                  className="absolute inset-0 items-center justify-center bg-[#0A3F61]"
+                  style={{
+                    display:
+                      studioLogo
+                        ? "none"
+                        : "flex",
+                  }}
+                >
+                  {studioInitial}
+                </span>
+
+              </div>
+
+
+              <div className="min-w-0">
+
+                <p className="truncate font-semibold text-slate-900">
+
+                  {studioName}
+
+                </p>
+
+
+                <p className="truncate text-sm text-slate-500">
+
+                  {studioProfile?.contact_email ??
+                    bootstrap.data?.user.email ??
+                    "No email available"}
+
+                </p>
+
+
+                <p className="mt-1 truncate text-xs text-slate-400">
+
+                  {displayName}
+
+                </p>
+
+              </div>
+
+            </div>
+
+          </div>
+
+
+          <div className="space-y-1 border-b border-slate-100 p-2">
+
+            <button
+              type="button"
+              onClick={
+                handleEditProfile
+              }
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            >
+
+              <Pencil
+                size={18}
+                className="text-slate-500"
+              />
+
+
+              <span>
+
+                Edit Profile
+
+              </span>
+
+            </button>
+
+
+            <button
+              type="button"
+              onClick={
+                handlePackages
+              }
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            >
+
+              <Box
+                size={18}
+                className="text-slate-500"
+              />
+
+
+              <span>
+
+                Packages
+
+              </span>
+
+            </button>
+
+          </div>
+
+
+          <div className="space-y-1 p-2">
+
+            <div className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-600">
+
+              {isPlatformAdmin
+                ? (
+
+                  <Crown
+                    size={17}
+                    className="text-amber-500"
+                  />
+
+                )
+                : (
+
+                  <UserCircle2
+                    size={17}
+                    className="text-slate-500"
+                  />
+
+                )}
+
+
+              <span>
+
+                {platformAdminLoading
+                  ? "Checking platform access..."
+                  : roleLabel}
+
+              </span>
+
+
+              {isPlatformAdmin && (
+
+                <CheckCircle2
+                  size={16}
+                  className="ml-auto text-emerald-500"
+                />
+
+              )}
+
+            </div>
+
+          </div>
+
+
+          <div className="border-t border-slate-100 p-2">
+
+            <button
+              type="button"
+              disabled={
+                signingOut
+              }
+              onClick={
+                handleSignOut
+              }
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+
+              {signingOut
+                ? (
+
+                  <Loader2
+                    size={18}
+                    className="animate-spin"
+                  />
+
+                )
+                : (
+
+                  <LogOut
+                    size={18}
+                  />
+
+                )}
+
+
+              {signingOut
+                ? "Signing out..."
+                : "Sign out"}
+
+            </button>
+
+          </div>
+
+        </div>
+
+      )}
+
+    </div>
+
+  );
+
+}

@@ -1,51 +1,144 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  useAppQuery,
+} from "@/hooks/useAppQuery";
 
 import {
   bootstrapRepository,
 } from "@/lib/repositories/bootstrap.repository";
 
+import { supabase } from "@/lib/supabase/client";
+
 import type {
   BootstrapResponse,
 } from "@/types/bootstrap/bootstrap";
 
-const BOOTSTRAP_QUERY_KEY = [
-  "bootstrap",
-];
 
 export function useBootstrap() {
+
+  const [
+    userId,
+    setUserId,
+  ] =
+    useState<
+      string | null
+    >(null);
+
+
+  useEffect(
+    () => {
+
+      let mounted = true;
+
+      void supabase.auth
+        .getSession()
+        .then(({ data }) => {
+
+          if (mounted) {
+
+            setUserId(
+              data.session?.user?.id ??
+              null,
+            );
+
+          }
+
+        });
+
+
+      const {
+        data: {
+          subscription,
+        },
+      } =
+        supabase.auth.onAuthStateChange(
+          (_event, session) => {
+
+            setUserId(
+              session?.user?.id ??
+              null,
+            );
+
+          },
+        );
+
+
+      return () => {
+
+        mounted = false;
+
+        subscription.unsubscribe();
+
+      };
+
+    },
+    [],
+  );
+
+
   const query =
-    useQuery<BootstrapResponse, Error>({
+    useAppQuery<
+      BootstrapResponse
+    >({
+
       queryKey:
-        BOOTSTRAP_QUERY_KEY,
+        [
+          "bootstrap",
+          userId,
+        ],
 
-      queryFn: () =>
-        bootstrapRepository.load(),
+      queryFn:
+        async () => {
 
-      staleTime: 1000 * 60 * 5,
+          if (!userId) {
 
-      gcTime:
-        1000 *
-        60 *
-        10,
+            throw new Error(
+              "User is not authenticated.",
+            );
+
+          }
+
+          return bootstrapRepository.load();
+
+        },
+
+      enabled:
+        Boolean(
+          userId,
+        ),
 
       retry: 1,
 
-      refetchOnWindowFocus:
-        false,
+      staleTime: 1000 * 30,
+
     });
+
 
   return {
 
     data:
-      query.data ?? null,
+      query.data ??
+      null,
 
     loading:
-      query.isPending,
+      Boolean(
+        userId,
+      )
+        ? query.isPending
+        : true,
+
+    refreshing:
+      query.isFetching,
 
     error:
-      query.error ?? null,
+      query.error ??
+      null,
 
     reload:
       async () => {

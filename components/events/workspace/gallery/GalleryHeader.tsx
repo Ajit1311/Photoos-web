@@ -1,6 +1,9 @@
 "use client";
 
-import { Images } from "lucide-react";
+import {
+  Images,
+  QrCode,
+} from "lucide-react";
 
 import UploadButton from "./upload/UploadButton";
 
@@ -8,16 +11,21 @@ export interface GalleryHeaderProps {
   totalPhotos: number;
 
   onFilesSelected: (files: File[]) => void;
+
+  onGenerateQR?: () => void;
 }
 
 export default function GalleryHeader({
   totalPhotos,
   onFilesSelected,
+  onGenerateQR,
 }: GalleryHeaderProps) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-        {/* Left */}
+        {/* ================================================================ */}
+        {/* LEFT */}
+        {/* ================================================================ */}
 
         <div className="flex items-center gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#0A3F61]/10">
@@ -35,9 +43,13 @@ export default function GalleryHeader({
           </div>
         </div>
 
-        {/* Right */}
+        {/* ================================================================ */}
+        {/* RIGHT */}
+        {/* ================================================================ */}
 
         <div className="flex flex-col items-end gap-4">
+          {/* Total Photos */}
+
           <div className="text-right">
             <p className="text-xs uppercase tracking-wider text-slate-500">
               Total Photos
@@ -48,9 +60,51 @@ export default function GalleryHeader({
             </h3>
           </div>
 
-          <UploadButton
-            onFilesSelected={onFilesSelected}
-          />
+          {/* ============================================================ */}
+          {/* GALLERY ACTIONS */}
+          {/* ============================================================ */}
+
+          <div className="flex items-center gap-3">
+            {/* Generate QR */}
+
+            <button
+              type="button"
+              onClick={onGenerateQR}
+              disabled={!onGenerateQR}
+              className="
+                inline-flex
+                items-center
+                gap-2
+                rounded-2xl
+                border
+                border-[#0A3F61]
+                bg-white
+                px-5
+                py-3
+                font-medium
+                text-[#0A3F61]
+                shadow-sm
+                transition-all
+                hover:-translate-y-0.5
+                hover:bg-[#0A3F61]/5
+                hover:shadow-md
+                disabled:cursor-not-allowed
+                disabled:opacity-50
+              "
+            >
+              <QrCode className="h-5 w-5" />
+
+              <span>
+                Generate QR
+              </span>
+            </button>
+
+            {/* Upload Photos */}
+
+            <UploadButton
+              onFilesSelected={onFilesSelected}
+            />
+          </div>
         </div>
       </div>
     </div>

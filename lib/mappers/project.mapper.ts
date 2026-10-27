@@ -7,6 +7,8 @@ export function mapProjectToEvent(
   return {
     id: project.id,
 
+    projectId: project.id,
+
     title: project.title,
 
     status: project.status as Event["status"],
@@ -38,6 +40,12 @@ export function mapProjectToEvent(
       allowDownloads: false,
       watermark: true,
       expiresAt: "",
+    },
+
+    financial: {
+      budget: project.budget,
+      received: project.advance_amount,
+      balance: project.balance_amount,
     },
   };
 }

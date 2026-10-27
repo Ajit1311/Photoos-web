@@ -1,0 +1,67 @@
+import { getSupabaseClient } from "@/lib/supabase/client";
+
+export type ResolvedStudioMembership = {
+  memberId: string;
+  studioId: string;
+  profileId: string;
+  roleId: string;
+  status: string;
+  invitationStatus: string;
+  joinedAt: string | null;
+};
+
+export async function resolveUserStudio(): Promise<ResolvedStudioMembership | null> {
+  const supabase = getSupabaseClient();
+
+  const {
+    data: { session },
+    error: userError,
+  } = await supabase.auth.getSession();
+
+  if (userError) {
+    throw userError;
+  }
+
+  const user = session?.user ?? null;
+
+  if (!user) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("studio_members")
+    .select(`
+      id,
+      studio_id,
+      profile_id,
+      role_id,
+      status,
+      invitation_status,
+      joined_at
+    `)
+    .eq("profile_id", user.id)
+    .eq("status", "active")
+    .order("joined_at", {
+      ascending: true,
+    })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return {
+    memberId: data.id,
+    studioId: data.studio_id,
+    profileId: data.profile_id,
+    roleId: data.role_id,
+    status: data.status,
+    invitationStatus: data.invitation_status,
+    joinedAt: data.joined_at,
+  };
+}

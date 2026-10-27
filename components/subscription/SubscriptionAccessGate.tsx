@@ -1,0 +1,1796 @@
+"use client";
+
+import {
+  useMemo,
+  useState,
+} from "react";
+
+import {
+  ChevronDown,
+  ChevronUp,
+  Check,
+  CreditCard,
+  Landmark,
+  Smartphone,
+} from "lucide-react";
+
+import {
+  usePathname,
+  useRouter,
+} from "next/navigation";
+
+import {
+  useSubscriptionAccess,
+} from "@/context/SubscriptionAccessContext";
+
+import {
+  requestSubscriptionRenewal,
+  verifySubscriptionPayment,
+} from "@/lib/api/payments";
+
+import {
+  processSubscriptionPayment,
+} from "@/lib/payments/subscription-payment-gateway";
+
+
+type SubscriptionStep =
+  | "EXPIRED"
+  | "PLAN_DETAILS"
+  | "PAYMENT_METHODS"
+  | "SUCCESS";
+
+
+type PaymentProvider =
+  | "google_pay"
+  | "phonepe"
+  | "bhim_upi"
+  | "amazon_pay"
+  | "paytm"
+  | "net_banking"
+  | "card";
+
+
+interface PlanFeature {
+  id: string;
+  label: string;
+}
+
+
+interface PlanDetails {
+  name: string;
+  slug: string;
+  billingCycle: string;
+  amount: number;
+  features: PlanFeature[];
+}
+
+
+const DEFAULT_PLAN: PlanDetails = {
+  name: "Business Starter",
+  slug: "business_starter",
+  billingCycle: "Monthly",
+  amount: 399,
+  features: [
+    {
+      id: "clients",
+      label: "Manage clients and projects",
+    },
+    {
+      id: "events",
+      label: "Event management",
+    },
+    {
+      id: "albums",
+      label: "Albums and asset management",
+    },
+    {
+      id: "team",
+      label: "Team workspace access",
+    },
+    {
+      id: "ai",
+      label: "Basic AI processing tools",
+    },
+  ],
+};
+
+
+const UPI_PROVIDERS: Array<{
+  id: Extract<
+    PaymentProvider,
+    | "google_pay"
+    | "phonepe"
+    | "bhim_upi"
+    | "amazon_pay"
+    | "paytm"
+  >;
+  label: string;
+}> = [
+  {
+    id: "google_pay",
+    label: "Google Pay",
+  },
+  {
+    id: "phonepe",
+    label: "PhonePe",
+  },
+  {
+    id: "bhim_upi",
+    label: "BHIM UPI",
+  },
+  {
+    id: "amazon_pay",
+    label: "Amazon Pay",
+  },
+  {
+    id: "paytm",
+    label: "Paytm",
+  },
+];
+
+
+function formatCurrency(
+  amount: number,
+) {
+
+  return new Intl.NumberFormat(
+    "en-IN",
+    {
+      style: "currency",
+      currency: "INR",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    },
+  ).format(
+    amount,
+  );
+
+}
+
+
+export function SubscriptionAccessGate() {
+
+  const router =
+    useRouter();
+
+  const pathname =
+    usePathname();
+
+
+  const {
+    data,
+    loading,
+    reload: reloadSubscriptionAccess,
+  } =
+    useSubscriptionAccess();
+
+
+  const [
+    step,
+    setStep,
+  ] =
+    useState<SubscriptionStep>(
+      "EXPIRED",
+    );
+
+
+  const [
+    upiOpen,
+    setUpiOpen,
+  ] =
+    useState(
+      false,
+    );
+
+
+  const [
+    selectedProvider,
+    setSelectedProvider,
+  ] =
+    useState<PaymentProvider | null>(
+      null,
+    );
+
+
+  const [
+    processingPayment,
+    setProcessingPayment,
+  ] =
+    useState(
+      false,
+    );
+
+
+  const [
+    paymentError,
+    setPaymentError,
+  ] =
+    useState<
+      string | null
+    >(
+      null,
+    );
+
+
+  const [
+    renewalPaymentId,
+    setRenewalPaymentId,
+  ] =
+    useState<
+      string | null
+    >(
+      null,
+    );
+
+
+  const [
+    paymentSource,
+    setPaymentSource,
+  ] =
+    useState<
+      "RENEW" |
+      "UPGRADE"
+    >(
+      "RENEW",
+    );
+
+
+  const plan =
+    useMemo(
+      () => {
+
+        /*
+         * IMPORTANT:
+         *
+         * This fallback keeps the component working even when
+         * SubscriptionAccessDetails does not expose plan_slug,
+         * plan_code or subscription_plan_slug.
+         *
+         * If your context already exposes a plan object with a
+         * different field name, map it here later.
+         */
+
+        return DEFAULT_PLAN;
+
+      },
+      [],
+    );
+
+
+  const hasAccess =
+    data?.has_access ??
+    false;
+
+
+  const isExpired =
+    !loading &&
+    !hasAccess &&
+    pathname !==
+      "/dashboard/subscription-plans" &&
+    !pathname.startsWith(
+      "/dashboard/plans/payment",
+    );
+
+
+  function handleBack() {
+
+    if (
+      step === "PLAN_DETAILS"
+    ) {
+
+      setStep(
+        "EXPIRED",
+      );
+
+      return;
+
+    }
+
+
+    if (
+      step === "PAYMENT_METHODS"
+    ) {
+
+      setSelectedProvider(
+        null,
+      );
+
+      setUpiOpen(
+        false,
+      );
+
+
+      if (
+        paymentSource ===
+        "UPGRADE"
+      ) {
+
+        handleUpgrade();
+
+        return;
+
+      }
+
+
+      setStep(
+        "PLAN_DETAILS",
+      );
+
+    }
+
+  }
+
+
+  function selectProvider(
+    provider: PaymentProvider,
+  ) {
+
+    setSelectedProvider(
+      provider,
+    );
+
+  }
+
+
+  async function handlePayment() {
+
+    if (
+      !selectedProvider ||
+      processingPayment
+    ) {
+
+      return;
+
+    }
+
+
+    if (
+      !data?.subscription_id
+    ) {
+
+      setPaymentError(
+        "Subscription information is missing.",
+      );
+
+      return;
+
+    }
+
+
+    const paymentCategory =
+      selectedProvider === "net_banking"
+        ? "net_banking"
+        : selectedProvider === "card"
+          ? "card"
+          : "upi";
+
+
+    setPaymentError(
+      null,
+    );
+
+
+    setProcessingPayment(
+      true,
+    );
+
+
+    try {
+
+      let paymentId =
+        renewalPaymentId;
+
+
+      if (
+        !paymentId
+      ) {
+
+        const renewal =
+          await requestSubscriptionRenewal(
+            data.subscription_id,
+          );
+
+
+        paymentId =
+          renewal.payment_id;
+
+
+        setRenewalPaymentId(
+          paymentId,
+        );
+
+      }
+
+
+      const gatewayResult =
+        await processSubscriptionPayment(
+          {
+            paymentId,
+
+            amount:
+              plan.amount,
+
+            currency:
+              "INR",
+
+            planName:
+              plan.name,
+
+            paymentCategory,
+          },
+        );
+
+
+      if (
+        !gatewayResult.success ||
+        !gatewayResult.transactionId
+      ) {
+
+        throw new Error(
+          gatewayResult.error ??
+          "Payment could not be completed.",
+        );
+
+      }
+
+
+      await verifySubscriptionPayment(
+        paymentId,
+        gatewayResult.transactionId,
+      );
+
+
+      /*
+       * Do not reload subscription access here.
+       *
+       * A successful reload changes has_access to true,
+       * which would immediately unmount this gate before
+       * the SUCCESS screen can render.
+       *
+       * Access is reloaded only when the user clicks
+       * Go to Dashboard.
+       */
+
+      setRenewalPaymentId(
+        null,
+      );
+
+
+      setStep(
+        "SUCCESS",
+      );
+
+    } catch (error) {
+
+      setPaymentError(
+        error instanceof Error
+          ? error.message
+          : "Unable to process subscription payment.",
+      );
+
+    } finally {
+
+      setProcessingPayment(
+        false,
+      );
+
+    }
+
+  }
+
+
+  async function handleDashboard() {
+
+    try {
+
+      await reloadSubscriptionAccess();
+
+    } finally {
+
+      if (
+        typeof window !==
+        "undefined"
+      ) {
+
+        window.location.href =
+          "/dashboard";
+
+      }
+
+    }
+
+  }
+
+
+  function handleUpgrade() {
+
+    setPaymentError(null);
+
+    setStep("EXPIRED");
+
+    router.push(
+      "/dashboard/subscription-plans",
+    );
+
+  }
+
+
+  if (
+    loading ||
+    !isExpired
+  ) {
+
+    return null;
+
+  }
+
+
+  function renderBackButton() {
+
+    return (
+      <button
+        type="button"
+        onClick={handleBack}
+        className="
+          inline-flex
+          items-center
+          gap-2
+          rounded-lg
+          px-2
+          py-1.5
+          text-sm
+          font-medium
+          text-muted-foreground
+          transition-colors
+          hover:bg-muted
+          hover:text-foreground
+        "
+      >
+
+        ←
+
+        <span>
+
+          Back
+
+        </span>
+
+      </button>
+    );
+
+  }
+
+
+  return (
+    <div
+      className="
+        fixed
+        inset-0
+        z-[99999]
+        min-h-screen
+        overflow-y-auto
+        bg-background
+      "
+    >
+
+                    <div className="mb-6">
+
+                      {renderBackButton()}
+
+                    </div>
+
+
+      <main
+        className="
+          flex
+          min-h-screen
+          items-center
+          justify-center
+          px-4
+          py-8
+          sm:px-6
+          lg:px-8
+        "
+      >
+
+        <section
+          className="
+            w-full
+            max-w-[620px]
+          "
+        >
+
+          <div
+            className="
+              overflow-hidden
+              rounded-2xl
+              border
+              border-border
+              bg-card
+              shadow-2xl
+            "
+          >
+
+
+            {/* ================================================
+                STEP 1
+                EXPIRED
+            ================================================= */}
+
+            {
+              step === "EXPIRED"
+                ? (
+                  <div
+                    className="
+                      px-6
+                      py-10
+                      sm:px-10
+                      sm:py-12
+                    "
+                  >
+
+                    <div
+                      className="
+                        flex
+                        justify-center
+                      "
+                    >
+
+                      <div
+                        className="
+                          flex
+                          h-20
+                          w-20
+                          items-center
+                          justify-center
+                          rounded-full
+                          bg-destructive/10
+                          text-4xl
+                        "
+                      >
+
+                        🥺
+
+                      </div>
+
+                    </div>
+
+
+                    <div
+                      className="
+                        mt-7
+                        text-center
+                      "
+                    >
+
+                      <h1
+                        className="
+                          text-2xl
+                          font-semibold
+                          tracking-tight
+                          sm:text-3xl
+                        "
+                      >
+
+                        {data?.access_status === "no_subscription" ? "Choose a PhotoOS plan" : "Your subscription has expired"}
+
+                      </h1>
+
+
+                      <p
+                        className="
+                          mx-auto
+                          mt-4
+                          max-w-[500px]
+                          text-sm
+                          leading-7
+                          text-muted-foreground
+                        "
+                      >
+
+                        {data?.access_status === "no_subscription"
+                          ? "Your studio does not have a subscription yet. Choose a plan to continue."
+                          : "Your PhotoOS subscription is no longer active. Renew your current plan or upgrade to another plan to continue using the software."}
+
+                      </p>
+
+                    </div>
+
+
+                    <div
+                      className="
+                        mt-9
+                        grid
+                        gap-3
+                        sm:grid-cols-2
+                      "
+                    >
+
+                      {data?.access_status !== "no_subscription" && (
+
+
+                        <button
+                        type="button"
+                        onClick={() => {
+                            setPaymentSource("RENEW");
+                            setPaymentError(null);
+                            setStep("PLAN_DETAILS");
+                          }}
+                        className="
+                          inline-flex
+                          h-12
+                          items-center
+                          justify-center
+                          rounded-xl
+                          border
+                          border-border
+                          bg-background
+                          px-5
+                          text-sm
+                          font-semibold
+                          transition-colors
+                          hover:bg-muted
+                        "
+                      >
+
+                        Renew Plan
+
+                      </button>
+
+
+                      )}
+
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                            window.location.assign(
+                              "/dashboard/subscription-plans",
+                            );
+                          }}
+                        className="
+                          inline-flex
+                          h-12
+                          items-center
+                          justify-center
+                          rounded-xl
+                          bg-primary
+                          px-5
+                          text-sm
+                          font-semibold
+                          text-primary-foreground
+                          transition-opacity
+                          hover:opacity-90
+                        "
+                      >
+
+                        Upgrade Plan
+
+                      </button>
+
+                    </div>
+
+                  </div>
+                )
+                : null
+            }
+
+
+            {/* ================================================
+                STEP 2
+                PLAN DETAILS
+            ================================================= */}
+
+            {
+              step === "PLAN_DETAILS"
+                ? (
+                  <div>
+
+                    <div className="mb-6">
+
+                      {renderBackButton()}
+
+                    </div>
+
+
+                    <div
+                      className="
+                        border-b
+                        border-border
+                        px-6
+                        py-6
+                        sm:px-8
+                      "
+                    >
+
+                      <p
+                        className="
+                          text-xs
+                          font-semibold
+                          uppercase
+                          tracking-[0.16em]
+                          text-muted-foreground
+                        "
+                      >
+
+                        Your current plan
+
+                      </p>
+
+
+                      <div
+                        className="
+                          mt-4
+                          flex
+                          flex-col
+                          gap-5
+                          sm:flex-row
+                          sm:items-start
+                          sm:justify-between
+                        "
+                      >
+
+                        <div>
+
+                          <h1
+                            className="
+                              text-2xl
+                              font-semibold
+                            "
+                          >
+
+                            {plan.name}
+
+                          </h1>
+
+
+                          <p
+                            className="
+                              mt-1
+                              text-sm
+                              text-muted-foreground
+                            "
+                          >
+
+                            {plan.slug}
+
+                          </p>
+
+                        </div>
+
+
+                        <div
+                          className="
+                            rounded-xl
+                            bg-muted
+                            px-5
+                            py-4
+                            text-left
+                            sm:text-right
+                          "
+                        >
+
+                          <p
+                            className="
+                              text-[11px]
+                              font-semibold
+                              uppercase
+                              tracking-[0.12em]
+                              text-muted-foreground
+                            "
+                          >
+
+                            Renewal Amount
+
+                          </p>
+
+
+                          <p
+                            className="
+                              mt-1
+                              text-xl
+                              font-semibold
+                            "
+                          >
+
+                            {formatCurrency(
+                              plan.amount,
+                            )}
+
+                          </p>
+
+                        </div>
+
+                      </div>
+
+                    </div>
+
+
+                    <div
+                      className="
+                        px-6
+                        py-6
+                        sm:px-8
+                      "
+                    >
+
+                      <h2
+                        className="
+                          text-sm
+                          font-semibold
+                        "
+                      >
+
+                        Your plan includes
+
+                      </h2>
+
+
+                      <div
+                        className="
+                          mt-4
+                          grid
+                          gap-3
+                          sm:grid-cols-2
+                        "
+                      >
+
+                        {
+                          plan.features.map(
+                            (
+                              feature,
+                            ) => (
+                              <div
+                                key={feature.id}
+                                className="
+                                  flex
+                                  min-h-12
+                                  items-center
+                                  gap-3
+                                  rounded-xl
+                                  border
+                                  border-border
+                                  bg-background
+                                  px-4
+                                  py-3
+                                "
+                              >
+
+                                <Check
+                                  className="
+                                    h-4
+                                    w-4
+                                    shrink-0
+                                  "
+                                />
+
+
+                                <span
+                                  className="
+                                    text-sm
+                                  "
+                                >
+
+                                  {feature.label}
+
+                                </span>
+
+                              </div>
+                            ),
+                          )
+                        }
+
+                      </div>
+
+                    </div>
+
+
+                    <div
+                      className="
+                        border-t
+                        border-border
+                      "
+                    >
+
+                      <div
+                        className="
+                          flex
+                          items-center
+                          justify-between
+                          px-6
+                          py-4
+                          sm:px-8
+                        "
+                      >
+
+                        <span
+                          className="
+                            text-sm
+                            text-muted-foreground
+                          "
+                        >
+
+                          Billing Cycle
+
+                        </span>
+
+
+                        <span
+                          className="
+                            text-sm
+                            font-medium
+                          "
+                        >
+
+                          {plan.billingCycle}
+
+                        </span>
+
+                      </div>
+
+
+                      <div
+                        className="
+                          flex
+                          items-center
+                          justify-between
+                          border-t
+                          border-border
+                          px-6
+                          py-4
+                          sm:px-8
+                        "
+                      >
+
+                        <span
+                          className="
+                            text-sm
+                            font-medium
+                          "
+                        >
+
+                          Total Payable
+
+                        </span>
+
+
+                        <span
+                          className="
+                            text-lg
+                            font-semibold
+                          "
+                        >
+
+                          {formatCurrency(
+                            plan.amount,
+                          )}
+
+                        </span>
+
+                      </div>
+
+                    </div>
+
+
+                    <div
+                      className="
+                        flex
+                        justify-end
+                        border-t
+                        border-border
+                        px-6
+                        py-5
+                        sm:px-8
+                      "
+                    >
+
+                      <button
+                        type="button"
+                        onClick={() => {
+
+                          setStep(
+                            "PAYMENT_METHODS",
+                          );
+
+                        }}
+                        className="
+                          inline-flex
+                          h-12
+                          items-center
+                          justify-center
+                          rounded-xl
+                          bg-primary
+                          px-6
+                          text-sm
+                          font-semibold
+                          text-primary-foreground
+                          transition-opacity
+                          hover:opacity-90
+                        "
+                      >
+
+                        Continue to Payment
+
+                      </button>
+
+                    </div>
+
+                  </div>
+                )
+                : null
+            }
+
+
+            {/* ================================================
+                STEP 3
+                PAYMENT METHODS
+            ================================================= */}
+
+            {
+              step === "PAYMENT_METHODS"
+                ? (
+                  <div>
+
+                    <div
+                      className="
+                        border-b
+                        border-border
+                        px-6
+                        py-6
+                        sm:px-8
+                      "
+                    >
+
+                      <h1
+                        className="
+                          text-2xl
+                          font-semibold
+                        "
+                      >
+
+                        Choose payment method
+
+                      </h1>
+
+
+                      <p
+                        className="
+                          mt-2
+                          text-sm
+                          text-muted-foreground
+                        "
+                      >
+
+                        Select your preferred payment option to renew
+                        {` ${plan.name}`}.
+
+                      </p>
+
+                    </div>
+
+
+                    <div
+                      className="
+                        space-y-3
+                        px-6
+                        py-6
+                        sm:px-8
+                      "
+                    >
+
+
+                      {/* UPI */}
+
+                      <div
+                        className="
+                          overflow-hidden
+                          rounded-xl
+                          border
+                          border-border
+                        "
+                      >
+
+                        <button
+                          type="button"
+                          onClick={() => {
+
+                            setUpiOpen(
+                              (
+                                value,
+                              ) =>
+                                !value,
+                            );
+
+                          }}
+                          className="
+                            flex
+                            w-full
+                            items-center
+                            justify-between
+                            px-4
+                            py-4
+                            text-left
+                            transition-colors
+                            hover:bg-muted/60
+                          "
+                        >
+
+                          <div
+                            className="
+                              flex
+                              items-center
+                              gap-3
+                            "
+                          >
+
+                            <div
+                              className="
+                                flex
+                                h-10
+                                w-10
+                                items-center
+                                justify-center
+                                rounded-lg
+                                bg-muted
+                              "
+                            >
+
+                              <Smartphone
+                                className="
+                                  h-5
+                                  w-5
+                                "
+                              />
+
+                            </div>
+
+
+                            <div>
+
+                              <p
+                                className="
+                                  text-sm
+                                  font-semibold
+                                "
+                              >
+
+                                UPI
+
+                              </p>
+
+
+                              <p
+                                className="
+                                  mt-0.5
+                                  text-xs
+                                  text-muted-foreground
+                                "
+                              >
+
+                                Google Pay, PhonePe, BHIM and more
+
+                              </p>
+
+                            </div>
+
+                          </div>
+
+
+                          {
+                            upiOpen
+                              ? (
+                                <ChevronUp
+                                  className="
+                                    h-5
+                                    w-5
+                                    text-muted-foreground
+                                  "
+                                />
+                              )
+                              : (
+                                <ChevronDown
+                                  className="
+                                    h-5
+                                    w-5
+                                    text-muted-foreground
+                                  "
+                                />
+                              )
+                          }
+
+                        </button>
+
+
+                        {
+                          upiOpen
+                            ? (
+                              <div
+                                className="
+                                  border-t
+                                  border-border
+                                  p-3
+                                "
+                              >
+
+                                <div
+                                  className="
+                                    grid
+                                    gap-2
+                                    sm:grid-cols-2
+                                  "
+                                >
+
+                                  {
+                                    UPI_PROVIDERS.map(
+                                      (
+                                        provider,
+                                      ) => {
+
+                                        const selected =
+                                          selectedProvider ===
+                                          provider.id;
+
+
+                                        return (
+                                          <button
+                                            key={provider.id}
+                                            type="button"
+                                            onClick={() => {
+
+                                              selectProvider(
+                                                provider.id,
+                                              );
+
+                                            }}
+                                            className={`
+                                              flex
+                                              min-h-12
+                                              items-center
+                                              justify-between
+                                              rounded-lg
+                                              border
+                                              px-4
+                                              text-left
+                                              text-sm
+                                              font-medium
+                                              transition-colors
+                                              ${
+                                                selected
+                                                  ? "border-primary bg-primary/5"
+                                                  : "border-border hover:bg-muted"
+                                              }
+                                            `}
+                                          >
+
+                                            {provider.label}
+
+
+                                            {
+                                              selected
+                                                ? (
+                                                  <Check
+                                                    className="
+                                                      h-4
+                                                      w-4
+                                                    "
+                                                  />
+                                                )
+                                                : null
+                                            }
+
+                                          </button>
+                                        );
+
+                                      },
+                                    )
+                                  }
+
+                                </div>
+
+                              </div>
+                            )
+                            : null
+                        }
+
+                      </div>
+
+
+                      {/* NET BANKING */}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+
+                          selectProvider(
+                            "net_banking",
+                          );
+
+                        }}
+                        className={`
+                          flex
+                          w-full
+                          items-center
+                          justify-between
+                          rounded-xl
+                          border
+                          px-4
+                          py-4
+                          text-left
+                          transition-colors
+                          ${
+                            selectedProvider === "net_banking"
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:bg-muted"
+                          }
+                        `}
+                      >
+
+                        <div
+                          className="
+                            flex
+                            items-center
+                            gap-3
+                          "
+                        >
+
+                          <div
+                            className="
+                              flex
+                              h-10
+                              w-10
+                              items-center
+                              justify-center
+                              rounded-lg
+                              bg-muted
+                            "
+                          >
+
+                            <Landmark
+                              className="
+                                h-5
+                                w-5
+                              "
+                            />
+
+                          </div>
+
+
+                          <div>
+
+                            <p
+                              className="
+                                text-sm
+                                font-semibold
+                              "
+                            >
+
+                              Net Banking
+
+                            </p>
+
+
+                            <p
+                              className="
+                                mt-0.5
+                                text-xs
+                                text-muted-foreground
+                              "
+                            >
+
+                              Pay directly through your bank
+
+                            </p>
+
+                          </div>
+
+                        </div>
+
+
+                        {
+                          selectedProvider === "net_banking"
+                            ? (
+                              <Check
+                                className="
+                                  h-5
+                                  w-5
+                                "
+                              />
+                            )
+                            : null
+                        }
+
+                      </button>
+
+
+                      {/* CARD */}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+
+                          selectProvider(
+                            "card",
+                          );
+
+                        }}
+                        className={`
+                          flex
+                          w-full
+                          items-center
+                          justify-between
+                          rounded-xl
+                          border
+                          px-4
+                          py-4
+                          text-left
+                          transition-colors
+                          ${
+                            selectedProvider === "card"
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:bg-muted"
+                          }
+                        `}
+                      >
+
+                        <div
+                          className="
+                            flex
+                            items-center
+                            gap-3
+                          "
+                        >
+
+                          <div
+                            className="
+                              flex
+                              h-10
+                              w-10
+                              items-center
+                              justify-center
+                              rounded-lg
+                              bg-muted
+                            "
+                          >
+
+                            <CreditCard
+                              className="
+                                h-5
+                                w-5
+                              "
+                            />
+
+                          </div>
+
+
+                          <div>
+
+                            <p
+                              className="
+                                text-sm
+                                font-semibold
+                              "
+                            >
+
+                              Credit / Debit Card
+
+                            </p>
+
+
+                            <p
+                              className="
+                                mt-0.5
+                                text-xs
+                                text-muted-foreground
+                              "
+                            >
+
+                              Visa, Mastercard and RuPay
+
+                            </p>
+
+                          </div>
+
+                        </div>
+
+
+                        {
+                          selectedProvider === "card"
+                            ? (
+                              <Check
+                                className="
+                                  h-5
+                                  w-5
+                                "
+                              />
+                            )
+                            : null
+                        }
+
+                      </button>
+
+                    </div>
+
+
+                    <div
+                      className="
+                        border-t
+                        border-border
+                        px-6
+                        py-5
+                        sm:px-8
+                      "
+                    >
+
+                      <button
+                        type="button"
+                        disabled={
+                          !selectedProvider ||
+                          processingPayment
+                        }
+                        onClick={handlePayment}
+                        className="
+                          inline-flex
+                          h-12
+                          w-full
+                          items-center
+                          justify-center
+                          rounded-xl
+                          bg-primary
+                          px-6
+                          text-sm
+                          font-semibold
+                          text-primary-foreground
+                          transition-opacity
+                          hover:opacity-90
+                          disabled:cursor-not-allowed
+                          disabled:opacity-40
+                        "
+                      >
+
+                        {
+                          processingPayment
+                            ? "Processing Payment..."
+                            : `Pay ${formatCurrency(
+                                plan.amount,
+                              )}`
+                        }
+
+                      </button>
+
+                    </div>
+
+                  </div>
+                )
+                : null
+            }
+
+
+            {/* ================================================
+                STEP 4
+                PAYMENT SUCCESS
+            ================================================= */}
+
+            {
+              step === "SUCCESS"
+                ? (
+                  <div
+                    className="
+                      px-6
+                      py-12
+                      sm:px-10
+                      sm:py-14
+                    "
+                  >
+
+                    <div
+                      className="
+                        flex
+                        justify-center
+                      "
+                    >
+
+                      <div
+                        className="
+                          flex
+                          h-20
+                          w-20
+                          items-center
+                          justify-center
+                          rounded-full
+                          bg-primary/10
+                          text-4xl
+                        "
+                      >
+
+                        🎉
+
+                      </div>
+
+                    </div>
+
+
+                    <div
+                      className="
+                        mt-7
+                        text-center
+                      "
+                    >
+
+                      <h1
+                        className="
+                          text-2xl
+                          font-semibold
+                          tracking-tight
+                          sm:text-3xl
+                        "
+                      >
+
+                        Thank You! Payment Successful
+
+                      </h1>
+
+
+                      <p
+                        className="
+                          mt-4
+                          text-sm
+                          leading-7
+                          text-muted-foreground
+                        "
+                      >
+
+                        You can access PhotoOS software now.
+
+                      </p>
+
+                    </div>
+
+
+                    <div
+                      className="
+                        mt-9
+                      "
+                    >
+
+                      <button
+                        type="button"
+                        onClick={handleDashboard}
+                        className="
+                          inline-flex
+                          h-12
+                          w-full
+                          items-center
+                          justify-center
+                          rounded-xl
+                          bg-primary
+                          px-6
+                          text-sm
+                          font-semibold
+                          text-primary-foreground
+                          transition-opacity
+                          hover:opacity-90
+                        "
+                      >
+
+                        Go to Dashboard
+
+                      </button>
+
+                    </div>
+
+                  </div>
+                )
+                : null
+            }
+
+
+          </div>
+
+        </section>
+
+      </main>
+
+    </div>
+  );
+
+}

@@ -1,0 +1,829 @@
+"use client";
+
+
+import {
+  CalendarDays,
+  Check,
+  ChevronRight,
+  FolderKanban,
+  Image,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Sparkles,
+  Workflow,
+} from "lucide-react";
+
+import {
+  useBootstrapContext,
+} from "@/context/BootstrapContext";
+
+import {
+  useDashboardContext,
+} from "@/context/DashboardContext";
+
+import PendingPayments from "@/components/dashboard/finance/PendingPayments";
+import MarketplaceLeads from "@/components/dashboard/marketplace/MarketplaceLeads";
+
+import {
+  usePlanAccess,
+} from "@/hooks/usePlanAccess";
+
+import {
+  useSubscriptionUsage,
+} from "@/hooks/useSubscriptionUsage";
+
+
+import TodaysFocus from "@/components/dashboard/overview/TodaysFocus";
+import ActiveProjects from "@/components/dashboard/overview/ActiveProjects";
+import RecentActivity from "@/components/dashboard/overview/RecentActivity";
+
+
+function getGreeting() {
+
+  const indiaHour =
+    Number(
+      new Intl.DateTimeFormat(
+        "en-IN",
+        {
+          timeZone:
+            "Asia/Kolkata",
+          hour:
+            "2-digit",
+          hour12:
+            false,
+        },
+      ).format(
+        new Date(),
+      ),
+    );
+
+
+  if (
+    indiaHour >= 5 &&
+    indiaHour < 12
+  ) {
+    return "Good morning";
+  }
+
+
+  if (
+    indiaHour >= 12 &&
+    indiaHour < 17
+  ) {
+    return "Good afternoon";
+  }
+
+
+  if (
+    indiaHour >= 17 &&
+    indiaHour < 21
+  ) {
+    return "Good evening";
+  }
+
+
+  return "Good evening";
+
+}
+
+function getTodayLabel() {
+
+  return new Intl.DateTimeFormat(
+    "en-IN",
+    {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    },
+  ).format(
+    new Date(),
+  );
+
+}
+
+
+function MetricCard({
+  icon,
+  label,
+  value,
+  description,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  description: string;
+}) {
+
+  return (
+
+    <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_4px_20px_rgb(15,23,42,0.03)]">
+
+      <div className="flex items-start justify-between">
+
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-[#0A3F61]">
+
+          {
+            icon
+          }
+
+        </div>
+
+      </div>
+
+
+      <p className="mt-6 text-3xl font-bold tracking-tight text-slate-900">
+
+        {
+          value
+        }
+
+      </p>
+
+
+      <p className="mt-1 text-sm font-medium text-slate-700">
+
+        {
+          label
+        }
+
+      </p>
+
+
+      <p className="mt-1 text-xs text-slate-400">
+
+        {
+          description
+        }
+
+      </p>
+
+    </div>
+
+  );
+
+}
+
+
+export default function DashboardPage() {
+
+  const bootstrap =
+    useBootstrapContext();
+
+
+  const dashboard =
+    useDashboardContext();
+
+
+  const planAccess =
+    usePlanAccess();
+
+
+  const subscriptionUsage =
+    useSubscriptionUsage();
+
+
+
+  const profile =
+    bootstrap.data?.profile ??
+    null;
+
+
+  const workspace =
+    bootstrap.data?.workspace ??
+    null;
+
+
+  const metrics =
+    dashboard.data?.metrics ??
+    null;
+
+
+  const displayName =
+    profile?.first_name ??
+    profile?.full_name ??
+    "there";
+
+
+  const studioName =
+    workspace?.studio?.name ??
+    "Your Studio";
+
+
+
+  async function handleRefresh() {
+
+    await Promise.all(
+      [
+        bootstrap.reload(),
+        dashboard.reload(),
+      ],
+    );
+
+  }
+
+
+  if (
+    bootstrap.loading ||
+    dashboard.loading
+  ) {
+
+    return (
+      <main className="flex min-h-[60vh] items-center justify-center">
+
+        <div className="space-y-4 text-center">
+
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#0A3F61]/10 text-[#0A3F61]">
+
+            <Loader2
+              className="animate-spin"
+              size={24}
+            />
+
+          </div>
+
+
+          <p className="text-sm text-slate-500">
+
+            Loading your workspace...
+
+          </p>
+
+        </div>
+
+      </main>
+    );
+
+  }
+
+
+  if (
+    bootstrap.error ||
+    dashboard.error
+  ) {
+
+    return (
+      <main className="flex min-h-[60vh] items-center justify-center">
+
+        <div className="rounded-[28px] border border-red-100 bg-white p-8 text-center shadow-sm">
+
+          <h1 className="text-lg font-semibold text-slate-900">
+
+            Unable to load dashboard
+
+          </h1>
+
+
+        </div>
+
+      </main>
+    );
+
+
+  }
+
+
+  return (
+
+    <main className="mx-auto max-w-[1600px] space-y-6 pb-10">
+
+      <section className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+
+        <div>
+
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+
+            <span>
+              {studioName}
+            </span>
+
+            <span className="h-1 w-1 rounded-full bg-slate-300" />
+
+            <span>
+              {getTodayLabel()}
+            </span>
+
+          </div>
+
+
+          <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
+
+            {getGreeting()}, {displayName}
+
+          </h1>
+
+
+          <p className="mt-2 text-sm text-slate-500">
+
+            Here is what needs your attention today.
+
+          </p>
+
+        </div>
+
+
+        <div className="flex items-center gap-3">
+
+          <button
+            type="button"
+            onClick={handleRefresh}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+          >
+
+            <RefreshCw
+              size={16}
+            />
+
+            Refresh
+
+          </button>
+
+        </div>
+
+      </section>
+
+
+      {/* ============================================================
+          QUICK ACTIONS
+          ============================================================ */}
+
+
+      <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
+
+        <div>
+
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-[#0A3F61]">
+            Quick Actions
+          </p>
+
+          <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900">
+            Get things done
+          </h2>
+
+          <p className="mt-1 text-sm text-slate-500">
+            Jump directly into the most common studio workflows.
+          </p>
+
+        </div>
+
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+
+          {[
+            {
+              label: "Create Client",
+              description: "Add a new client",
+              href: "/dashboard/clients/create",
+              icon: Plus,
+            },
+            {
+              label: "Create Project",
+              description: "Start a new project",
+              href: "/dashboard/projects/create",
+              icon: FolderKanban,
+            },
+            {
+              label: "Create Event",
+              description: "Schedule a new event",
+              href: "/dashboard/events/create",
+              icon: CalendarDays,
+            },
+            {
+              label: "View Albums",
+              description: "Manage your albums",
+              href: "/dashboard/albums",
+              icon: Image,
+            },
+          ].map(
+            (action) => {
+
+              const Icon =
+                action.icon;
+
+              return (
+                <button
+                  key={action.href}
+                  type="button"
+                  onClick={() => {
+                    window.location.href =
+                      action.href;
+                  }}
+                  className="group flex items-center gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 p-4 text-left transition hover:border-[#0A3F61]/20 hover:bg-white hover:shadow-sm"
+                >
+
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#0A3F61]/10 text-[#0A3F61] transition group-hover:bg-[#0A3F61] group-hover:text-white">
+
+                    <Icon
+                      size={19}
+                    />
+
+                  </div>
+
+
+                  <div className="min-w-0">
+
+                    <p className="text-sm font-bold text-slate-900">
+                      {action.label}
+                    </p>
+
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      {action.description}
+                    </p>
+
+                  </div>
+
+                </button>
+              );
+
+            },
+          )}
+
+        </div>
+
+      </section>
+
+
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+
+        <MetricCard
+          icon={
+            <FolderKanban
+              size={19}
+            />
+          }
+          label="Active Projects"
+          value={
+            metrics?.activeProjects ??
+            0
+          }
+          description="Projects currently in progress"
+        />
+
+
+        <MetricCard
+          icon={
+            <CalendarDays
+              size={19}
+            />
+          }
+          label="Today's Events"
+          value={
+            metrics?.todayEvents ??
+            0
+          }
+          description="Events scheduled for today"
+        />
+
+
+        <MetricCard
+          icon={
+            <Image
+              size={19}
+            />
+          }
+          label="Pending Deliveries"
+          value={
+            metrics?.pendingDeliveries ??
+            0
+          }
+          description="Deliverables waiting to go out"
+        />
+
+
+        <MetricCard
+          icon={
+            <Workflow
+              size={19}
+            />
+          }
+          label="Processing Jobs"
+          value={
+            metrics?.pendingProcessingJobs ??
+            0
+          }
+          description="Media jobs currently running"
+        />
+
+      </section>
+
+
+
+
+
+      {/* ============================================================
+          SUBSCRIPTION USAGE
+          ============================================================ */}
+
+      <section className="mt-6 rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
+
+        <div>
+
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-[#0A3F61]">
+            Subscription Usage
+          </p>
+
+          <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900">
+            Current usage
+          </h2>
+
+          <p className="mt-1 text-sm text-slate-500">
+            See how much of your current plan capacity your studio is using.
+          </p>
+
+        </div>
+
+
+        {subscriptionUsage.loading ? (
+
+          <div className="mt-6 grid gap-4 sm:grid-cols-3">
+
+            {[1, 2, 3].map(
+              (item) => (
+
+                <div
+                  key={item}
+                  className="h-32 animate-pulse rounded-2xl bg-slate-50"
+                />
+
+              ),
+            )}
+
+          </div>
+
+        ) : subscriptionUsage.error ? (
+
+          <div className="mt-6 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-4">
+
+            <p className="text-sm font-bold text-amber-800">
+              Usage data is currently unavailable.
+            </p>
+
+            <p className="mt-1 text-xs text-amber-700">
+              Your plan limits are still available above.
+            </p>
+
+          </div>
+
+        ) : subscriptionUsage.data ? (
+
+          <div className="mt-6 grid gap-4 sm:grid-cols-3">
+
+            {[
+              {
+                label: "Team members",
+                used:
+                  subscriptionUsage.data.users.used,
+                limit:
+                  subscriptionUsage.data.users.limit,
+                remaining:
+                  subscriptionUsage.data.users.remaining,
+                percentage:
+                  subscriptionUsage.data.users.percentage,
+              },
+              {
+                label: "Events / month",
+                used:
+                  subscriptionUsage.data.events.used_this_month,
+                limit:
+                  subscriptionUsage.data.events.limit,
+                remaining:
+                  subscriptionUsage.data.events.remaining,
+                percentage:
+                  subscriptionUsage.data.events.percentage,
+              },
+              {
+                label: "Storage",
+                used:
+                  subscriptionUsage.data.storage.used_bytes /
+                  (1024 * 1024 * 1024),
+                limit:
+                  subscriptionUsage.data.storage.limit_gb,
+                remaining:
+                  subscriptionUsage.data.storage.remaining_bytes === null
+                    ? null
+                    : subscriptionUsage.data.storage.remaining_bytes /
+                      (1024 * 1024 * 1024),
+                percentage:
+                  subscriptionUsage.data.storage.percentage,
+              },
+            ].map(
+              (item) => {
+
+                const unlimited =
+                  item.limit === -1;
+
+                const percentage =
+                  item.percentage === null
+                    ? 0
+                    : Math.min(
+                        100,
+                        Math.max(
+                          0,
+                          item.percentage,
+                        ),
+                      );
+
+                const usedLabel =
+                  item.label === "Storage"
+                    ? `${item.used.toLocaleString("en-IN", {
+                        maximumFractionDigits: 2,
+                      })} GB`
+                    : item.used.toLocaleString(
+                        "en-IN",
+                      );
+
+                const limitLabel =
+                  unlimited
+                    ? "Unlimited"
+                    : item.limit === null
+                      ? "Not available"
+                      : item.label === "Storage"
+                        ? `${item.limit.toLocaleString("en-IN", {
+                            maximumFractionDigits: 2,
+                          })} GB`
+                        : item.limit.toLocaleString(
+                            "en-IN",
+                          );
+
+                const remainingLabel =
+                  unlimited
+                    ? "Unlimited capacity"
+                    : item.remaining === null
+                      ? "Not available"
+                      : item.label === "Storage"
+                        ? `${item.remaining.toLocaleString("en-IN", {
+                            maximumFractionDigits: 2,
+                          })} GB remaining`
+                        : `${item.remaining.toLocaleString(
+                            "en-IN",
+                          )} remaining`;
+
+                return (
+
+                  <div
+                    key={item.label}
+                    className="rounded-2xl border border-slate-100 bg-slate-50/70 p-5"
+                  >
+
+                    <div className="flex items-start justify-between gap-3">
+
+                      <div>
+
+                        <p className="text-xs font-semibold text-slate-400">
+                          {item.label}
+                        </p>
+
+                        <p className="mt-1 text-xl font-black text-slate-900">
+                          {usedLabel}
+                          <span className="ml-1 text-sm font-bold text-slate-400">
+                            / {limitLabel}
+                          </span>
+                        </p>
+
+                      </div>
+
+                      <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-[#0A3F61]">
+                        {unlimited
+                          ? "Unlimited"
+                          : `${Math.round(percentage)}%`}
+                      </span>
+
+                    </div>
+
+
+                    {!unlimited && (
+
+                      <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-200">
+
+                        <div
+                          className="h-full rounded-full bg-[#0A3F61] transition-all"
+                          style={{
+                            width: `${percentage}%`,
+                          }}
+                        />
+
+                      </div>
+
+                    )}
+
+
+                    <p className="mt-3 text-xs font-semibold text-slate-500">
+                      {remainingLabel}
+                    </p>
+
+                  </div>
+
+                );
+
+              },
+            )}
+
+          </div>
+
+        ) : (
+
+          <div className="mt-6 rounded-2xl bg-slate-50 px-4 py-4">
+
+            <p className="text-sm font-bold text-slate-700">
+              No subscription usage data available.
+            </p>
+
+          </div>
+
+        )}
+
+      </section>
+
+
+      <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+
+        <TodaysFocus />
+
+        <ActiveProjects />
+
+      </section>
+
+
+      <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+
+        <RecentActivity />
+
+
+        <div className="rounded-[28px] border border-slate-200 bg-gradient-to-br from-[#0A3F61] to-[#06283D] p-7 text-white shadow-[0_10px_35px_rgba(10,63,97,0.16)]">
+
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10">
+
+            <Sparkles
+              size={20}
+            />
+
+          </div>
+
+
+          <h2 className="mt-6 text-xl font-semibold">
+
+            Studio intelligence
+
+          </h2>
+
+
+          <p className="mt-2 max-w-md text-sm leading-6 text-white/70">
+
+            Your dashboard is now focused on active work, payments,
+            marketplace opportunities and the things that need attention.
+
+          </p>
+
+
+          <div className="mt-8 grid grid-cols-2 gap-3">
+
+            <div className="rounded-2xl bg-white/10 p-4">
+
+              <p className="text-2xl font-bold">
+
+                {
+                  metrics?.activeAlbums ??
+                  0
+                }
+
+              </p>
+
+              <p className="mt-1 text-xs text-white/60">
+
+                Active Albums
+
+              </p>
+
+            </div>
+
+
+            <div className="rounded-2xl bg-white/10 p-4">
+
+              <p className="text-2xl font-bold">
+
+                {
+                  metrics?.totalAssets ??
+                  0
+                }
+
+              </p>
+
+              <p className="mt-1 text-xs text-white/60">
+
+                Total Assets
+
+              </p>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </section>
+
+    </main>
+
+  );
+
+}

@@ -2,13 +2,11 @@
 
 import { useQuery } from "@tanstack/react-query";
 
+import { useStudioId } from "@/hooks/useStudioId";
+
 import {
   projectsRepository,
 } from "@/lib/repositories/projects.repository";
-
-import {
-  useBootstrapContext,
-} from "@/context/BootstrapContext";
 
 import type {
   GetProjectsResponse,
@@ -16,7 +14,7 @@ import type {
 
 const PROJECTS_QUERY_KEY = [
   "projects",
-];
+] as const;
 
 type UseProjectsOptions = {
   page?: number;
@@ -27,13 +25,10 @@ type UseProjectsOptions = {
 export function useProjects(
   options: UseProjectsOptions = {},
 ) {
-
   const {
-    data: bootstrap,
-  } = useBootstrapContext();
-
-  const studioId =
-    bootstrap?.workspace?.studio?.id;
+    studioId,
+    bootstrapLoading,
+  } = useStudioId();
 
   const page =
     options.page ?? 1;
@@ -46,7 +41,6 @@ export function useProjects(
 
   const query =
     useQuery<GetProjectsResponse, Error>({
-
       queryKey: [
         ...PROJECTS_QUERY_KEY,
         studioId,
@@ -56,15 +50,17 @@ export function useProjects(
       ],
 
       enabled:
-        !!studioId,
+        !bootstrapLoading &&
+        Boolean(studioId),
 
-      queryFn: () =>
-        projectsRepository.list(
-          studioId!,
-          page,
-          limit,
-          search,
-        ),
+      queryFn:
+        () =>
+          projectsRepository.list(
+            studioId!,
+            page,
+            limit,
+            search,
+          ),
 
       staleTime:
         1000 * 60,
@@ -72,31 +68,34 @@ export function useProjects(
       gcTime:
         1000 * 60 * 10,
 
-      retry: 2,
+      retry:
+        2,
 
       refetchOnWindowFocus:
         false,
-
     });
 
   return {
-
     data:
       query.data ?? null,
 
+    projects:
+      query.data?.projects ?? [],
+
+    pagination:
+      query.data?.pagination ?? null,
+
     loading:
+      bootstrapLoading ||
       query.isPending,
+
+    refreshing:
+      query.isFetching,
 
     error:
       query.error ?? null,
 
     reload:
-      async () => {
-
-        await query.refetch();
-
-      },
-
+      query.refetch,
   };
-
 }

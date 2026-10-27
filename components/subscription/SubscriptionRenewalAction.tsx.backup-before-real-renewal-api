@@ -1,0 +1,1742 @@
+"use client";
+
+import {
+  useMemo,
+  useState,
+} from "react";
+
+import {
+  ArrowLeft,
+  Building2,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  CreditCard,
+  Landmark,
+  Loader2,
+  Smartphone,
+} from "lucide-react";
+
+import {
+  useRouter,
+} from "next/navigation";
+
+
+type SubscriptionStep =
+  | "EXPIRED"
+  | "RENEW_SUMMARY"
+  | "UPGRADE_PLANS"
+  | "PAYMENT"
+  | "SUCCESS";
+
+
+type PaymentCategory =
+  | "upi"
+  | "net_banking"
+  | "card"
+  | null;
+
+
+type SubscriptionPlan = {
+  id: string;
+  name: string;
+  billingCycle: string;
+  amount: number;
+  description: string;
+  features: string[];
+};
+
+
+type SubscriptionRenewalActionProps = {
+  currentPlan?: SubscriptionPlan;
+};
+
+
+const CURRENT_PLAN: SubscriptionPlan = {
+  id: "business_starter",
+  name: "Business Starter",
+  billingCycle: "Monthly",
+  amount: 399,
+  description:
+    "Everything you need to manage your photography studio and daily workflow.",
+  features: [
+    "Up to 3 team members",
+    "50 GB secure storage",
+    "Up to 50 events per month",
+    "CRM and client management",
+    "Event and project management",
+    "Client gallery access",
+    "PhotoOS dashboard access",
+  ],
+};
+
+
+const UPGRADE_PLANS: SubscriptionPlan[] = [
+  {
+    id: "business_pro",
+    name: "Business Pro",
+    billingCycle: "Monthly",
+    amount: 799,
+    description:
+      "More capacity and collaboration tools for growing studios.",
+    features: [
+      "Up to 10 team members",
+      "250 GB secure storage",
+      "Unlimited events",
+      "Advanced CRM",
+      "Advanced gallery controls",
+      "Project and workflow tools",
+      "Priority support",
+    ],
+  },
+  {
+    id: "studio",
+    name: "Studio",
+    billingCycle: "Monthly",
+    amount: 1499,
+    description:
+      "For established studios managing larger teams and operations.",
+    features: [
+      "Up to 25 team members",
+      "1 TB secure storage",
+      "Unlimited events",
+      "Advanced automation",
+      "Advanced analytics",
+      "Priority support",
+      "All PhotoOS features",
+    ],
+  },
+  {
+    id: "agency",
+    name: "Agency",
+    billingCycle: "Monthly",
+    amount: 2999,
+    description:
+      "Built for large teams, agencies and multi-workflow operations.",
+    features: [
+      "Unlimited team members",
+      "5 TB secure storage",
+      "Unlimited events",
+      "Agency level workflows",
+      "Advanced permissions",
+      "Dedicated support",
+      "All premium features",
+    ],
+  },
+];
+
+
+const UPI_APPS = [
+  "Google Pay",
+  "PhonePe",
+  "BHIM UPI",
+  "Amazon Pay",
+  "Paytm",
+];
+
+
+const BANKS = [
+  "State Bank of India",
+  "HDFC Bank",
+  "ICICI Bank",
+  "Axis Bank",
+  "Kotak Mahindra Bank",
+];
+
+
+function formatCurrency(
+  amount: number,
+) {
+  return new Intl.NumberFormat(
+    "en-IN",
+    {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    },
+  ).format(
+    amount,
+  );
+}
+
+
+export function SubscriptionRenewalAction(
+  {
+    currentPlan = CURRENT_PLAN,
+  }: SubscriptionRenewalActionProps,
+) {
+
+  const router =
+    useRouter();
+
+
+  const [
+    step,
+    setStep,
+  ] =
+    useState<SubscriptionStep>(
+      "EXPIRED",
+    );
+
+
+  const [
+    paymentSourceStep,
+    setPaymentSourceStep,
+  ] =
+    useState<
+      "RENEW_SUMMARY" |
+      "UPGRADE_PLANS" |
+      null
+    >(
+      null,
+    );
+
+
+  const [
+    selectedPlan,
+    setSelectedPlan,
+  ] =
+    useState<
+      SubscriptionPlan |
+      null
+    >(
+      null,
+    );
+
+
+  const [
+    paymentCategory,
+    setPaymentCategory,
+  ] =
+    useState<PaymentCategory>(
+      null,
+    );
+
+
+  const [
+    selectedProvider,
+    setSelectedProvider,
+  ] =
+    useState<
+      string |
+      null
+    >(
+      null,
+    );
+
+
+  const [
+    upiOpen,
+    setUpiOpen,
+  ] =
+    useState(
+      false,
+    );
+
+
+  const [
+    bankOpen,
+    setBankOpen,
+  ] =
+    useState(
+      false,
+    );
+
+
+  const [
+    cardOpen,
+    setCardOpen,
+  ] =
+    useState(
+      false,
+    );
+
+
+  const [
+    cardNumber,
+    setCardNumber,
+  ] =
+    useState(
+      "",
+    );
+
+
+  const [
+    cardExpiry,
+    setCardExpiry,
+  ] =
+    useState(
+      "",
+    );
+
+
+  const [
+    cardCvv,
+    setCardCvv,
+  ] =
+    useState(
+      "",
+    );
+
+
+  const [
+    processing,
+    setProcessing,
+  ] =
+    useState(
+      false,
+    );
+
+
+  const activePlan =
+    useMemo(
+      () =>
+        selectedPlan ??
+        currentPlan,
+      [
+        selectedPlan,
+        currentPlan,
+      ],
+    );
+
+
+  function resetPaymentSelection() {
+
+    setPaymentCategory(
+      null,
+    );
+
+
+    setSelectedProvider(
+      null,
+    );
+
+
+    setUpiOpen(
+      false,
+    );
+
+
+    setBankOpen(
+      false,
+    );
+
+
+    setCardOpen(
+      false,
+    );
+
+
+    setCardNumber(
+      "",
+    );
+
+
+    setCardExpiry(
+      "",
+    );
+
+
+    setCardCvv(
+      "",
+    );
+
+  }
+
+
+  function goToRenewSummary() {
+
+    setSelectedPlan(
+      currentPlan,
+    );
+
+
+    resetPaymentSelection();
+
+
+    setStep(
+      "RENEW_SUMMARY",
+    );
+
+  }
+
+
+  function goToUpgradePlans() {
+
+    setSelectedPlan(
+      null,
+    );
+
+
+    resetPaymentSelection();
+
+
+    setStep(
+      "UPGRADE_PLANS",
+    );
+
+  }
+
+
+  function continueRenewalPayment() {
+
+    setSelectedPlan(
+      currentPlan,
+    );
+
+
+    resetPaymentSelection();
+
+
+    setPaymentSourceStep(
+      "RENEW_SUMMARY",
+    );
+
+
+    setStep(
+      "PAYMENT",
+    );
+
+  }
+
+
+  function continueUpgradePayment() {
+
+    if (
+      !selectedPlan
+    ) {
+      return;
+    }
+
+
+    resetPaymentSelection();
+
+
+    setPaymentSourceStep(
+      "UPGRADE_PLANS",
+    );
+
+
+    setStep(
+      "PAYMENT",
+    );
+
+  }
+
+
+  function goBack() {
+
+    if (
+      step === "RENEW_SUMMARY"
+    ) {
+
+      setStep(
+        "EXPIRED",
+      );
+
+      return;
+
+    }
+
+
+    if (
+      step === "UPGRADE_PLANS"
+    ) {
+
+      setStep(
+        "EXPIRED",
+      );
+
+      return;
+
+    }
+
+
+    if (
+      step === "PAYMENT"
+    ) {
+
+      resetPaymentSelection();
+
+
+      if (
+        paymentSourceStep
+      ) {
+
+        setStep(
+          paymentSourceStep,
+        );
+
+      }
+
+    }
+
+  }
+
+
+  function selectUpiProvider(
+    provider: string,
+  ) {
+
+    setPaymentCategory(
+      "upi",
+    );
+
+
+    setSelectedProvider(
+      provider,
+    );
+
+  }
+
+
+  function selectBank(
+    bank: string,
+  ) {
+
+    setPaymentCategory(
+      "net_banking",
+    );
+
+
+    setSelectedProvider(
+      bank,
+    );
+
+  }
+
+
+  function selectCardPayment() {
+
+    setPaymentCategory(
+      "card",
+    );
+
+
+    setSelectedProvider(
+      "Credit / Debit Card",
+    );
+
+  }
+
+
+  const isCardValid =
+    cardNumber.trim().length >= 12 &&
+    cardExpiry.trim().length >= 4 &&
+    cardCvv.trim().length >= 3;
+
+
+  const canPay =
+    paymentCategory === "upi"
+      ? Boolean(
+          selectedProvider,
+        )
+      : paymentCategory === "net_banking"
+        ? Boolean(
+            selectedProvider,
+          )
+        : paymentCategory === "card"
+          ? isCardValid
+          : false;
+
+
+  async function handlePayment() {
+
+    if (
+      !canPay ||
+      processing
+    ) {
+      return;
+    }
+
+
+    setProcessing(
+      true,
+    );
+
+
+    await new Promise(
+      (
+        resolve,
+      ) => {
+
+        window.setTimeout(
+          resolve,
+          1200,
+        );
+
+      },
+    );
+
+
+    setProcessing(
+      false,
+    );
+
+
+    setStep(
+      "SUCCESS",
+    );
+
+  }
+
+
+  function goToDashboard() {
+
+    if (
+      typeof window !==
+      "undefined"
+    ) {
+
+      window.sessionStorage.setItem(
+        "photoos_subscription_unlocked",
+        "true",
+      );
+
+    }
+
+    router.replace(
+      "/dashboard",
+    );
+
+    router.refresh();
+
+  }
+
+
+  function renderBackButton() {
+
+    return (
+      <button
+        type="button"
+        onClick={() => {
+
+              router.replace(
+                "/dashboard",
+              );
+
+              router.refresh();
+
+            }}
+        className="inline-flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      >
+        <ArrowLeft className="h-4 w-4" />
+
+        Back
+      </button>
+    );
+
+  }
+
+
+  function renderExpiredStep() {
+
+    return (
+      <div className="px-6 py-10 sm:px-10 sm:py-12">
+
+        <div className="flex justify-center">
+
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted text-4xl">
+
+            🥺
+
+          </div>
+
+        </div>
+
+
+        <div className="mt-7 text-center">
+
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+
+            Your subscription has expired
+
+          </h1>
+
+
+          <p className="mx-auto mt-4 max-w-lg text-sm leading-7 text-muted-foreground">
+
+            Your PhotoOS subscription is no longer active.
+            Renew your current plan or upgrade to another plan
+            to continue using the software.
+
+          </p>
+
+        </div>
+
+
+        <div className="mt-9 grid gap-3 sm:grid-cols-2">
+
+          <button
+            type="button"
+            onClick={goToRenewSummary}
+            className="inline-flex h-12 items-center justify-center rounded-xl border bg-background px-5 text-sm font-semibold transition-colors hover:bg-muted"
+          >
+            Renew Plan
+          </button>
+
+
+          <button
+            type="button"
+            onClick={goToUpgradePlans}
+            className="inline-flex h-12 items-center justify-center rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+          >
+            Upgrade Plan
+          </button>
+
+        </div>
+
+      </div>
+    );
+
+  }
+
+
+  function renderPlanDetails(
+    plan: SubscriptionPlan,
+  ) {
+
+    return (
+      <div className="space-y-5 rounded-2xl border bg-background p-5">
+
+        <div>
+
+          <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+
+            Current subscription
+
+          </p>
+
+
+          <h2 className="mt-2 text-xl font-semibold">
+
+            {plan.name}
+
+          </h2>
+
+
+          <p className="mt-1 text-sm text-muted-foreground">
+
+            {plan.description}
+
+          </p>
+
+        </div>
+
+
+        <div className="grid gap-3 sm:grid-cols-2">
+
+          <div className="rounded-xl bg-muted/60 p-4">
+
+            <p className="text-xs text-muted-foreground">
+
+              Billing Cycle
+
+            </p>
+
+
+            <p className="mt-1 text-sm font-semibold">
+
+              {plan.billingCycle}
+
+            </p>
+
+          </div>
+
+
+          <div className="rounded-xl bg-muted/60 p-4">
+
+            <p className="text-xs text-muted-foreground">
+
+              Renewal Amount
+
+            </p>
+
+
+            <p className="mt-1 text-lg font-bold text-primary">
+
+              {formatCurrency(
+                plan.amount,
+              )}
+
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <div>
+
+          <p className="text-sm font-semibold">
+
+            Included with your plan
+
+          </p>
+
+
+          <div className="mt-3 grid gap-3">
+
+            {
+              plan.features.map(
+                (
+                  feature,
+                ) => (
+
+                  <div
+                    key={feature}
+                    className="flex items-start gap-3 text-sm text-muted-foreground"
+                  >
+
+                    <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10">
+
+                      <Check className="h-3.5 w-3.5 text-primary" />
+
+                    </div>
+
+
+                    <span>
+
+                      {feature}
+
+                    </span>
+
+                  </div>
+
+                ),
+              )
+            }
+
+          </div>
+
+        </div>
+
+      </div>
+    );
+
+  }
+
+
+  function renderRenewSummary() {
+
+    return (
+      <div className="px-6 py-7 sm:px-10 sm:py-9">
+
+        {renderBackButton()}
+
+
+        <div className="mt-6">
+
+          <p className="text-sm font-medium text-primary">
+
+            Renew your subscription
+
+          </p>
+
+
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight">
+
+            Review your plan
+
+          </h1>
+
+
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+
+            Review your existing subscription before continuing to payment.
+
+          </p>
+
+        </div>
+
+
+        <div className="mt-7">
+
+          {renderPlanDetails(
+            currentPlan,
+          )}
+
+        </div>
+
+
+        <button
+          type="button"
+          onClick={continueRenewalPayment}
+          className="mt-7 inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+        >
+          Continue to Payment
+        </button>
+
+      </div>
+    );
+
+  }
+
+
+  function renderUpgradePlans() {
+
+    return (
+      <div className="px-6 py-7 sm:px-10 sm:py-9">
+
+        {renderBackButton()}
+
+
+        <div className="mt-6">
+
+          <p className="text-sm font-medium text-primary">
+
+            Upgrade your subscription
+
+          </p>
+
+
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight">
+
+            Choose your next plan
+
+          </h1>
+
+
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+
+            Select a higher plan and continue to payment.
+
+          </p>
+
+        </div>
+
+
+        <div className="mt-7 space-y-4">
+
+          {
+            UPGRADE_PLANS.map(
+              (
+                plan,
+              ) => {
+
+                const isSelected =
+                  selectedPlan?.id ===
+                  plan.id;
+
+
+                return (
+                  <button
+                    key={plan.id}
+                    type="button"
+                    onClick={() => {
+
+                      setSelectedPlan(
+                        plan,
+                      );
+
+                    }}
+                    className={[
+                      "w-full rounded-2xl border p-5 text-left transition-all",
+                      isSelected
+                        ? "border-primary bg-primary/5 ring-1 ring-primary"
+                        : "bg-background hover:bg-muted/50",
+                    ].join(
+                      " ",
+                    )}
+                  >
+
+                    <div className="flex items-start justify-between gap-4">
+
+                      <div>
+
+                        <h2 className="text-base font-semibold">
+
+                          {plan.name}
+
+                        </h2>
+
+
+                        <p className="mt-1 text-sm text-muted-foreground">
+
+                          {plan.description}
+
+                        </p>
+
+                      </div>
+
+
+                      <div className="text-right">
+
+                        <p className="text-lg font-bold">
+
+                          {formatCurrency(
+                            plan.amount,
+                          )}
+
+                        </p>
+
+
+                        <p className="text-xs text-muted-foreground">
+
+                          / month
+
+                        </p>
+
+                      </div>
+
+                    </div>
+
+
+                    <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2">
+
+                      {
+                        plan.features.slice(
+                          0,
+                          4,
+                        ).map(
+                          (
+                            feature,
+                          ) => (
+
+                            <span
+                              key={feature}
+                              className="inline-flex items-center gap-2 text-xs text-muted-foreground"
+                            >
+
+                              <Check className="h-3.5 w-3.5 text-primary" />
+
+                              {feature}
+
+                            </span>
+
+                          ),
+                        )
+                      }
+
+                    </div>
+
+                  </button>
+                );
+
+              },
+            )
+          }
+
+        </div>
+
+
+        <button
+          type="button"
+          disabled={
+            !selectedPlan
+          }
+          onClick={continueUpgradePayment}
+          className="mt-7 inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Proceed to Payment
+        </button>
+
+      </div>
+    );
+
+  }
+
+
+  function renderPaymentMethods() {
+
+    return (
+      <div className="px-6 py-7 sm:px-10 sm:py-9">
+
+        {renderBackButton()}
+
+
+        <div className="mt-6">
+
+          <p className="text-sm font-medium text-primary">
+
+            Secure payment
+
+          </p>
+
+
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight">
+
+            Choose payment method
+
+          </h1>
+
+
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+
+            Select your preferred payment method to continue.
+
+          </p>
+
+        </div>
+
+
+        <div className="mt-6 rounded-2xl border bg-muted/30 p-5">
+
+          <div className="flex items-center justify-between gap-5">
+
+            <div>
+
+              <p className="text-xs text-muted-foreground">
+
+                Selected Plan
+
+              </p>
+
+
+              <p className="mt-1 font-semibold">
+
+                {activePlan.name}
+
+              </p>
+
+            </div>
+
+
+            <div className="text-right">
+
+              <p className="text-xs text-muted-foreground">
+
+                Total Payable
+
+              </p>
+
+
+              <p className="mt-1 text-xl font-bold text-primary">
+
+                {formatCurrency(
+                  activePlan.amount,
+                )}
+
+              </p>
+
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <div className="mt-6 space-y-3">
+
+          <div className="overflow-hidden rounded-xl border">
+
+            <button
+              type="button"
+              onClick={() => {
+
+                setUpiOpen(
+                  (
+                    value,
+                  ) =>
+                    !value,
+                );
+
+
+                setBankOpen(
+                  false,
+                );
+
+
+                setCardOpen(
+                  false,
+                );
+
+              }}
+              className="flex w-full items-center justify-between px-5 py-4 text-left"
+            >
+
+              <span className="flex items-center gap-3">
+
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+
+                  <Smartphone className="h-5 w-5 text-primary" />
+
+                </span>
+
+
+                <span>
+
+                  <span className="block text-sm font-semibold">
+
+                    UPI
+
+                  </span>
+
+
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+
+                    Google Pay, PhonePe, BHIM and more
+
+                  </span>
+
+                </span>
+
+              </span>
+
+
+              {
+                upiOpen
+                  ? (
+                    <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                  )
+                  : (
+                    <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                  )
+              }
+
+            </button>
+
+
+            {
+              upiOpen
+                ? (
+                  <div className="border-t p-3">
+
+                    <div className="space-y-1">
+
+                      {
+                        UPI_APPS.map(
+                          (
+                            provider,
+                          ) => {
+
+                            const selected =
+                              paymentCategory ===
+                              "upi" &&
+                              selectedProvider ===
+                              provider;
+
+
+                            return (
+                              <button
+                                key={provider}
+                                type="button"
+                                onClick={() =>
+                                  selectUpiProvider(
+                                    provider,
+                                  )
+                                }
+                                className={[
+                                  "flex w-full items-center justify-between rounded-lg px-4 py-3 text-left text-sm transition-colors",
+                                  selected
+                                    ? "bg-primary/10 font-medium text-primary"
+                                    : "hover:bg-muted",
+                                ].join(
+                                  " ",
+                                )}
+                              >
+
+                                {provider}
+
+
+                                {
+                                  selected
+                                    ? (
+                                      <CheckCircle2 className="h-4 w-4" />
+                                    )
+                                    : null
+                                }
+
+                              </button>
+                            );
+
+                          },
+                        )
+                      }
+
+                    </div>
+
+                  </div>
+                )
+                : null
+            }
+
+          </div>
+
+
+          <div className="overflow-hidden rounded-xl border">
+
+            <button
+              type="button"
+              onClick={() => {
+
+                setBankOpen(
+                  (
+                    value,
+                  ) =>
+                    !value,
+                );
+
+
+                setUpiOpen(
+                  false,
+                );
+
+
+                setCardOpen(
+                  false,
+                );
+
+              }}
+              className="flex w-full items-center justify-between px-5 py-4 text-left"
+            >
+
+              <span className="flex items-center gap-3">
+
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+
+                  <Landmark className="h-5 w-5 text-primary" />
+
+                </span>
+
+
+                <span>
+
+                  <span className="block text-sm font-semibold">
+
+                    Net Banking
+
+                  </span>
+
+
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+
+                    Pay directly through your bank
+
+                  </span>
+
+                </span>
+
+              </span>
+
+
+              {
+                bankOpen
+                  ? (
+                    <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                  )
+                  : (
+                    <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                  )
+              }
+
+            </button>
+
+
+            {
+              bankOpen
+                ? (
+                  <div className="border-t p-3">
+
+                    <div className="space-y-1">
+
+                      {
+                        BANKS.map(
+                          (
+                            bank,
+                          ) => {
+
+                            const selected =
+                              paymentCategory ===
+                              "net_banking" &&
+                              selectedProvider ===
+                              bank;
+
+
+                            return (
+                              <button
+                                key={bank}
+                                type="button"
+                                onClick={() =>
+                                  selectBank(
+                                    bank,
+                                  )
+                                }
+                                className={[
+                                  "flex w-full items-center justify-between rounded-lg px-4 py-3 text-left text-sm transition-colors",
+                                  selected
+                                    ? "bg-primary/10 font-medium text-primary"
+                                    : "hover:bg-muted",
+                                ].join(
+                                  " ",
+                                )}
+                              >
+
+                                {bank}
+
+
+                                {
+                                  selected
+                                    ? (
+                                      <CheckCircle2 className="h-4 w-4" />
+                                    )
+                                    : null
+                                }
+
+                              </button>
+                            );
+
+                          },
+                        )
+                      }
+
+                    </div>
+
+                  </div>
+                )
+                : null
+            }
+
+          </div>
+
+
+          <div className="overflow-hidden rounded-xl border">
+
+            <button
+              type="button"
+              onClick={() => {
+
+                setCardOpen(
+                  (
+                    value,
+                  ) =>
+                    !value,
+                );
+
+
+                setUpiOpen(
+                  false,
+                );
+
+
+                setBankOpen(
+                  false,
+                );
+
+
+                selectCardPayment();
+
+              }}
+              className="flex w-full items-center justify-between px-5 py-4 text-left"
+            >
+
+              <span className="flex items-center gap-3">
+
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+
+                  <CreditCard className="h-5 w-5 text-primary" />
+
+                </span>
+
+
+                <span>
+
+                  <span className="block text-sm font-semibold">
+
+                    Credit / Debit Card
+
+                  </span>
+
+
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+
+                    Visa, Mastercard, RuPay and more
+
+                  </span>
+
+                </span>
+
+              </span>
+
+
+              {
+                cardOpen
+                  ? (
+                    <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                  )
+                  : (
+                    <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                  )
+              }
+
+            </button>
+
+
+            {
+              cardOpen
+                ? (
+                  <div className="space-y-3 border-t p-4">
+
+                    <input
+                      value={cardNumber}
+                      onChange={
+                        (
+                          event,
+                        ) => {
+
+                          setCardNumber(
+                            event.target.value,
+                          );
+
+                        }
+                      }
+                      placeholder="Card number"
+                      inputMode="numeric"
+                      className="h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+
+
+                    <div className="grid grid-cols-2 gap-3">
+
+                      <input
+                        value={cardExpiry}
+                        onChange={
+                          (
+                            event,
+                          ) => {
+
+                            setCardExpiry(
+                              event.target.value,
+                            );
+
+                          }
+                        }
+                        placeholder="MM / YY"
+                        className="h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                      />
+
+
+                      <input
+                        value={cardCvv}
+                        onChange={
+                          (
+                            event,
+                          ) => {
+
+                            setCardCvv(
+                              event.target.value,
+                            );
+
+                          }
+                        }
+                        placeholder="CVV"
+                        inputMode="numeric"
+                        type="password"
+                        className="h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                      />
+
+                    </div>
+
+                  </div>
+                )
+                : null
+            }
+
+          </div>
+
+        </div>
+
+
+        <button
+          type="button"
+          disabled={
+            !canPay ||
+            processing
+          }
+          onClick={handlePayment}
+          className="mt-7 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+
+          {
+            processing
+              ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+
+                  Processing Payment
+
+                </>
+              )
+              : (
+                <>
+                  Pay{" "}
+
+                  {
+                    formatCurrency(
+                      activePlan.amount,
+                    )
+                  }
+
+                </>
+              )
+          }
+
+        </button>
+
+
+        {
+          selectedProvider
+            ? (
+              <p className="mt-3 text-center text-xs text-muted-foreground">
+
+                Selected payment method:{" "}
+
+                <span className="font-medium text-foreground">
+
+                  {selectedProvider}
+
+                </span>
+
+              </p>
+            )
+            : null
+        }
+
+      </div>
+    );
+
+  }
+
+
+  function renderSuccess() {
+
+    return (
+      <div className="px-6 py-12 text-center sm:px-10 sm:py-14">
+
+        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-4xl">
+
+          🎉
+
+        </div>
+
+
+        <h1 className="mt-7 text-2xl font-semibold tracking-tight sm:text-3xl">
+
+          Thank You! Payment Successful
+
+        </h1>
+
+
+        <p className="mx-auto mt-4 max-w-md text-sm leading-7 text-muted-foreground">
+
+          Your PhotoOS subscription is now active.
+          You can access all features now.
+
+        </p>
+
+
+        <div className="mt-8 rounded-2xl border bg-muted/30 p-5 text-left">
+
+          <div className="flex items-center justify-between gap-4">
+
+            <span className="text-sm text-muted-foreground">
+
+              Active Plan
+
+            </span>
+
+
+            <span className="text-sm font-semibold">
+
+              {activePlan.name}
+
+            </span>
+
+          </div>
+
+
+          <div className="mt-4 flex items-center justify-between gap-4 border-t pt-4">
+
+            <span className="text-sm text-muted-foreground">
+
+              Payment Amount
+
+            </span>
+
+
+            <span className="text-lg font-bold text-primary">
+
+              {formatCurrency(
+                activePlan.amount,
+              )}
+
+            </span>
+
+          </div>
+
+        </div>
+
+
+        <button
+          type="button"
+          onClick={goToDashboard}
+          className="mt-8 inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+        >
+          Go to Dashboard
+        </button>
+
+      </div>
+    );
+
+  }
+
+
+  return (
+    <div
+      className="fixed inset-0 z-[9999] overflow-y-auto bg-background"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Subscription recovery"
+    >
+
+      <main className="flex min-h-screen items-center justify-center p-4 sm:p-8">
+
+        <section className="w-full max-w-2xl">
+
+          <div className="overflow-hidden rounded-2xl border bg-card shadow-2xl">
+
+            {
+              step === "EXPIRED"
+                ? renderExpiredStep()
+                : null
+            }
+
+
+            {
+              step === "RENEW_SUMMARY"
+                ? renderRenewSummary()
+                : null
+            }
+
+
+            {
+              step === "UPGRADE_PLANS"
+                ? renderUpgradePlans()
+                : null
+            }
+
+
+            {
+              step === "PAYMENT"
+                ? renderPaymentMethods()
+                : null
+            }
+
+
+            {
+              step === "SUCCESS"
+                ? renderSuccess()
+                : null
+            }
+
+          </div>
+
+        </section>
+
+      </main>
+
+    </div>
+  );
+
+}

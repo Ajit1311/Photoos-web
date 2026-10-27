@@ -1,3 +1,5 @@
+"use client";
+
 import EventStepper from "./EventStepper";
 import StepOneBasicDetails from "./StepOneBasicDetails";
 import StepTwoClient from "./StepTwoClient";
@@ -12,12 +14,13 @@ import {
   EventWizardProvider,
 } from "@/context/EventWizardContext";
 
+type EventWizardProps = {
+  projectId?: string;
+};
+
 function EventWizardContent() {
-
   return (
-
     <div className="space-y-8">
-
       <EventStepper />
 
       <StepOneBasicDetails />
@@ -35,23 +38,18 @@ function EventWizardContent() {
       <StepSevenReview />
 
       <WizardFooter />
-
     </div>
-
   );
-
 }
 
-export default function EventWizard() {
-
+export default function EventWizard({
+  projectId,
+}: EventWizardProps) {
   return (
-
-    <EventWizardProvider>
-
+    <EventWizardProvider
+      initialProjectId={projectId}
+    >
       <EventWizardContent />
-
     </EventWizardProvider>
-
   );
-
 }

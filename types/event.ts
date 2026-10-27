@@ -26,8 +26,15 @@ export interface EventDelivery {
   expiresAt: string | null;
 }
 
+export interface EventFinancial {
+  budget: number;
+  received: number;
+  balance: number;
+}
+
 export interface Event {
   id: string;
+  projectId: string; // <-- इथे projectId ॲड केला आहे
   title: string;
   status: EventStatus;
   date: string;
@@ -35,4 +42,5 @@ export interface Event {
   client: EventClient;
   gallery: EventGallery;
   delivery: EventDelivery;
+  financial: EventFinancial;
 }

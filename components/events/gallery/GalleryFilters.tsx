@@ -1,69 +1,76 @@
 "use client";
 
-import {
-  Filter,
-  Image,
-  Sparkles,
-  Star,
-  UserRound,
-} from "lucide-react";
+import type {
+  GalleryFilter,
+} from "@/hooks/events/useGalleryFilters";
 
-const filters = [
+interface Props {
+  value: GalleryFilter;
+
+  onChange: (
+    value: GalleryFilter,
+  ) => void;
+}
+
+const FILTERS: {
+  value: GalleryFilter;
+  label: string;
+}[] = [
   {
-    title: "All Photos",
-    icon: Image,
+    value: "all",
+    label: "All",
   },
   {
-    title: "AI Tagged",
-    icon: Sparkles,
+    value: "favorites",
+    label: "Favorites",
   },
   {
-    title: "Favorites",
-    icon: Star,
+    value: "selected",
+    label: "Selected",
   },
   {
-    title: "People",
-    icon: UserRound,
+    value: "hidden",
+    label: "Hidden",
+  },
+  {
+    value: "rejected",
+    label: "Rejected",
+  },
+  {
+    value: "ai",
+    label: "AI",
   },
 ];
 
-export default function GalleryFilters() {
+export default function GalleryFilters({
+  value,
+  onChange,
+}: Props) {
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white shadow-sm">
+    <div className="flex flex-wrap gap-2">
+      {FILTERS.map((filter) => (
+        <button
+          key={filter.value}
+          type="button"
+          onClick={() =>
+            onChange(filter.value)
+          }
+          className={[
+            "rounded-full",
+            "px-4",
+            "py-2",
+            "text-sm",
+            "font-medium",
+            "transition",
 
-      <div className="flex flex-wrap gap-4 p-5">
-
-        {filters.map((filter) => {
-
-          const Icon = filter.icon;
-
-          return (
-
-            <button
-              key={filter.title}
-              className="flex items-center gap-2 rounded-2xl border border-slate-200 px-5 py-3 transition hover:border-[#0A3F61] hover:bg-[#0A3F61]/5"
-            >
-
-              <Icon size={18} />
-
-              {filter.title}
-
-            </button>
-
-          );
-
-        })}
-
-        <button className="ml-auto flex items-center gap-2 rounded-2xl bg-[#0A3F61] px-5 py-3 text-white">
-
-          <Filter size={18} />
-
-          More Filters
-
+            value === filter.value
+              ? "bg-[#0A3F61] text-white"
+              : "border border-slate-300 bg-white text-slate-700 hover:border-[#0A3F61]",
+          ].join(" ")}
+        >
+          {filter.label}
         </button>
-
-      </div>
-
-    </section>
+      ))}
+    </div>
   );
 }

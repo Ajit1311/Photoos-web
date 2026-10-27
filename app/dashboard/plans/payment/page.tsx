@@ -1,0 +1,1387 @@
+"use client";
+
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  ChevronLeft,
+  CreditCard,
+  Landmark,
+  Smartphone,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Check,
+} from "lucide-react";
+
+import {
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
+
+import {
+  createSubscriptionUpgradePayment,
+  verifySubscriptionUpgradePayment,
+  verifySubscriptionPayment,
+} from "@/lib/api/payments";
+
+import {
+  processSubscriptionPayment,
+} from "@/lib/payments/subscription-payment-gateway";
+
+import {
+  useSubscriptionAccess,
+} from "@/context/SubscriptionAccessContext";
+
+import {
+  getSubscriptionPlans,
+} from "@/lib/api/subscription/plans";
+
+import type {
+  SubscriptionPlan,
+} from "@/types/subscription/plan";
+
+
+type PaymentCategory =
+  | "upi"
+  | "net_banking"
+  | "card"
+  | null;
+
+
+type PlanDetails = {
+  id: string;
+  name: string;
+  amount: number;
+  currency: string;
+};
+
+
+function formatCurrency(
+  amount: number,
+) {
+
+  return new Intl.NumberFormat(
+    "en-IN",
+    {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    },
+  ).format(
+    amount,
+  );
+
+}
+
+
+export default function PlanPaymentPage() {
+
+  const router =
+    useRouter();
+
+
+  const searchParams =
+    useSearchParams();
+
+
+  const {
+    data,
+    reload,
+  } =
+    useSubscriptionAccess();
+
+
+  const [
+    plans,
+    setPlans,
+  ] =
+    useState<SubscriptionPlan[]>([]);
+
+  const [
+    plansLoading,
+    setPlansLoading,
+  ] =
+    useState(true);
+
+  const [
+    plansError,
+    setPlansError,
+  ] =
+    useState<string | null>(null);
+
+
+  useEffect(() => {
+
+    let mounted = true;
+
+    const loadPlans =
+      async () => {
+
+        try {
+
+          setPlansLoading(true);
+          setPlansError(null);
+
+          const result =
+            await getSubscriptionPlans();
+
+          if (mounted) {
+            setPlans(result);
+          }
+
+        } catch (error) {
+
+          if (mounted) {
+
+            setPlansError(
+              error instanceof Error
+                ? error.message
+                : "Unable to load subscription plans.",
+            );
+
+          }
+
+        } finally {
+
+          if (mounted) {
+            setPlansLoading(false);
+          }
+
+        }
+
+      };
+
+    void loadPlans();
+
+    return () => {
+      mounted = false;
+    };
+
+  }, []);
+
+
+  const planId =
+    searchParams.get(
+      "planCode",
+    ) ??
+    searchParams.get(
+      "plan_id",
+    );
+
+
+  const selectedPlan =
+    planId
+      ? plans.find(
+          (plan) =>
+            plan.plan_code ===
+            planId,
+        ) ?? null
+      : null;
+
+
+  const subscriptionId =
+    data?.subscription_id ??
+    null;
+
+
+  const paymentMode =
+    searchParams.get("mode") ??
+    "subscription";
+
+  const addonPaymentId =
+    searchParams.get("payment_id");
+
+  const addonSubscriptionId =
+    searchParams.get("subscription_id");
+
+  const isAddonRenewal =
+    paymentMode === "addon" &&
+    Boolean(addonPaymentId) &&
+    Boolean(addonSubscriptionId);
+
+
+  const currentPlanCode =
+    data?.plan ??
+    null;
+
+
+  const [
+    paymentCategory,
+    setPaymentCategory,
+  ] =
+    useState<PaymentCategory>(
+      null,
+    );
+
+
+  const [
+    upiOpen,
+    setUpiOpen,
+  ] =
+    useState(
+      false,
+    );
+
+
+  const [
+    selectedUpiProvider,
+    setSelectedUpiProvider,
+  ] =
+    useState<
+      string | null
+    >(
+      null,
+    );
+
+
+  const [
+    processing,
+    setProcessing,
+  ] =
+    useState(
+      false,
+    );
+
+
+  const [
+    paymentError,
+    setPaymentError,
+  ] =
+    useState<
+      string | null
+    >(
+      null,
+    );
+
+
+  const [
+    success,
+    setSuccess,
+  ] =
+    useState(
+      false,
+    );
+
+
+  function handleBack() {
+
+    router.push(
+      "/dashboard/plans",
+    );
+
+  }
+
+
+  async function handlePayment() {
+
+    if (
+      processing
+    ) {
+
+      return;
+
+    }
+
+
+    if (
+      plansLoading
+    ) {
+      return;
+    }
+
+    if (
+      plansError
+    ) {
+      setPaymentError(
+        plansError,
+      );
+
+      return;
+    }
+
+    if (
+      !selectedPlan &&
+      !isAddonRenewal
+    ) {
+
+      setPaymentError(
+        "Selected plan could not be found.",
+      );
+
+      return;
+
+    }
+
+
+    if (
+      !subscriptionId &&
+      !isAddonRenewal
+    ) {
+
+      setPaymentError(
+        "Subscription information is missing.",
+      );
+
+      return;
+
+    }
+
+
+    if (
+      !paymentCategory
+    ) {
+
+      setPaymentError(
+        "Please select a payment method.",
+      );
+
+      return;
+
+    }
+
+
+    /*
+     * A yearly subscription can block monthly switching
+     * only while its actual subscription_end_at is still
+     * in the future.
+     *
+     * Once subscription_end_at has passed, the subscription
+     * is expired for this purpose even if the stored status
+     * has not yet been refreshed.
+     *
+     * Backend remains the final source of truth.
+     */
+
+    const subscriptionEndAt =
+      data?.subscription_end_at ?? null;
+
+    const yearlySubscriptionActive =
+      currentPlanCode?.endsWith("_yearly") &&
+      subscriptionEndAt !== null &&
+      new Date(subscriptionEndAt).getTime() >
+        Date.now();
+
+    if (
+      yearlySubscriptionActive &&
+      selectedPlan?.billing_cycle === "monthly"
+    ) {
+      setPaymentError(
+        "Your yearly subscription is active until it expires. You can switch to a monthly plan after your yearly subscription ends.",
+      );
+
+      return;
+    }
+
+
+    setPaymentError(
+      null,
+    );
+
+
+    setProcessing(
+      true,
+    );
+
+
+    try {
+
+      if (isAddonRenewal) {
+        const paymentId =
+          addonPaymentId as string;
+
+        const gatewayResult =
+          await processSubscriptionPayment(
+            {
+              paymentId,
+
+              amount: 99,
+
+              currency: "INR",
+
+              planName:
+                "Marketplace Verified Badge",
+
+              paymentCategory,
+            },
+          );
+
+        if (
+          !gatewayResult.success ||
+          !gatewayResult.transactionId
+        ) {
+          throw new Error(
+            gatewayResult.error ??
+            "Add-on payment could not be completed.",
+          );
+        }
+
+        await verifySubscriptionPayment(
+          paymentId,
+          gatewayResult.transactionId,
+        );
+
+        setSuccess(true);
+
+        return;
+      }
+
+
+      /*
+       * Current backend renewal flow is reused here.
+       *
+       * The backend creates the payment record for the
+       * existing subscription.
+       */
+
+        if (!subscriptionId || !selectedPlan) {
+          throw new Error(
+            "Subscription information is missing.",
+          );
+        }
+
+        const upgrade =
+          await createSubscriptionUpgradePayment(
+            subscriptionId,
+            selectedPlan.plan_code,
+          );
+
+
+      const paymentId =
+        upgrade.payment_id;
+
+
+      const gatewayResult =
+        await processSubscriptionPayment(
+          {
+            paymentId,
+
+            amount:
+              selectedPlan.price ?? 0,
+
+            currency:
+              selectedPlan.currency ?? "INR",
+
+            planName:
+              selectedPlan.name ?? selectedPlan.plan_code,
+
+            paymentCategory,
+          },
+        );
+
+
+      if (
+        !gatewayResult.success ||
+        !gatewayResult.transactionId
+      ) {
+
+        throw new Error(
+          gatewayResult.error ??
+          "Payment could not be completed.",
+        );
+
+      }
+
+
+      await verifySubscriptionUpgradePayment(
+        paymentId,
+        gatewayResult.transactionId,
+      );
+
+
+      /*
+       * Upgrade payment verification completes the
+       * subscription plan conversion on the backend.
+       *
+       * Do not call changeSubscriptionPlan() again.
+       */
+
+      /*
+       * Do not reload before success UI is shown.
+       *
+       * The subscription state is refreshed only when
+       * the user continues to the dashboard.
+       */
+
+      setSuccess(
+        true,
+      );
+
+    } catch (
+      error
+    ) {
+
+      setPaymentError(
+        error instanceof Error
+          ? error.message
+          : "Unable to process subscription payment.",
+      );
+
+    } finally {
+
+      setProcessing(
+        false,
+      );
+
+    }
+
+  }
+
+
+  async function handleDashboard() {
+
+    try {
+
+      await reload();
+
+    } finally {
+
+      if (
+        typeof window !==
+        "undefined"
+      ) {
+
+        window.location.href =
+          "/dashboard";
+
+      }
+
+    }
+
+  }
+
+
+  if (
+    !selectedPlan &&
+    !isAddonRenewal
+  ) {
+
+    return (
+      <main
+        className="
+          flex
+          min-h-screen
+          items-center
+          justify-center
+          bg-background
+          p-6
+        "
+      >
+
+        <div
+          className="
+            w-full
+            max-w-md
+            rounded-2xl
+            border
+            bg-card
+            p-8
+            text-center
+          "
+        >
+
+          <h1
+            className="
+              text-xl
+              font-semibold
+            "
+          >
+
+            Plan not found
+
+          </h1>
+
+
+          <p
+            className="
+              mt-3
+              text-sm
+              text-muted-foreground
+            "
+          >
+
+            Please go back and select a valid plan.
+
+          </p>
+
+
+          <button
+            type="button"
+            onClick={handleBack}
+            className="
+              mt-6
+              inline-flex
+              h-11
+              items-center
+              justify-center
+              rounded-xl
+              bg-primary
+              px-6
+              text-sm
+              font-semibold
+              text-primary-foreground
+            "
+          >
+
+            Back to Plans
+
+          </button>
+
+        </div>
+
+      </main>
+    );
+
+  }
+
+
+  if (
+    success
+  ) {
+
+    return (
+      <main
+        className="
+          flex
+          min-h-screen
+          items-center
+          justify-center
+          bg-background
+          px-4
+          py-8
+        "
+      >
+
+        <section
+          className="
+            w-full
+            max-w-lg
+            rounded-2xl
+            border
+            bg-card
+            p-8
+            text-center
+            shadow-xl
+            sm:p-10
+          "
+        >
+
+          <div
+            className="
+              flex
+              justify-center
+            "
+          >
+
+            <div
+              className="
+                flex
+                h-20
+                w-20
+                items-center
+                justify-center
+                rounded-full
+                bg-primary/10
+              "
+            >
+
+              <CheckCircle2
+                className="
+                  h-10
+                  w-10
+                  text-primary
+                "
+              />
+
+            </div>
+
+          </div>
+
+
+          <h1
+            className="
+              mt-7
+              text-2xl
+              font-semibold
+            "
+          >
+
+            Payment successful
+
+          </h1>
+
+
+          <p
+            className="
+              mt-4
+              text-sm
+              leading-7
+              text-muted-foreground
+            "
+          >
+
+            Your subscription payment has been completed
+            successfully. You can now continue to PhotoOS.
+
+          </p>
+
+
+          <button
+            type="button"
+            onClick={handleDashboard}
+            className="
+              mt-8
+              inline-flex
+              h-12
+              w-full
+              items-center
+              justify-center
+              rounded-xl
+              bg-primary
+              px-6
+              text-sm
+              font-semibold
+              text-primary-foreground
+              transition-opacity
+              hover:opacity-90
+            "
+          >
+
+            Go to Dashboard
+
+          </button>
+
+        </section>
+
+      </main>
+    );
+
+  }
+
+
+  return (
+    <main
+      className="
+        min-h-screen
+        bg-background
+      "
+    >
+
+      <div
+        className="
+          mx-auto
+          w-full
+          max-w-2xl
+          px-4
+          py-8
+          sm:px-6
+          lg:py-12
+        "
+      >
+
+        <button
+          type="button"
+          onClick={handleBack}
+          disabled={processing}
+          className="
+            inline-flex
+            items-center
+            gap-2
+            rounded-lg
+            px-2
+            py-1.5
+            text-sm
+            font-medium
+            text-muted-foreground
+            transition-colors
+            hover:bg-muted
+            hover:text-foreground
+            disabled:opacity-50
+          "
+        >
+
+          <ChevronLeft
+            className="
+              h-4
+              w-4
+            "
+          />
+
+          Back to Plans
+
+        </button>
+
+
+        <div
+          className="
+            mt-10
+            rounded-2xl
+            border
+            bg-card
+            p-6
+            sm:p-8
+          "
+        >
+
+          <div
+            className="
+              border-b
+              pb-6
+            "
+          >
+
+            <p
+              className="
+                text-sm
+                text-muted-foreground
+              "
+            >
+
+              Selected Plan
+
+            </p>
+
+
+            <div
+              className="
+                mt-2
+                flex
+                items-center
+                justify-between
+                gap-4
+              "
+            >
+
+              <h1
+                className="
+                  text-2xl
+                  font-semibold
+                "
+              >
+
+                {
+                  isAddonRenewal
+                    ? "Marketplace Verified Badge"
+                    : selectedPlan?.name ?? "Subscription"
+                }
+
+              </h1>
+
+
+              <div
+                className="
+                  text-xl
+                  font-bold
+                "
+                >
+                {formatCurrency(
+                  isAddonRenewal
+                    ? 99
+                    : selectedPlan?.price ?? 0,
+                )}
+
+              </div>
+
+            </div>
+
+          </div>
+
+
+          <div
+            className="
+              mt-8
+            "
+          >
+
+            <h2
+              className="
+                text-base
+                font-semibold
+              "
+            >
+
+              Select payment method
+
+            </h2>
+
+
+            <div
+              className="
+                mt-4
+                grid
+                gap-3
+              "
+            >
+
+              <div
+                  className="
+                    overflow-hidden
+                    rounded-2xl
+                    border
+                    bg-background
+                    transition-all
+                  "
+                >
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentCategory("upi");
+                      setUpiOpen((value) => !value);
+                    }}
+                    className={`
+                      flex
+                      w-full
+                      items-center
+                      justify-between
+                      gap-4
+                      p-4
+                      text-left
+                      transition-colors
+                      ${
+                        paymentCategory === "upi"
+                          ? "bg-primary/5"
+                          : "hover:bg-muted/50"
+                      }
+                    `}
+                  >
+
+                    <div
+                      className="
+                        flex
+                        items-center
+                        gap-4
+                      "
+                    >
+
+                      <div
+                        className="
+                          flex
+                          h-11
+                          w-11
+                          shrink-0
+                          items-center
+                          justify-center
+                          rounded-xl
+                          border
+                          bg-white
+                          text-xs
+                          font-bold
+                          shadow-sm
+                        "
+                      >
+                        UPI
+                      </div>
+
+                      <div>
+
+                        <div
+                          className="
+                            text-sm
+                            font-semibold
+                          "
+                        >
+                          UPI
+                        </div>
+
+                        <div
+                          className="
+                            mt-1
+                            text-xs
+                            text-muted-foreground
+                          "
+                        >
+                          Pay with your preferred UPI app
+                        </div>
+
+                      </div>
+
+                    </div>
+
+                    {
+                      upiOpen
+                        ? (
+                          <ChevronUp
+                            className="
+                              h-5
+                              w-5
+                              shrink-0
+                              text-muted-foreground
+                            "
+                          />
+                        )
+                        : (
+                          <ChevronDown
+                            className="
+                              h-5
+                              w-5
+                              shrink-0
+                              text-muted-foreground
+                            "
+                          />
+                        )
+                    }
+
+                  </button>
+
+
+                  {
+                    upiOpen
+                      ? (
+                        <div
+                          className="
+                            border-t
+                            bg-muted/20
+                            p-3
+                          "
+                        >
+
+                          <div
+                            className="
+                              grid
+                              gap-2
+                              sm:grid-cols-2
+                            "
+                          >
+
+                            {
+                              [
+                                {
+                                  id: "google_pay",
+                                  name: "Google Pay",
+                                  logo: "/payment/upi/google-pay.png",
+                                },
+                                {
+                                  id: "phonepe",
+                                  name: "PhonePe",
+                                  logo: "/payment/upi/phonepe.png",
+                                },
+                                {
+                                  id: "paytm",
+                                  name: "Paytm",
+                                  logo: "/payment/upi/paytm.png",
+                                },
+                                {
+                                  id: "bhim",
+                                  name: "BHIM",
+                                  logo: "/payment/upi/bhim.png",
+                                },
+                              ].map(
+                                (
+                                  provider,
+                                ) => (
+                                  <button
+                                    key={
+                                      provider.id
+                                    }
+                                    type="button"
+                                    onClick={() => {
+                                      setPaymentCategory("upi");
+                                      setSelectedUpiProvider(
+                                        provider.id,
+                                      );
+                                    }}
+                                    className={`
+                                      flex
+                                      items-center
+                                      justify-between
+                                      rounded-xl
+                                      border
+                                      bg-background
+                                      px-3
+                                      py-3
+                                      text-left
+                                      transition-all
+                                      ${
+                                        selectedUpiProvider === provider.id
+                                          ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                                          : "border-border hover:bg-muted/50"
+                                      }
+                                    `}
+                                  >
+
+                                    <div
+                                      className="
+                                        flex
+                                        items-center
+                                        gap-3
+                                      "
+                                    >
+
+                                      <div
+                                        className="
+                                          flex
+                                          h-10
+                                          w-10
+                                          shrink-0
+                                          items-center
+                                          justify-center
+                                          overflow-hidden
+                                          rounded-lg
+                                          border
+                                          bg-white
+                                          shadow-sm
+                                        "
+                                      >
+                                        <img
+                                          src={
+                                            provider.logo
+                                          }
+                                          alt=""
+                                          className="
+                                            h-8
+                                            w-8
+                                            object-contain
+                                          "
+                                        />
+                                      </div>
+
+                                      <span
+                                        className="
+                                          text-sm
+                                          font-semibold
+                                        "
+                                      >
+                                        {
+                                          provider.name
+                                        }
+                                      </span>
+
+                                    </div>
+
+                                    {
+                                      selectedUpiProvider === provider.id
+                                        ? (
+                                          <Check
+                                            className="
+                                              h-5
+                                              w-5
+                                              text-primary
+                                            "
+                                          />
+                                        )
+                                        : null
+                                    }
+
+                                  </button>
+                                ),
+                              )
+                            }
+
+                          </div>
+
+                        </div>
+                      )
+                      : null
+                  }
+
+                </div>
+
+
+              <button
+                type="button"
+                onClick={() => {
+
+                  setPaymentCategory(
+                    "net_banking",
+                  );
+
+                }}
+                className={`
+                  flex
+                  items-center
+                  gap-4
+                  rounded-xl
+                  border
+                  p-4
+                  text-left
+                  transition-colors
+                  ${
+                    paymentCategory ===
+                    "net_banking"
+                      ? "border-primary bg-primary/5"
+                      : "hover:bg-muted/50"
+                  }
+                `}
+              >
+
+                <Landmark
+                  className="
+                    h-5
+                    w-5
+                  "
+                />
+
+                <div>
+
+                  <div
+                    className="
+                      text-sm
+                      font-semibold
+                    "
+                  >
+
+                    Net Banking
+
+                  </div>
+
+
+                  <div
+                    className="
+                      mt-1
+                      text-xs
+                      text-muted-foreground
+                    "
+                  >
+
+                    Pay securely using your bank account
+
+                  </div>
+
+                </div>
+
+              </button>
+
+
+              <button
+                type="button"
+                onClick={() => {
+
+                  setPaymentCategory(
+                    "card",
+                  );
+
+                }}
+                className={`
+                  flex
+                  items-center
+                  gap-4
+                  rounded-xl
+                  border
+                  p-4
+                  text-left
+                  transition-colors
+                  ${
+                    paymentCategory ===
+                    "card"
+                      ? "border-primary bg-primary/5"
+                      : "hover:bg-muted/50"
+                  }
+                `}
+              >
+
+                <CreditCard
+                  className="
+                    h-5
+                    w-5
+                  "
+                />
+
+                <div>
+
+                  <div
+                    className="
+                      text-sm
+                      font-semibold
+                    "
+                  >
+
+                    Debit / Credit Card
+
+                  </div>
+
+
+                  <div
+                    className="
+                      mt-1
+                      text-xs
+                      text-muted-foreground
+                    "
+                  >
+
+                    Pay using your debit or credit card
+
+                  </div>
+
+                </div>
+
+              </button>
+
+            </div>
+
+
+            {
+              paymentError
+                ? (
+                  <div
+                    className="
+                      mt-5
+                      rounded-xl
+                      border
+                      border-destructive/30
+                      bg-destructive/10
+                      px-4
+                      py-3
+                      text-sm
+                      text-destructive
+                    "
+                  >
+
+                    {paymentError}
+
+                  </div>
+                )
+                : null
+            }
+
+
+            <button
+              type="button"
+              onClick={handlePayment}
+              disabled={
+                processing
+              }
+              className="
+                mt-8
+                inline-flex
+                h-12
+                w-full
+                items-center
+                justify-center
+                rounded-xl
+                bg-primary
+                px-6
+                text-sm
+                font-semibold
+                text-primary-foreground
+                transition-opacity
+                hover:opacity-90
+                disabled:cursor-not-allowed
+                disabled:opacity-60
+              "
+            >
+
+              {
+                processing
+                  ? "Processing payment..."
+                  : `Pay ${formatCurrency(
+                      isAddonRenewal
+                        ? 99
+                        : selectedPlan?.price ?? 0,
+                    )}`
+              }
+
+            </button>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </main>
+  );
+
+}

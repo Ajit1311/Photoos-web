@@ -1,0 +1,518 @@
+"use client";
+
+import {
+  CalendarDays,
+  FolderKanban,
+  Image,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Sparkles,
+  Workflow,
+} from "lucide-react";
+
+import {
+  useBootstrapContext,
+} from "@/context/BootstrapContext";
+
+import {
+  useDashboardContext,
+} from "@/context/DashboardContext";
+
+import PendingPayments from "@/components/dashboard/finance/PendingPayments";
+import MarketplaceLeads from "@/components/dashboard/marketplace/MarketplaceLeads";
+
+import TodaysFocus from "@/components/dashboard/overview/TodaysFocus";
+import ActiveProjects from "@/components/dashboard/overview/ActiveProjects";
+import RecentActivity from "@/components/dashboard/overview/RecentActivity";
+
+
+function getGreeting() {
+
+  const hour =
+    new Date().getHours();
+
+
+  if (
+    hour >= 5 &&
+    hour < 12
+  ) {
+    return "Good morning";
+  }
+
+
+  if (
+    hour >= 12 &&
+    hour < 17
+  ) {
+    return "Good afternoon";
+  }
+
+
+  if (
+    hour >= 17 &&
+    hour < 21
+  ) {
+    return "Good evening";
+  }
+
+
+  return "Good evening";
+
+}
+
+
+function getTodayLabel() {
+
+  return new Intl.DateTimeFormat(
+    "en-IN",
+    {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    },
+  ).format(
+    new Date(),
+  );
+
+}
+
+
+function MetricCard({
+  icon,
+  label,
+  value,
+  description,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  description: string;
+}) {
+
+  return (
+
+    <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_4px_20px_rgb(15,23,42,0.03)]">
+
+      <div className="flex items-start justify-between">
+
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-[#0A3F61]">
+
+          {
+            icon
+          }
+
+        </div>
+
+      </div>
+
+
+      <p className="mt-6 text-3xl font-bold tracking-tight text-slate-900">
+
+        {
+          value
+        }
+
+      </p>
+
+
+      <p className="mt-1 text-sm font-medium text-slate-700">
+
+        {
+          label
+        }
+
+      </p>
+
+
+      <p className="mt-1 text-xs text-slate-400">
+
+        {
+          description
+        }
+
+      </p>
+
+    </div>
+
+  );
+
+}
+
+
+export default function DashboardPage() {
+
+  const bootstrap =
+    useBootstrapContext();
+
+
+  const dashboard =
+    useDashboardContext();
+
+
+  const profile =
+    bootstrap.data?.profile ??
+    null;
+
+
+  const workspace =
+    bootstrap.data?.workspace ??
+    null;
+
+
+  const metrics =
+    dashboard.data?.metrics ??
+    null;
+
+
+  const displayName =
+    profile?.first_name ??
+    profile?.full_name ??
+    "there";
+
+
+  const studioName =
+    workspace?.studio?.name ??
+    "Your Studio";
+
+
+  async function handleRefresh() {
+
+    await Promise.all(
+      [
+        bootstrap.reload(),
+        dashboard.reload(),
+      ],
+    );
+
+  }
+
+
+  if (
+    bootstrap.loading ||
+    dashboard.loading
+  ) {
+
+    return (
+      <main className="flex min-h-[60vh] items-center justify-center">
+
+        <div className="space-y-4 text-center">
+
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#0A3F61]/10 text-[#0A3F61]">
+
+            <Loader2
+              className="animate-spin"
+              size={24}
+            />
+
+          </div>
+
+
+          <p className="text-sm text-slate-500">
+
+            Loading your workspace...
+
+          </p>
+
+        </div>
+
+      </main>
+    );
+
+  }
+
+
+  if (
+    bootstrap.error ||
+    dashboard.error
+  ) {
+
+    return (
+      <main className="flex min-h-[60vh] items-center justify-center">
+
+        <div className="rounded-[28px] border border-red-100 bg-white p-8 text-center shadow-sm">
+
+          <h1 className="text-lg font-semibold text-slate-900">
+
+            Unable to load dashboard
+
+          </h1>
+
+
+          <button
+            type="button"
+            onClick={
+              handleRefresh
+            }
+            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#0A3F61] px-4 py-2.5 text-sm font-semibold text-white"
+          >
+
+            <RefreshCw
+              size={16}
+            />
+
+            Retry
+
+          </button>
+
+        </div>
+
+      </main>
+    );
+
+  }
+
+
+  return (
+
+    <main className="mx-auto max-w-[1600px] space-y-6 pb-10">
+
+      <section className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+
+        <div>
+
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+
+            <span>
+
+              {studioName}
+
+            </span>
+
+            <span className="h-1 w-1 rounded-full bg-slate-300" />
+
+            <span>
+
+              {getTodayLabel()}
+
+            </span>
+
+          </div>
+
+
+          <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
+
+            {getGreeting()}, {displayName}
+
+          </h1>
+
+
+          <p className="mt-2 text-sm text-slate-500">
+
+            Here is what needs your attention today.
+
+          </p>
+
+        </div>
+
+
+        <div className="flex items-center gap-3">
+
+          <button
+            type="button"
+            onClick={
+              handleRefresh
+            }
+            disabled={
+              dashboard.refreshing
+            }
+            className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+          >
+
+            <RefreshCw
+              size={16}
+              className={
+                dashboard.refreshing
+                  ? "animate-spin"
+                  : ""
+              }
+            />
+
+            Refresh
+
+          </button>
+
+
+          <button
+            type="button"
+            className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#0A3F61] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#083653]"
+          >
+
+            <Plus
+              size={17}
+            />
+
+            Create Client
+
+          </button>
+
+        </div>
+
+      </section>
+
+
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+
+        <MetricCard
+          icon={
+            <FolderKanban
+              size={19}
+            />
+          }
+          label="Active Projects"
+          value={
+            metrics?.activeProjects ??
+            0
+          }
+          description="Projects currently in progress"
+        />
+
+
+        <MetricCard
+          icon={
+            <CalendarDays
+              size={19}
+            />
+          }
+          label="Today's Events"
+          value={
+            metrics?.todayEvents ??
+            0
+          }
+          description="Events scheduled for today"
+        />
+
+
+        <MetricCard
+          icon={
+            <Image
+              size={19}
+            />
+          }
+          label="Pending Deliveries"
+          value={
+            metrics?.pendingDeliveries ??
+            0
+          }
+          description="Deliverables waiting to go out"
+        />
+
+
+        <MetricCard
+          icon={
+            <Workflow
+              size={19}
+            />
+          }
+          label="Processing Jobs"
+          value={
+            metrics?.pendingProcessingJobs ??
+            0
+          }
+          description="Media jobs currently running"
+        />
+
+      </section>
+
+
+      <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+
+        <PendingPayments />
+
+        <MarketplaceLeads />
+
+      </section>
+
+
+      <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+
+        <TodaysFocus />
+
+        <ActiveProjects />
+
+      </section>
+
+
+      <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+
+        <RecentActivity />
+
+
+        <div className="rounded-[28px] border border-slate-200 bg-gradient-to-br from-[#0A3F61] to-[#06283D] p-7 text-white shadow-[0_10px_35px_rgba(10,63,97,0.16)]">
+
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10">
+
+            <Sparkles
+              size={20}
+            />
+
+          </div>
+
+
+          <h2 className="mt-6 text-xl font-semibold">
+
+            Studio intelligence
+
+          </h2>
+
+
+          <p className="mt-2 max-w-md text-sm leading-6 text-white/70">
+
+            Your dashboard is now focused on active work, payments,
+            marketplace opportunities and the things that need attention.
+
+          </p>
+
+
+          <div className="mt-8 grid grid-cols-2 gap-3">
+
+            <div className="rounded-2xl bg-white/10 p-4">
+
+              <p className="text-2xl font-bold">
+
+                {
+                  metrics?.activeAlbums ??
+                  0
+                }
+
+              </p>
+
+              <p className="mt-1 text-xs text-white/60">
+
+                Active Albums
+
+              </p>
+
+            </div>
+
+
+            <div className="rounded-2xl bg-white/10 p-4">
+
+              <p className="text-2xl font-bold">
+
+                {
+                  metrics?.totalAssets ??
+                  0
+                }
+
+              </p>
+
+              <p className="mt-1 text-xs text-white/60">
+
+                Total Assets
+
+              </p>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </section>
+
+    </main>
+
+  );
+
+}

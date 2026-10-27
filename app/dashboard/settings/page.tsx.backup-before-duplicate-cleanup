@@ -1,0 +1,3751 @@
+"use client";
+
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  Bell,
+  Building2,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  Clock3,
+  CreditCard,
+  Database,
+  Download,
+  Image,
+  ImagePlus,
+  Upload,
+  MapPin,
+  Globe2,
+  Loader2,
+  LockKeyhole,
+  Mail,
+  Palette,
+  RefreshCw,
+  Settings,
+  ShieldCheck,
+  SlidersHorizontal,
+  Sparkles,
+  Users,
+  UsersRound,
+} from "lucide-react";
+
+import {
+  getCurrentSoftwareUpdate,
+} from "@/lib/api/software-update/get-current-software-update";
+
+import {
+  getWatermarkSettings,
+  saveWatermarkSettings,
+} from "@/lib/api/workspace-settings/watermark-settings";
+
+import type {
+  WatermarkSettings,
+} from "@/types/watermark-settings/watermark-settings";
+
+import {
+  DEFAULT_WATERMARK_SETTINGS,
+} from "@/types/watermark-settings/watermark-settings";
+
+import type {
+  SoftwareUpdate,
+} from "@/types/software-update/software-update";
+
+import {
+  getWorkspaceSettings,
+} from "@/lib/api/workspace-settings/get-workspace-settings";
+
+import {
+  saveWorkspaceSetting,
+} from "@/lib/api/workspace-settings/save-workspace-setting";
+
+import {
+  resolveUserStudio,
+} from "@/lib/auth/resolve-user-studio";
+
+import type {
+  WorkspaceSetting,
+} from "@/types/workspace-settings/workspace-setting";
+
+
+type SettingValue = {
+  enabled?: boolean;
+  [key: string]:
+    unknown;
+};
+
+
+const DEFAULT_SETTINGS:
+  Record<
+    string,
+    SettingValue
+  > = {
+
+  workspace_notifications: {
+    enabled: true,
+  },
+
+  email_notifications: {
+    enabled: true,
+  },
+
+  browser_notifications: {
+    enabled: true,
+  },
+
+  event_reminders: {
+    enabled: true,
+  },
+
+  client_updates: {
+    enabled: true,
+  },
+
+  team_activity_alerts: {
+    enabled: true,
+  },
+
+  public_workspace: {
+    enabled: false,
+  },
+
+  team_member_access: {
+    enabled: true,
+  },
+
+  new_member_approval: {
+    enabled: true,
+  },
+
+  email_communications: {
+    enabled: true,
+  },
+
+  session_protection: {
+    enabled: true,
+  },
+
+  payment_notifications: {
+    enabled: true,
+  },
+
+  ai_processing: {
+    enabled: true,
+  },
+
+  automatic_processing: {
+    enabled: false,
+  },
+
+  watermark_enabled: {
+    enabled: false,
+  },
+
+  download_protection: {
+    enabled: false,
+  },
+
+};
+
+
+function getSettingValue(
+  settings:
+    WorkspaceSetting[],
+
+  key:
+    string,
+):
+  SettingValue {
+
+  const setting =
+    settings.find(
+      (
+        item,
+      ) =>
+        item.key ===
+        key,
+    );
+
+
+  if (
+    setting
+  ) {
+
+    return (
+      setting.value ??
+      {}
+    );
+
+  }
+
+
+  return (
+    DEFAULT_SETTINGS[
+      key
+    ] ??
+    {}
+  );
+
+}
+
+
+type InteractiveSettingRowProps = {
+
+  title:
+    string;
+
+  description:
+    string;
+
+  category:
+    string;
+
+  settingKey:
+    string;
+
+  icon:
+    React.ComponentType<
+      {
+        size?:
+          number;
+
+        className?:
+          string;
+      }
+    >;
+
+  enabled:
+    boolean;
+
+  saving:
+    boolean;
+
+  onToggle:
+    () => void;
+
+};
+
+
+function InteractiveSettingRow(
+  {
+    title,
+    description,
+    icon:
+      Icon,
+    enabled,
+    saving,
+    onToggle,
+  }:
+    InteractiveSettingRowProps,
+) {
+
+  return (
+    <div className="flex flex-col gap-4 rounded-2xl border border-slate-100 bg-white p-5 transition hover:border-slate-200 sm:flex-row sm:items-center sm:justify-between">
+
+      <div className="flex gap-4">
+
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#0A3F61]/10 text-[#0A3F61]">
+
+          <Icon
+            size={19}
+          />
+
+        </div>
+
+
+        <div>
+
+          <p className="text-sm font-semibold text-slate-900">
+
+            {
+              title
+            }
+
+          </p>
+
+
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
+
+            {
+              description
+            }
+
+          </p>
+
+        </div>
+
+      </div>
+
+
+      <button
+        type="button"
+        onClick={
+          onToggle
+        }
+        disabled={
+          saving
+        }
+        aria-pressed={
+          enabled
+        }
+        className={
+          `relative inline-flex h-8 w-14 shrink-0 items-center rounded-full transition ${
+            enabled
+              ? "bg-[#0A3F61]"
+              : "bg-slate-200"
+          } ${
+            saving
+              ? "cursor-wait opacity-60"
+              : "cursor-pointer"
+          }`
+        }
+      >
+
+        <span
+          className={
+            `inline-block h-6 w-6 rounded-full bg-white shadow-sm transition-transform ${
+              enabled
+                ? "translate-x-7"
+                : "translate-x-1"
+            }`
+          }
+        />
+
+      </button>
+
+    </div>
+  );
+
+}
+
+
+
+function formatDate(
+  value:
+    string,
+) {
+
+  try {
+
+    return new Intl.DateTimeFormat(
+      "en-IN",
+      {
+        day:
+          "numeric",
+
+        month:
+          "long",
+
+        year:
+          "numeric",
+
+        hour:
+          "numeric",
+
+        minute:
+          "2-digit",
+      },
+    ).format(
+      new Date(
+        value,
+      ),
+    );
+
+  } catch {
+
+    return value;
+
+  }
+
+}
+
+
+function getDisplaySchemaVersion(
+  softwareUpdate:
+    SoftwareUpdate,
+) {
+
+  const value =
+    softwareUpdate.metadata[
+      "display_schema_version"
+    ];
+
+
+  if (
+    typeof value ===
+    "string"
+  ) {
+
+    return value;
+
+  }
+
+
+  return (
+    `PhotoOS-${
+      String(
+        softwareUpdate.schema_version,
+      ).padStart(
+        2,
+        "0",
+      )
+    }`
+  );
+
+}
+
+
+export default function SettingsPage() {
+
+  const [
+    softwareUpdate,
+    setSoftwareUpdate,
+  ] =
+    useState<
+      SoftwareUpdate
+      | null
+    >(
+      null,
+    );
+
+
+  const [
+    loading,
+    setLoading,
+  ] =
+    useState(
+      true,
+    );
+
+
+  const [
+    error,
+    setError,
+  ] =
+    useState<
+      string
+      | null
+    >(
+      null,
+    );
+
+
+  const [
+    workspaceSettings,
+    setWorkspaceSettings,
+  ] =
+    useState<
+      WorkspaceSetting[]
+    >(
+      [],
+    );
+
+
+  const [
+    studioId,
+    setStudioId,
+  ] =
+    useState<
+      string
+      | null
+    >(
+      null,
+    );
+
+
+  const [
+    savingSetting,
+    setSavingSetting,
+  ] =
+    useState<
+      string
+      | null
+    >(
+      null,
+    );
+
+
+  const [
+    settingDrafts,
+    setSettingDrafts,
+  ] =
+    useState<
+      Record<
+        string,
+        Record<
+          string,
+          unknown
+        >
+      >
+    >(
+      {},
+    );
+
+
+  const [
+    watermarkSettings,
+    setWatermarkSettings,
+  ] =
+    useState<
+      WatermarkSettings
+    >(
+      DEFAULT_WATERMARK_SETTINGS,
+    );
+
+
+  const [
+    watermarkSaving,
+    setWatermarkSaving,
+  ] =
+    useState(
+      false,
+    );
+
+
+  const [
+    watermarkUploadPreview,
+    setWatermarkUploadPreview,
+  ] =
+    useState<
+      string
+      | null
+    >(
+      null,
+    );
+
+
+  const [
+    showReleaseNotes,
+    setShowReleaseNotes,
+  ] =
+    useState(
+      false,
+    );
+
+
+  const loadWorkspaceSettings =
+    useCallback(
+      async () => {
+
+        try {
+
+          const membership =
+            await resolveUserStudio();
+
+
+          if (
+            !membership
+          ) {
+
+            return;
+
+          }
+
+
+          setStudioId(
+            membership.studioId,
+          );
+
+
+          const result =
+            await getWorkspaceSettings(
+              membership.studioId,
+            );
+
+
+          setWorkspaceSettings(
+            result,
+          );
+
+
+          await loadWatermarkSettings(
+            membership.studioId,
+          );
+
+        } catch (
+          settingsError
+        ) {
+
+          console.error(
+            "Unable to load workspace settings:",
+            settingsError,
+          );
+
+        }
+
+      },
+      [],
+    );
+
+
+  const updateToggleSetting =
+    useCallback(
+      async (
+        category:
+          string,
+
+        key:
+          string,
+
+        description:
+          string,
+      ) => {
+
+        if (
+          !studioId
+        ) {
+
+          return;
+
+        }
+
+
+        const currentValue =
+          getSettingValue(
+            workspaceSettings,
+            key,
+          );
+
+
+        const nextValue = {
+          ...currentValue,
+          enabled:
+            !Boolean(
+              currentValue.enabled,
+            ),
+        };
+
+
+        try {
+
+          setSavingSetting(
+            key,
+          );
+
+
+          await saveWorkspaceSetting(
+            studioId,
+            category,
+            key,
+            nextValue,
+            description,
+          );
+
+
+          setWorkspaceSettings(
+            (
+              current,
+            ) => {
+
+              const existingIndex =
+                current.findIndex(
+                  (
+                    item,
+                  ) =>
+                    item.key ===
+                    key,
+                );
+
+
+              if (
+                existingIndex ===
+                -1
+              ) {
+
+                return current;
+
+              }
+
+
+              return current.map(
+                (
+                  item,
+                ) =>
+                  item.key ===
+                  key
+                    ? {
+                        ...item,
+                        value:
+                          nextValue,
+                      }
+                    : item,
+              );
+
+            },
+          );
+
+
+          await loadWorkspaceSettings();
+
+        } catch (
+          saveError
+        ) {
+
+          console.error(
+            "Unable to save workspace setting:",
+            saveError,
+          );
+
+        } finally {
+
+          setSavingSetting(
+            null,
+          );
+
+        }
+
+      },
+      [
+        studioId,
+        workspaceSettings,
+        loadWorkspaceSettings,
+      ],
+    );
+
+
+  const loadWatermarkSettings =
+    useCallback(
+      async (
+        targetStudioId:
+          string,
+      ) => {
+
+        try {
+
+          const result =
+            await getWatermarkSettings(
+              targetStudioId,
+            );
+
+
+          setWatermarkSettings(
+            result,
+          );
+
+
+          if (
+            result.source ===
+            "upload"
+            &&
+            result.upload_url
+          ) {
+
+            setWatermarkUploadPreview(
+              result.upload_url,
+            );
+
+          }
+
+        } catch (
+          watermarkError
+        ) {
+
+          console.error(
+            "Unable to load watermark settings:",
+            watermarkError,
+          );
+
+        }
+
+      },
+      [],
+    );
+
+
+  const persistWatermarkSettings =
+    useCallback(
+      async (
+        nextSettings:
+          WatermarkSettings,
+      ) => {
+
+        if (
+          !studioId
+        ) {
+
+          return;
+
+        }
+
+
+        try {
+
+          setWatermarkSaving(
+            true,
+          );
+
+
+          await saveWatermarkSettings(
+            studioId,
+            nextSettings,
+          );
+
+
+          setWatermarkSettings(
+            nextSettings,
+          );
+
+        } catch (
+          watermarkSaveError
+        ) {
+
+          console.error(
+            "Unable to save watermark settings:",
+            watermarkSaveError,
+          );
+
+        } finally {
+
+          setWatermarkSaving(
+            false,
+          );
+
+        }
+
+      },
+      [
+        studioId,
+      ],
+    );
+
+
+  const handleWatermarkUpload =
+    useCallback(
+      async (
+        event:
+          React.ChangeEvent<
+            HTMLInputElement
+          >,
+      ) => {
+
+        const file =
+          event.target.files?.[
+            0
+          ];
+
+
+        if (
+          !file
+        ) {
+
+          return;
+
+        }
+
+
+        const previewUrl =
+          URL.createObjectURL(
+            file,
+          );
+
+
+        setWatermarkUploadPreview(
+          previewUrl,
+        );
+
+
+        const nextSettings = {
+          ...watermarkSettings,
+
+          enabled:
+            true,
+
+          source:
+            "upload" as const,
+
+          upload_url:
+            previewUrl,
+
+          upload_name:
+            file.name,
+        };
+
+
+        await persistWatermarkSettings(
+          nextSettings,
+        );
+
+      },
+      [
+        watermarkSettings,
+        persistWatermarkSettings,
+      ],
+    );
+
+
+  const getWorkspaceSetting =
+    useCallback(
+      (
+        key:
+          string,
+      ) => {
+
+        const saved =
+          workspaceSettings.find(
+            (
+              item,
+            ) =>
+              item.key ===
+              key,
+          );
+
+
+        return (
+          settingDrafts[
+            key
+          ] ??
+          saved?.value ??
+          {}
+        );
+
+      },
+      [
+        workspaceSettings,
+        settingDrafts,
+      ],
+    );
+
+
+  const updateWorkspaceSettingValue =
+    useCallback(
+      (
+        key:
+          string,
+
+        value:
+          Record<
+            string,
+            unknown
+          >,
+      ) => {
+
+        setSettingDrafts(
+          (
+            current,
+          ) => (
+            {
+              ...current,
+
+              [
+                key
+              ]:
+                value,
+            }
+          ),
+        );
+
+      },
+      [],
+    );
+
+
+  const persistWorkspaceSetting =
+    useCallback(
+      async (
+        category:
+          string,
+
+        key:
+          string,
+
+        value:
+          Record<
+            string,
+            unknown
+          >,
+
+        description:
+          string,
+      ) => {
+
+        if (
+          !studioId
+        ) {
+
+          return;
+
+        }
+
+
+        try {
+
+          setSavingSetting(
+            key,
+          );
+
+
+          await saveWorkspaceSetting(
+            studioId,
+            category,
+            key,
+            value,
+            description,
+          );
+
+
+          setWorkspaceSettings(
+            (
+              current,
+            ) => {
+
+              const existing =
+                current.find(
+                  (
+                    item,
+                  ) =>
+                    item.key ===
+                    key,
+                );
+
+
+              if (
+                existing
+              ) {
+
+                return current.map(
+                  (
+                    item,
+                  ) =>
+                    item.key ===
+                    key
+                      ? {
+                          ...item,
+
+                          category,
+
+                          value,
+                          description,
+                        }
+                      : item,
+                );
+
+              }
+
+
+              return [
+                ...current,
+                {
+                  id:
+                    crypto.randomUUID(),
+
+                  studio_id:
+                    studioId,
+
+                  category,
+
+                  key,
+
+                  value,
+
+                  description,
+
+                  is_active:
+                    true,
+
+                  created_at:
+                    new Date().toISOString(),
+
+                  updated_at:
+                    new Date().toISOString(),
+                },
+              ];
+
+            },
+          );
+
+
+          setSettingDrafts(
+            (
+              current,
+            ) => {
+
+              const next =
+                {
+                  ...current,
+                };
+
+
+              delete next[
+                key
+              ];
+
+
+              return next;
+
+            },
+          );
+
+        } catch (
+          saveError
+        ) {
+
+          console.error(
+            "Unable to save workspace setting:",
+            saveError,
+          );
+
+        } finally {
+
+          setSavingSetting(
+            null,
+          );
+
+        }
+
+      },
+      [
+        studioId,
+      ],
+    );
+
+
+  const toggleWorkspaceSetting =
+    useCallback(
+      async (
+        category:
+          string,
+
+        key:
+          string,
+
+        description:
+          string,
+
+        defaultEnabled:
+          boolean =
+            false,
+      ) => {
+
+        const current =
+          getWorkspaceSetting(
+            key,
+          );
+
+
+        const currentEnabled =
+          typeof current.enabled ===
+          "boolean"
+            ? current.enabled
+            : defaultEnabled;
+
+
+        const next =
+          {
+            ...current,
+
+            enabled:
+              !currentEnabled,
+          };
+
+
+        updateWorkspaceSettingValue(
+          key,
+          next,
+        );
+
+
+        await persistWorkspaceSetting(
+          category,
+          key,
+          next,
+          description,
+        );
+
+      },
+      [
+        getWorkspaceSetting,
+        updateWorkspaceSettingValue,
+        persistWorkspaceSetting,
+      ],
+    );
+
+
+
+  const loadSoftwareUpdate =
+    useCallback(
+      async () => {
+
+        try {
+
+          setLoading(
+            true,
+          );
+
+
+          setError(
+            null,
+          );
+
+
+          const result =
+            await getCurrentSoftwareUpdate();
+
+
+          setSoftwareUpdate(
+            result,
+          );
+
+        } catch (
+          loadError
+        ) {
+
+          console.error(
+            "Unable to load software update:",
+            loadError,
+          );
+
+
+          setError(
+            "Unable to load software update information. Please try again.",
+          );
+
+        } finally {
+
+          setLoading(
+            false,
+          );
+
+        }
+
+      },
+      [],
+    );
+
+
+  useEffect(
+    () => {
+
+      void Promise.all(
+        [
+          loadSoftwareUpdate(),
+          loadWorkspaceSettings(),
+        ],
+      );
+
+    },
+    [
+      loadSoftwareUpdate,
+      loadWorkspaceSettings,
+    ],
+  );
+
+
+  if (
+    loading
+  ) {
+
+    return (
+      <main className="flex min-h-[60vh] items-center justify-center">
+
+        <div className="space-y-4 text-center">
+
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#0A3F61]/10 text-[#0A3F61]">
+
+            <Loader2
+              className="animate-spin"
+              size={24}
+            />
+
+          </div>
+
+
+          <p className="text-sm text-slate-500">
+
+            Loading settings...
+
+          </p>
+
+        </div>
+
+      </main>
+    );
+
+  }
+
+
+  return (
+    <main className="mx-auto w-full max-w-6xl space-y-8 pb-10">
+
+      <section className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+
+        <div>
+
+          <div className="flex items-center gap-3">
+
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#0A3F61]/10 text-[#0A3F61]">
+
+              <Settings
+                size={22}
+              />
+
+            </div>
+
+
+            <div>
+
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+
+                Settings
+
+              </h1>
+
+
+              <p className="mt-1 text-sm text-slate-500">
+
+                Manage your PhotoOS workspace, preferences, and software information.
+
+              </p>
+
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <button
+          type="button"
+          onClick={
+            loadSoftwareUpdate
+          }
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+        >
+
+          <RefreshCw
+            size={16}
+          />
+
+          Refresh
+
+        </button>
+
+      </section>
+
+
+      {/* Software Update */}
+
+      <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_4px_20px_rgb(15,23,42,0.03)] sm:p-8">
+
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+
+          <div className="flex gap-4">
+
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#0A3F61]/10 text-[#0A3F61]">
+
+              <Sparkles
+                size={24}
+              />
+
+            </div>
+
+
+            <div>
+
+              <p className="text-sm font-semibold text-[#0A3F61]">
+
+                SOFTWARE UPDATE
+
+              </p>
+
+
+              <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-900">
+
+                {
+                  softwareUpdate
+                    ?.release_name ??
+                  "PhotoOS"
+                }
+
+              </h2>
+
+
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+
+                {
+                  softwareUpdate
+                    ? `Version ${softwareUpdate.version} is the current available PhotoOS release.`
+                    : "No software version information is currently available."
+                }
+
+              </p>
+
+            </div>
+
+          </div>
+
+
+          {
+            softwareUpdate
+              ? (
+                <div className="inline-flex items-center gap-2 self-start rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-700">
+
+                  <CheckCircle2
+                    size={16}
+                  />
+
+                  Up to date
+
+                </div>
+              )
+              : null
+          }
+
+        </div>
+
+
+        {
+          error
+            ? (
+              <div className="mt-8 rounded-2xl border border-red-100 bg-red-50 p-4">
+
+                <p className="text-sm font-medium text-red-700">
+
+                  {
+                    error
+                  }
+
+                </p>
+
+              </div>
+            )
+            : null
+        }
+
+
+        {
+          softwareUpdate
+            ? (
+              <>
+                <div className="mt-8 grid gap-4 md:grid-cols-3">
+
+                  <div className="rounded-2xl bg-slate-50 p-5">
+
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+
+                      Version
+
+                    </p>
+
+
+                    <p className="mt-2 text-lg font-bold text-slate-900">
+
+                      {
+                        softwareUpdate.version
+                      }
+
+                    </p>
+
+                  </div>
+
+
+                  <div className="rounded-2xl bg-slate-50 p-5">
+
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+
+                      Schema Version
+
+                    </p>
+
+
+                    <p className="mt-2 text-lg font-bold text-slate-900">
+
+                      {
+                        getDisplaySchemaVersion(
+                          softwareUpdate,
+                        )
+                      }
+
+                    </p>
+
+                  </div>
+
+
+                  <div className="rounded-2xl bg-slate-50 p-5">
+
+                    <div className="flex items-center gap-2 text-slate-400">
+
+                      <Clock3
+                        size={14}
+                      />
+
+
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em]">
+
+                        Released
+
+                      </p>
+
+                    </div>
+
+
+                    <p className="mt-2 text-sm font-semibold text-slate-900">
+
+                      {
+                        formatDate(
+                          softwareUpdate.released_at,
+                        )
+                      }
+
+                    </p>
+
+                  </div>
+
+                </div>
+
+
+                {
+                  softwareUpdate.release_notes
+                    ? (
+                      <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
+
+                        <button
+                          type="button"
+                          onClick={
+                            () => {
+
+                              setShowReleaseNotes(
+                                (
+                                  current,
+                                ) =>
+                                  !current,
+                              );
+
+                            }
+                          }
+                          className="flex w-full items-center justify-between gap-4 bg-slate-50 px-5 py-4 text-left transition hover:bg-slate-100"
+                        >
+
+                          <div className="flex items-center gap-3">
+
+                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0A3F61]/10 text-[#0A3F61]">
+
+                              <Download
+                                size={17}
+                              />
+
+                            </div>
+
+
+                            <div>
+
+                              <p className="text-sm font-bold text-slate-900">
+
+                                What’s New
+
+                              </p>
+
+
+                              <p className="mt-1 text-xs text-slate-500">
+
+                                View release details for this version
+
+                              </p>
+
+                            </div>
+
+                          </div>
+
+
+                          {
+                            showReleaseNotes
+                              ? (
+                                <ChevronUp
+                                  size={20}
+                                  className="text-slate-500"
+                                />
+                              )
+                              : (
+                                <ChevronDown
+                                  size={20}
+                                  className="text-slate-500"
+                                />
+                              )
+                          }
+
+                        </button>
+
+
+                        {
+                          showReleaseNotes
+                            ? (
+                              <div className="border-t border-slate-200 bg-white p-5">
+
+                                <p className="whitespace-pre-wrap text-sm leading-7 text-slate-600">
+
+                                  {
+                                    softwareUpdate.release_notes
+                                  }
+
+                                </p>
+
+                              </div>
+                            )
+                            : null
+                        }
+
+                      </div>
+                    )
+                    : null
+                }
+              </>
+            )
+            : null
+        }
+
+      </section>
+
+
+      {/* Workspace Settings */}
+
+      <section>
+
+        <div className="mb-4">
+
+          <h2 className="text-lg font-bold text-slate-900">
+
+            Workspace Settings
+
+          </h2>
+
+
+          <p className="mt-1 text-sm text-slate-500">
+
+            Manage your studio and workspace preferences.
+
+          </p>
+
+        </div>
+
+
+        <div className="grid gap-4 md:grid-cols-2">
+
+          <button
+            type="button"
+            className="group rounded-2xl border border-slate-200 bg-white p-5 text-left transition hover:border-[#0A3F61]/30 hover:shadow-sm"
+          >
+
+            <div className="flex items-start gap-4">
+
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-[#0A3F61]">
+
+                <Building2
+                  size={21}
+                />
+
+              </div>
+
+
+              <div>
+
+                <h3 className="font-bold text-slate-900">
+
+                  Studio Settings
+
+                </h3>
+
+
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+
+                  Manage your studio information and workspace preferences.
+
+                </p>
+
+              </div>
+
+            </div>
+
+          </button>
+
+
+          <button
+            type="button"
+            className="group rounded-2xl border border-slate-200 bg-white p-5 text-left transition hover:border-[#0A3F61]/30 hover:shadow-sm"
+          >
+
+            <div className="flex items-start gap-4">
+
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-[#0A3F61]">
+
+                <Users
+                  size={21}
+                />
+
+              </div>
+
+
+              <div>
+
+                <h3 className="font-bold text-slate-900">
+
+                  Team Preferences
+
+                </h3>
+
+
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+
+                  Configure team access and workspace preferences.
+
+                </p>
+
+              </div>
+
+            </div>
+
+          </button>
+
+
+          <button
+            type="button"
+            className="group rounded-2xl border border-slate-200 bg-white p-5 text-left transition hover:border-[#0A3F61]/30 hover:shadow-sm"
+          >
+
+            <div className="flex items-start gap-4">
+
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-[#0A3F61]">
+
+                <Bell
+                  size={21}
+                />
+
+              </div>
+
+
+              <div>
+
+                <h3 className="font-bold text-slate-900">
+
+                  Notifications
+
+                </h3>
+
+
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+
+                  Control notification preferences and alerts.
+
+                </p>
+
+              </div>
+
+            </div>
+
+          </button>
+
+
+          <button
+            type="button"
+            className="group rounded-2xl border border-slate-200 bg-white p-5 text-left transition hover:border-[#0A3F61]/30 hover:shadow-sm"
+          >
+
+            <div className="flex items-start gap-4">
+
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-[#0A3F61]">
+
+                <ShieldCheck
+                  size={21}
+                />
+
+              </div>
+
+
+              <div>
+
+                <h3 className="font-bold text-slate-900">
+
+                  Security & Access
+
+                </h3>
+
+
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+
+                  Review access controls and workspace security settings.
+
+                </p>
+
+              </div>
+
+            </div>
+
+          </button>
+
+
+          <button
+            type="button"
+            className="group rounded-2xl border border-slate-200 bg-white p-5 text-left transition hover:border-[#0A3F61]/30 hover:shadow-sm md:col-span-2"
+          >
+
+            <div className="flex items-start gap-4">
+
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-[#0A3F61]">
+
+                <Database
+                  size={21}
+                />
+
+              </div>
+
+
+              <div>
+
+                <h3 className="font-bold text-slate-900">
+
+                  System Preferences
+
+                </h3>
+
+
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+
+                  Configure system-level preferences for your PhotoOS workspace.
+
+                </p>
+
+              </div>
+
+            </div>
+
+          </button>
+
+        </div>
+
+      </section>
+
+
+      {/* General Settings */}
+
+      <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_4px_20px_rgb(15,23,42,0.03)] sm:p-8">
+
+        <div className="flex items-start gap-4">
+
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-[#0A3F61]">
+
+            <SlidersHorizontal
+              size={23}
+            />
+
+          </div>
+
+
+          <div>
+
+            <h2 className="text-lg font-bold text-slate-900">
+
+              General
+
+            </h2>
+
+
+            <p className="mt-1 text-sm leading-6 text-slate-500">
+
+              Manage your general PhotoOS workspace preferences.
+
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <div className="mt-6 divide-y divide-slate-100">
+
+          <SettingsRow
+            icon={Globe2}
+            title="Workspace Preferences"
+            description="Language, timezone and general workspace preferences."
+          />
+
+
+          <SettingsRow
+            icon={Palette}
+            title="Appearance"
+            description="Manage display and interface preferences."
+          />
+
+        </div>
+
+      </section>
+
+
+      {/* Studio Settings */}
+
+      <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_4px_20px_rgb(15,23,42,0.03)] sm:p-8">
+
+        <div className="flex items-start gap-4">
+
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-[#0A3F61]">
+
+            <Building2
+              size={23}
+            />
+
+          </div>
+
+
+          <div>
+
+            <h2 className="text-lg font-bold text-slate-900">
+
+              Studio & Workspace
+
+            </h2>
+
+
+            <p className="mt-1 text-sm leading-6 text-slate-500">
+
+              Control your studio information and workspace configuration.
+
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <div className="mt-6 divide-y divide-slate-100">
+
+          <SettingsRow
+            icon={Building2}
+            title="Studio Profile"
+            description="Studio name, contact details and business information."
+          />
+
+
+          <SettingsRow
+            icon={UsersRound}
+            title="Team & Access"
+            description="Manage team members, roles and workspace access."
+          />
+
+        </div>
+
+      </section>
+
+
+      {/* Notifications */}
+
+      <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_4px_20px_rgb(15,23,42,0.03)] sm:p-8">
+
+        <div className="flex items-start gap-4">
+
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-[#0A3F61]">
+
+            <Bell
+              size={23}
+            />
+
+          </div>
+
+
+          <div>
+
+            <h2 className="text-lg font-bold text-slate-900">
+
+              Notifications
+
+            </h2>
+
+
+            <p className="mt-1 text-sm leading-6 text-slate-500">
+
+              Choose how and when PhotoOS keeps you informed.
+
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <div className="mt-6 divide-y divide-slate-100">
+
+          <SettingsRow
+            icon={Bell}
+            title="Notification Preferences"
+            description="Control in-app alerts and notification preferences."
+          />
+
+
+          <SettingsRow
+            icon={Mail}
+            title="Email Preferences"
+            description="Manage software, workspace and communication emails."
+          />
+
+        </div>
+
+      </section>
+
+
+      {/* Security */}
+
+      <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_4px_20px_rgb(15,23,42,0.03)] sm:p-8">
+
+        <div className="flex items-start gap-4">
+
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-[#0A3F61]">
+
+            <ShieldCheck
+              size={23}
+            />
+
+          </div>
+
+
+          <div>
+
+            <h2 className="text-lg font-bold text-slate-900">
+
+              Security
+
+            </h2>
+
+
+            <p className="mt-1 text-sm leading-6 text-slate-500">
+
+              Review account security and workspace protection settings.
+
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <div className="mt-6 divide-y divide-slate-100">
+
+          <SettingsRow
+            icon={LockKeyhole}
+            title="Account Security"
+            description="Manage sign-in and account security preferences."
+          />
+
+
+          <SettingsRow
+            icon={ShieldCheck}
+            title="Privacy & Permissions"
+            description="Review privacy controls and workspace permissions."
+          />
+
+        </div>
+
+      </section>
+
+
+      {/* Business Settings */}
+
+      <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_4px_20px_rgb(15,23,42,0.03)] sm:p-8">
+
+        <div className="flex items-start gap-4">
+
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-[#0A3F61]">
+
+            <CreditCard
+              size={23}
+            />
+
+          </div>
+
+
+          <div>
+
+            <h2 className="text-lg font-bold text-slate-900">
+
+              Business & Operations
+
+            </h2>
+
+
+            <p className="mt-1 text-sm leading-6 text-slate-500">
+
+              Configure booking, payments and business operations.
+
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <div className="mt-6 divide-y divide-slate-100">
+
+          <SettingsRow
+            icon={CreditCard}
+            title="Payments"
+            description="Manage payment preferences and financial settings."
+          />
+
+
+          <SettingsRow
+            icon={Building2}
+            title="Booking & Marketplace"
+            description="Configure booking availability and marketplace preferences."
+          />
+
+        </div>
+
+      </section>
+
+
+      {/* Data Settings */}
+
+      <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_4px_20px_rgb(15,23,42,0.03)] sm:p-8">
+
+        <div className="flex items-start gap-4">
+
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-[#0A3F61]">
+
+            <Database
+              size={23}
+            />
+
+          </div>
+
+
+          <div>
+
+            <h2 className="text-lg font-bold text-slate-900">
+
+              Data & Advanced
+
+            </h2>
+
+
+            <p className="mt-1 text-sm leading-6 text-slate-500">
+
+              Manage your workspace data and advanced configuration.
+
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <div className="mt-6 divide-y divide-slate-100">
+
+          <SettingsRow
+            icon={Database}
+            title="Data Management"
+            description="Review exports, workspace data and data controls."
+          />
+
+
+          <SettingsRow
+            icon={SlidersHorizontal}
+            title="Advanced Settings"
+            description="Configure advanced PhotoOS workspace options."
+          />
+
+        </div>
+
+      </section>
+
+
+      {/* =====================================================
+          WATERMARK SETTINGS
+      ====================================================== */}
+
+      <section
+        id="watermark"
+        className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_4px_20px_rgb(15,23,42,0.03)] sm:p-8"
+      >
+
+        <div className="flex flex-col gap-6">
+
+          <div className="flex items-start justify-between gap-6">
+
+            <div className="flex gap-4">
+
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#0A3F61]/10 text-[#0A3F61]">
+
+                <Image
+                  size={24}
+                />
+
+              </div>
+
+
+              <div>
+
+                <h2 className="text-xl font-bold tracking-tight text-slate-900">
+
+                  Watermark
+
+                </h2>
+
+
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+
+                  Control which watermark is used, how transparent it appears,
+                  where it is placed and when it is applied to studio assets.
+
+                </p>
+
+              </div>
+
+            </div>
+
+
+            <button
+              type="button"
+              onClick={
+                async () => {
+
+                  const nextSettings = {
+                    ...watermarkSettings,
+
+                    enabled:
+                      !watermarkSettings.enabled,
+                  };
+
+
+                  await persistWatermarkSettings(
+                    nextSettings,
+                  );
+
+                }
+              }
+              className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition ${
+                watermarkSettings.enabled
+                  ? "bg-[#0A3F61]"
+                  : "bg-slate-200"
+              }`}
+            >
+
+              <span
+                className={`inline-block h-5 w-5 rounded-full bg-white shadow transition ${
+                  watermarkSettings.enabled
+                    ? "translate-x-6"
+                    : "translate-x-1"
+                }`}
+              />
+
+            </button>
+
+          </div>
+
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+
+            <p className="text-sm font-semibold text-slate-900">
+
+              What happens when this is turned on?
+
+            </p>
+
+
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+
+              Enabled assets can receive your selected studio logo or uploaded
+              watermark during the configured delivery or export workflow.
+              Turning it off prevents automatic watermark application.
+
+            </p>
+
+          </div>
+
+
+          {
+            watermarkSettings.enabled
+              ? (
+                <div className="space-y-8">
+
+
+                  {/* SOURCE */}
+
+                  <div>
+
+                    <div className="mb-4">
+
+                      <h3 className="text-sm font-bold text-slate-900">
+
+                        Watermark source
+
+                      </h3>
+
+
+                      <p className="mt-1 text-sm text-slate-500">
+
+                        Choose the logo that should appear on your photos.
+
+                      </p>
+
+                    </div>
+
+
+                    <div className="grid gap-4 md:grid-cols-2">
+
+                      <button
+                        type="button"
+                        onClick={
+                          async () => {
+
+                            const nextSettings = {
+                              ...watermarkSettings,
+
+                              source:
+                                "existing_logo" as const,
+                            };
+
+
+                            await persistWatermarkSettings(
+                              nextSettings,
+                            );
+
+                          }
+                        }
+                        className={`rounded-2xl border p-5 text-left transition ${
+                          watermarkSettings.source ===
+                          "existing_logo"
+                            ? "border-[#0A3F61] bg-[#0A3F61]/5"
+                            : "border-slate-200 bg-white hover:border-slate-300"
+                        }`}
+                      >
+
+                        <div className="flex items-center gap-3">
+
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-[#0A3F61]">
+
+                            <Image
+                              size={20}
+                            />
+
+                          </div>
+
+
+                          <div>
+
+                            <p className="font-semibold text-slate-900">
+
+                              Use existing logo
+
+                            </p>
+
+
+                            <p className="mt-1 text-sm text-slate-500">
+
+                              Uses the studio logo already configured in PhotoOS.
+
+                            </p>
+
+                          </div>
+
+                        </div>
+
+                      </button>
+
+
+                      <button
+                        type="button"
+                        onClick={
+                          () => {
+
+                            document
+                              .getElementById(
+                                "watermark-upload",
+                              )
+                              ?.click();
+
+                          }
+                        }
+                        className={`rounded-2xl border p-5 text-left transition ${
+                          watermarkSettings.source ===
+                          "upload"
+                            ? "border-[#0A3F61] bg-[#0A3F61]/5"
+                            : "border-slate-200 bg-white hover:border-slate-300"
+                        }`}
+                      >
+
+                        <div className="flex items-center gap-3">
+
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-[#0A3F61]">
+
+                            <ImagePlus
+                              size={20}
+                            />
+
+                          </div>
+
+
+                          <div>
+
+                            <p className="font-semibold text-slate-900">
+
+                              Upload new watermark
+
+                            </p>
+
+
+                            <p className="mt-1 text-sm text-slate-500">
+
+                              Upload a separate PNG or image specifically for watermarking.
+
+                            </p>
+
+                          </div>
+
+                        </div>
+
+                      </button>
+
+                    </div>
+
+
+                    <input
+                      id="watermark-upload"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      onChange={
+                        handleWatermarkUpload
+                      }
+                    />
+
+
+                    {
+                      watermarkSettings.source ===
+                      "upload"
+                      ? (
+                        <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5">
+
+                          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+
+                            <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-white">
+
+                              {
+                                watermarkUploadPreview
+                                  ? (
+                                    <img
+                                      src={
+                                        watermarkUploadPreview
+                                      }
+                                      alt="Watermark preview"
+                                      className="h-full w-full object-contain"
+                                    />
+                                  )
+                                  : (
+                                    <Upload
+                                      className="text-slate-400"
+                                      size={24}
+                                    />
+                                  )
+                              }
+
+                            </div>
+
+
+                            <div className="flex-1">
+
+                              <p className="font-semibold text-slate-900">
+
+                                {
+                                  watermarkSettings.upload_name ??
+                                  "No watermark uploaded"
+                                }
+
+                              </p>
+
+
+                              <p className="mt-1 text-sm text-slate-500">
+
+                                PNG with a transparent background works best.
+
+                              </p>
+
+                            </div>
+
+
+                            <button
+                              type="button"
+                              onClick={
+                                () => {
+
+                                  document
+                                    .getElementById(
+                                      "watermark-upload",
+                                    )
+                                    ?.click();
+
+                                }
+                              }
+                              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+
+                              Change image
+
+                            </button>
+
+                          </div>
+
+                        </div>
+                      )
+                      : null
+                    }
+
+                  </div>
+
+
+                  {/* OPACITY + SIZE */}
+
+                  <div className="grid gap-6 lg:grid-cols-2">
+
+                    <div className="rounded-2xl border border-slate-200 p-5">
+
+                      <div className="flex items-center justify-between">
+
+                        <div>
+
+                          <p className="font-semibold text-slate-900">
+
+                            Opacity
+
+                          </p>
+
+
+                          <p className="mt-1 text-sm text-slate-500">
+
+                            Controls how visible the watermark appears.
+
+                          </p>
+
+                        </div>
+
+
+                        <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-sm font-bold text-slate-700">
+
+                          {watermarkSettings.opacity}%
+
+                        </span>
+
+                      </div>
+
+
+                      <input
+                        type="range"
+                        min="10"
+                        max="100"
+                        step="5"
+                        value={
+                          watermarkSettings.opacity
+                        }
+                        onChange={
+                          (
+                            event,
+                          ) => {
+
+                            setWatermarkSettings(
+                              {
+                                ...watermarkSettings,
+
+                                opacity:
+                                  Number(
+                                    event.target.value,
+                                  ),
+                              },
+                            );
+
+                          }
+                        }
+                        onMouseUp={
+                          async (
+                            event,
+                          ) => {
+
+                            const nextSettings = {
+                              ...watermarkSettings,
+
+                              opacity:
+                                Number(
+                                  (
+                                    event.target as HTMLInputElement
+                                  ).value,
+                                ),
+                            };
+
+
+                            await persistWatermarkSettings(
+                              nextSettings,
+                            );
+
+                          }
+                        }
+                        className="mt-6 w-full"
+                      />
+
+                    </div>
+
+
+                    <div className="rounded-2xl border border-slate-200 p-5">
+
+                      <div className="flex items-center justify-between">
+
+                        <div>
+
+                          <p className="font-semibold text-slate-900">
+
+                            Size
+
+                          </p>
+
+
+                          <p className="mt-1 text-sm text-slate-500">
+
+                            Controls the relative watermark size on the photo.
+
+                          </p>
+
+                        </div>
+
+
+                        <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-sm font-bold text-slate-700">
+
+                          {watermarkSettings.size}%
+
+                        </span>
+
+                      </div>
+
+
+                      <input
+                        type="range"
+                        min="5"
+                        max="50"
+                        step="1"
+                        value={
+                          watermarkSettings.size
+                        }
+                        onChange={
+                          (
+                            event,
+                          ) => {
+
+                            setWatermarkSettings(
+                              {
+                                ...watermarkSettings,
+
+                                size:
+                                  Number(
+                                    event.target.value,
+                                  ),
+                              },
+                            );
+
+                          }
+                        }
+                        onMouseUp={
+                          async (
+                            event,
+                          ) => {
+
+                            const nextSettings = {
+                              ...watermarkSettings,
+
+                              size:
+                                Number(
+                                  (
+                                    event.target as HTMLInputElement
+                                  ).value,
+                                ),
+                            };
+
+
+                            await persistWatermarkSettings(
+                              nextSettings,
+                            );
+
+                          }
+                        }
+                        className="mt-6 w-full"
+                      />
+
+                    </div>
+
+                  </div>
+
+
+                  {/* FIT / CROP */}
+
+                  <div>
+
+                    <h3 className="text-sm font-bold text-slate-900">
+
+                      Image behavior
+
+                    </h3>
+
+
+                    <p className="mt-1 text-sm text-slate-500">
+
+                      Decide how an uploaded watermark image should fit inside its watermark area.
+
+                    </p>
+
+
+                    <select
+                      value={
+                        watermarkSettings.fit
+                      }
+                      onChange={
+                        async (
+                          event,
+                        ) => {
+
+                          const nextSettings = {
+                            ...watermarkSettings,
+
+                            fit:
+                              event.target.value as WatermarkSettings["fit"],
+                          };
+
+
+                          await persistWatermarkSettings(
+                            nextSettings,
+                          );
+
+                        }
+                      }
+                      className="mt-4 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-[#0A3F61]"
+                    >
+
+                      <option value="contain">
+
+                        Contain
+
+                      </option>
+
+
+                      <option value="cover">
+
+                        Cover / crop
+
+                      </option>
+
+                    </select>
+
+                  </div>
+
+
+                  {/* POSITION */}
+
+                  <div>
+
+                    <div className="flex items-center gap-2">
+
+                      <MapPin
+                        size={18}
+                        className="text-[#0A3F61]"
+                      />
+
+
+                      <h3 className="text-sm font-bold text-slate-900">
+
+                        Watermark position
+
+                      </h3>
+
+                    </div>
+
+
+                    <p className="mt-1 text-sm text-slate-500">
+
+                      Choose where the watermark should appear on the photo.
+
+                    </p>
+
+
+                    <div className="mt-5 grid grid-cols-3 gap-3 sm:max-w-md">
+
+                      {
+                        [
+                          "top-left",
+                          "top-center",
+                          "top-right",
+                          "center-left",
+                          "center",
+                          "center-right",
+                          "bottom-left",
+                          "bottom-center",
+                          "bottom-right",
+                        ].map(
+                          (
+                            position,
+                          ) => (
+
+                            <button
+                              key={
+                                position
+                              }
+                              type="button"
+                              onClick={
+                                async () => {
+
+                                  const nextSettings = {
+                                    ...watermarkSettings,
+
+                                    position:
+                                      position as WatermarkSettings["position"],
+                                  };
+
+
+                                  await persistWatermarkSettings(
+                                    nextSettings,
+                                  );
+
+                                }
+                              }
+                              className={`flex aspect-square items-center justify-center rounded-xl border text-xs font-semibold capitalize transition ${
+                                watermarkSettings.position ===
+                                position
+                                  ? "border-[#0A3F61] bg-[#0A3F61] text-white"
+                                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                              }`}
+                            >
+
+                              {
+                                position
+                                  .replace(
+                                    "-",
+                                    " ",
+                                  )
+                              }
+
+                            </button>
+
+                          ),
+                        )
+                      }
+
+                    </div>
+
+                  </div>
+
+
+                  {/* APPLY OPTIONS */}
+
+                  <div className="rounded-2xl border border-slate-200 p-5">
+
+                    <h3 className="font-semibold text-slate-900">
+
+                      Apply watermark to
+
+                    </h3>
+
+
+                    <p className="mt-1 text-sm text-slate-500">
+
+                      Choose which generated or delivered files should receive the watermark.
+
+                    </p>
+
+
+                    <div className="mt-5 space-y-4">
+
+                      {
+                        [
+                          {
+                            key:
+                              "apply_on_export",
+
+                            title:
+                              "Exports",
+
+                            description:
+                              "Watermark exported images.",
+                          },
+                          {
+                            key:
+                              "apply_on_download",
+
+                            title:
+                              "Client downloads",
+
+                            description:
+                              "Watermark files generated for client download.",
+                          },
+                          {
+                            key:
+                              "apply_on_preview",
+
+                            title:
+                              "Gallery previews",
+
+                            description:
+                              "Show the watermark on preview images.",
+                          },
+                        ].map(
+                          (
+                            item,
+                          ) => {
+
+                            const checked =
+                              Boolean(
+                                watermarkSettings[
+                                  item.key as keyof WatermarkSettings
+                                ],
+                              );
+
+
+                            return (
+                              <label
+                                key={
+                                  item.key
+                                }
+                                className="flex cursor-pointer items-start justify-between gap-6"
+                              >
+
+                                <div>
+
+                                  <p className="text-sm font-semibold text-slate-900">
+
+                                    {
+                                      item.title
+                                    }
+
+                                  </p>
+
+
+                                  <p className="mt-1 text-sm text-slate-500">
+
+                                    {
+                                      item.description
+                                    }
+
+                                  </p>
+
+                                </div>
+
+
+                                <input
+                                  type="checkbox"
+                                  checked={
+                                    checked
+                                  }
+                                  onChange={
+                                    async (
+                                      event,
+                                    ) => {
+
+                                      const nextSettings = {
+                                        ...watermarkSettings,
+
+                                        [
+                                          item.key
+                                        ]:
+                                          event.target.checked,
+                                      };
+
+
+                                      await persistWatermarkSettings(
+                                        nextSettings,
+                                      );
+
+                                    }
+                                  }
+                                  className="mt-1 h-5 w-5 rounded border-slate-300 text-[#0A3F61] focus:ring-[#0A3F61]"
+                                />
+
+                              </label>
+                            );
+
+                          },
+                        )
+                      }
+
+                    </div>
+
+                  </div>
+
+
+                  {
+                    watermarkSaving
+                      ? (
+                        <p className="text-sm font-medium text-[#0A3F61]">
+
+                          Saving watermark settings...
+
+                        </p>
+                      )
+                      : (
+                        <p className="text-sm text-emerald-600">
+
+                          Changes are saved automatically.
+
+                        </p>
+                      )
+                  }
+
+                </div>
+              )
+              : (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+
+                  <p className="font-semibold text-slate-700">
+
+                    Watermark is currently disabled
+
+                  </p>
+
+
+                  <p className="mt-2 text-sm text-slate-500">
+
+                    Turn it on to configure your logo, uploaded watermark,
+                    opacity, size, crop behavior, position and delivery rules.
+
+                  </p>
+
+                </div>
+              )
+          }
+
+        </div>
+
+      </section>
+
+
+      <section className="space-y-6">
+
+        <div className="flex items-start gap-4">
+
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#0A3F61]/10 text-[#0A3F61]">
+
+            <SlidersHorizontal
+              size={21}
+            />
+
+          </div>
+
+
+          <div>
+
+            <h2 className="text-xl font-bold tracking-tight text-slate-900">
+
+              Live Workspace Controls
+
+            </h2>
+
+
+            <p className="mt-1 text-sm leading-6 text-slate-500">
+
+              These settings are saved to your PhotoOS workspace. Turning a setting on or off changes how that feature behaves for this studio.
+
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <div className="grid gap-6 xl:grid-cols-2">
+
+
+          <div className="space-y-3 rounded-[28px] border border-slate-200 bg-slate-50/50 p-5">
+
+            <div className="mb-2 flex items-center gap-3">
+
+              <Globe2
+                size={19}
+                className="text-[#0A3F61]"
+              />
+
+
+              <div>
+
+                <h3 className="font-bold text-slate-900">
+
+                  General & Workspace
+
+                </h3>
+
+
+                <p className="text-xs text-slate-500">
+
+                  Controls the everyday PhotoOS workspace experience.
+
+                </p>
+
+              </div>
+
+            </div>
+
+
+            <InteractiveSettingRow
+              title="Compact workspace"
+              description="Reduces spacing in workspace screens so more projects, clients and records are visible at once."
+              category="studio"
+              settingKey="compact_workspace"
+              icon={SlidersHorizontal}
+              enabled={
+                Boolean(
+                  getWorkspaceSetting(
+                    "compact_workspace",
+                  ).enabled,
+                )
+              }
+              saving={
+                savingSetting ===
+                "compact_workspace"
+              }
+              onToggle={
+                () =>
+                  void toggleWorkspaceSetting(
+                    "studio",
+                    "compact_workspace",
+                    "Use a denser workspace layout with reduced visual spacing.",
+                  )
+              }
+            />
+
+
+            <InteractiveSettingRow
+              title="Show recent activity"
+              description="Displays recent studio activity and workspace changes in relevant dashboard and workspace areas."
+              category="studio"
+              settingKey="recent_activity"
+              icon={Clock3}
+              enabled={
+                Boolean(
+                  getWorkspaceSetting(
+                    "recent_activity",
+                  ).enabled,
+                )
+              }
+              saving={
+                savingSetting ===
+                "recent_activity"
+              }
+              onToggle={
+                () =>
+                  void toggleWorkspaceSetting(
+                    "studio",
+                    "recent_activity",
+                    "Show recent studio activity across supported workspace screens.",
+                    true,
+                  )
+              }
+            />
+
+
+            <InteractiveSettingRow
+              title="Enable interface animations"
+              description="Turns PhotoOS interface transitions and supported motion effects on or off."
+              category="studio"
+              settingKey="interface_animations"
+              icon={Palette}
+              enabled={
+                typeof getWorkspaceSetting(
+                  "interface_animations",
+                ).enabled ===
+                "boolean"
+                  ? Boolean(
+                      getWorkspaceSetting(
+                        "interface_animations",
+                      ).enabled,
+                    )
+                  : true
+              }
+              saving={
+                savingSetting ===
+                "interface_animations"
+              }
+              onToggle={
+                () =>
+                  void toggleWorkspaceSetting(
+                    "studio",
+                    "interface_animations",
+                    "Enable visual transitions and supported interface animations.",
+                    true,
+                  )
+              }
+            />
+
+          </div>
+
+
+          <div className="space-y-3 rounded-[28px] border border-slate-200 bg-slate-50/50 p-5">
+
+            <div className="mb-2 flex items-center gap-3">
+
+              <Building2
+                size={19}
+                className="text-[#0A3F61]"
+              />
+
+
+              <div>
+
+                <h3 className="font-bold text-slate-900">
+
+                  Studio & Team
+
+                </h3>
+
+
+                <p className="text-xs text-slate-500">
+
+                  Controls what your team can see and how studio activity is shared.
+
+                </p>
+
+              </div>
+
+            </div>
+
+
+            <InteractiveSettingRow
+              title="Team activity visibility"
+              description="Allows supported workspace areas to show relevant activity performed by studio team members."
+              category="studio"
+              settingKey="team_activity_visibility"
+              icon={UsersRound}
+              enabled={
+                typeof getWorkspaceSetting(
+                  "team_activity_visibility",
+                ).enabled ===
+                "boolean"
+                  ? Boolean(
+                      getWorkspaceSetting(
+                        "team_activity_visibility",
+                      ).enabled,
+                    )
+                  : true
+              }
+              saving={
+                savingSetting ===
+                "team_activity_visibility"
+              }
+              onToggle={
+                () =>
+                  void toggleWorkspaceSetting(
+                    "studio",
+                    "team_activity_visibility",
+                    "Show supported team activity within the studio workspace.",
+                    true,
+                  )
+              }
+            />
+
+
+            <InteractiveSettingRow
+              title="Client workspace access"
+              description="Keeps supported client-facing workspace features available when client access is configured."
+              category="studio"
+              settingKey="client_workspace_access"
+              icon={Users}
+              enabled={
+                typeof getWorkspaceSetting(
+                  "client_workspace_access",
+                ).enabled ===
+                "boolean"
+                  ? Boolean(
+                      getWorkspaceSetting(
+                        "client_workspace_access",
+                      ).enabled,
+                    )
+                  : true
+              }
+              saving={
+                savingSetting ===
+                "client_workspace_access"
+              }
+              onToggle={
+                () =>
+                  void toggleWorkspaceSetting(
+                    "studio",
+                    "client_workspace_access",
+                    "Allow configured clients to use supported client workspace features.",
+                    true,
+                  )
+              }
+            />
+
+          </div>
+
+
+          <div className="space-y-3 rounded-[28px] border border-slate-200 bg-slate-50/50 p-5">
+
+            <div className="mb-2 flex items-center gap-3">
+
+              <Bell
+                size={19}
+                className="text-[#0A3F61]"
+              />
+
+
+              <div>
+
+                <h3 className="font-bold text-slate-900">
+
+                  Notifications
+
+                </h3>
+
+
+                <p className="text-xs text-slate-500">
+
+                  Controls which workspace alerts are allowed.
+
+                </p>
+
+              </div>
+
+            </div>
+
+
+            <InteractiveSettingRow
+              title="In-app notifications"
+              description="Shows supported PhotoOS notifications inside the application."
+              category="notification"
+              settingKey="in_app_notifications"
+              icon={Bell}
+              enabled={
+                typeof getWorkspaceSetting(
+                  "in_app_notifications",
+                ).enabled ===
+                "boolean"
+                  ? Boolean(
+                      getWorkspaceSetting(
+                        "in_app_notifications",
+                      ).enabled,
+                    )
+                  : true
+              }
+              saving={
+                savingSetting ===
+                "in_app_notifications"
+              }
+              onToggle={
+                () =>
+                  void toggleWorkspaceSetting(
+                    "notification",
+                    "in_app_notifications",
+                    "Allow supported notifications to appear inside PhotoOS.",
+                    true,
+                  )
+              }
+            />
+
+
+            <InteractiveSettingRow
+              title="Email notifications"
+              description="Allows PhotoOS notification workflows to send supported alerts through email."
+              category="notification"
+              settingKey="email_notifications"
+              icon={Mail}
+              enabled={
+                Boolean(
+                  getWorkspaceSetting(
+                    "email_notifications",
+                  ).enabled,
+                )
+              }
+              saving={
+                savingSetting ===
+                "email_notifications"
+              }
+              onToggle={
+                () =>
+                  void toggleWorkspaceSetting(
+                    "notification",
+                    "email_notifications",
+                    "Allow supported PhotoOS notification emails.",
+                  )
+              }
+            />
+
+
+            <InteractiveSettingRow
+              title="Payment alerts"
+              description="Shows supported alerts for payment updates, pending payments and related financial activity."
+              category="notification"
+              settingKey="payment_alerts"
+              icon={CreditCard}
+              enabled={
+                typeof getWorkspaceSetting(
+                  "payment_alerts",
+                ).enabled ===
+                "boolean"
+                  ? Boolean(
+                      getWorkspaceSetting(
+                        "payment_alerts",
+                      ).enabled,
+                    )
+                  : true
+              }
+              saving={
+                savingSetting ===
+                "payment_alerts"
+              }
+              onToggle={
+                () =>
+                  void toggleWorkspaceSetting(
+                    "notification",
+                    "payment_alerts",
+                    "Enable supported payment and billing notifications.",
+                    true,
+                  )
+              }
+            />
+
+          </div>
+
+
+          <div className="space-y-3 rounded-[28px] border border-slate-200 bg-slate-50/50 p-5">
+
+            <div className="mb-2 flex items-center gap-3">
+
+              <LockKeyhole
+                size={19}
+                className="text-[#0A3F61]"
+              />
+
+
+              <div>
+
+                <h3 className="font-bold text-slate-900">
+
+                  Security
+
+                </h3>
+
+
+                <p className="text-xs text-slate-500">
+
+                  Controls additional account and workspace protection behavior.
+
+                </p>
+
+              </div>
+
+            </div>
+
+
+            <InteractiveSettingRow
+              title="Login activity alerts"
+              description="Allows supported security workflows to notify you about important account sign-in activity."
+              category="security"
+              settingKey="login_activity_alerts"
+              icon={ShieldCheck}
+              enabled={
+                typeof getWorkspaceSetting(
+                  "login_activity_alerts",
+                ).enabled ===
+                "boolean"
+                  ? Boolean(
+                      getWorkspaceSetting(
+                        "login_activity_alerts",
+                      ).enabled,
+                    )
+                  : true
+              }
+              saving={
+                savingSetting ===
+                "login_activity_alerts"
+              }
+              onToggle={
+                () =>
+                  void toggleWorkspaceSetting(
+                    "security",
+                    "login_activity_alerts",
+                    "Enable supported alerts for important login activity.",
+                    true,
+                  )
+              }
+            />
+
+
+            <InteractiveSettingRow
+              title="Session protection"
+              description="Enables stricter supported session handling for the studio workspace."
+              category="security"
+              settingKey="session_protection"
+              icon={LockKeyhole}
+              enabled={
+                typeof getWorkspaceSetting(
+                  "session_protection",
+                ).enabled ===
+                "boolean"
+                  ? Boolean(
+                      getWorkspaceSetting(
+                        "session_protection",
+                      ).enabled,
+                    )
+                  : true
+              }
+              saving={
+                savingSetting ===
+                "session_protection"
+              }
+              onToggle={
+                () =>
+                  void toggleWorkspaceSetting(
+                    "security",
+                    "session_protection",
+                    "Enable stricter supported workspace session protection.",
+                    true,
+                  )
+              }
+            />
+
+          </div>
+
+
+          <div className="space-y-3 rounded-[28px] border border-slate-200 bg-slate-50/50 p-5">
+
+            <div className="mb-2 flex items-center gap-3">
+
+              <Database
+                size={19}
+                className="text-[#0A3F61]"
+              />
+
+
+              <div>
+
+                <h3 className="font-bold text-slate-900">
+
+                  Data & Storage
+
+                </h3>
+
+
+                <p className="text-xs text-slate-500">
+
+                  Controls supported storage and data management behavior.
+
+                </p>
+
+              </div>
+
+            </div>
+
+
+            <InteractiveSettingRow
+              title="Storage usage warnings"
+              description="Shows supported warnings when your studio storage approaches configured limits."
+              category="storage"
+              settingKey="storage_usage_warnings"
+              icon={Database}
+              enabled={
+                typeof getWorkspaceSetting(
+                  "storage_usage_warnings",
+                ).enabled ===
+                "boolean"
+                  ? Boolean(
+                      getWorkspaceSetting(
+                        "storage_usage_warnings",
+                      ).enabled,
+                    )
+                  : true
+              }
+              saving={
+                savingSetting ===
+                "storage_usage_warnings"
+              }
+              onToggle={
+                () =>
+                  void toggleWorkspaceSetting(
+                    "storage",
+                    "storage_usage_warnings",
+                    "Show supported warnings about studio storage usage.",
+                    true,
+                  )
+              }
+            />
+
+
+            <InteractiveSettingRow
+              title="Automatic archive"
+              description="Allows future supported archive workflows to automatically archive eligible workspace data."
+              category="storage"
+              settingKey="automatic_archive"
+              icon={Database}
+              enabled={
+                Boolean(
+                  getWorkspaceSetting(
+                    "automatic_archive",
+                  ).enabled,
+                )
+              }
+              saving={
+                savingSetting ===
+                "automatic_archive"
+              }
+              onToggle={
+                () =>
+                  void toggleWorkspaceSetting(
+                    "storage",
+                    "automatic_archive",
+                    "Allow supported eligible workspace data to be automatically archived.",
+                  )
+              }
+            />
+
+          </div>
+
+
+          <div className="space-y-3 rounded-[28px] border border-slate-200 bg-slate-50/50 p-5">
+
+            <div className="mb-2 flex items-center gap-3">
+
+              <Sparkles
+                size={19}
+                className="text-[#0A3F61]"
+              />
+
+
+              <div>
+
+                <h3 className="font-bold text-slate-900">
+
+                  Advanced
+
+                </h3>
+
+
+                <p className="text-xs text-slate-500">
+
+                  Optional controls for upcoming and experimental PhotoOS features.
+
+                </p>
+
+              </div>
+
+            </div>
+
+
+            <InteractiveSettingRow
+              title="Beta features"
+              description="Allows this studio to access supported PhotoOS features that are still being tested before wider release."
+              category="feature"
+              settingKey="beta_features"
+              icon={Sparkles}
+              enabled={
+                Boolean(
+                  getWorkspaceSetting(
+                    "beta_features",
+                  ).enabled,
+                )
+              }
+              saving={
+                savingSetting ===
+                "beta_features"
+              }
+              onToggle={
+                () =>
+                  void toggleWorkspaceSetting(
+                    "feature",
+                    "beta_features",
+                    "Allow access to supported PhotoOS beta features.",
+                  )
+              }
+            />
+
+
+            <InteractiveSettingRow
+              title="Diagnostic information"
+              description="Allows supported PhotoOS diagnostics to collect additional technical information for troubleshooting."
+              category="platform"
+              settingKey="diagnostic_information"
+              icon={Settings}
+              enabled={
+                Boolean(
+                  getWorkspaceSetting(
+                    "diagnostic_information",
+                  ).enabled,
+                )
+              }
+              saving={
+                savingSetting ===
+                "diagnostic_information"
+              }
+              onToggle={
+                () =>
+                  void toggleWorkspaceSetting(
+                    "platform",
+                    "diagnostic_information",
+                    "Allow supported diagnostic information for troubleshooting.",
+                  )
+              }
+            />
+
+          </div>
+
+        </div>
+
+      </section>
+
+    </main>
+  );
+
+}
+
+
+type SettingsRowProps = {
+
+  icon:
+    React.ElementType;
+
+  title:
+    string;
+
+  description:
+    string;
+
+};
+
+
+function SettingsRow({
+  icon: Icon,
+  title,
+  description,
+}: SettingsRowProps) {
+
+  return (
+    <button
+      type="button"
+      className="flex w-full items-center gap-4 py-5 text-left transition hover:bg-slate-50"
+    >
+
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-[#0A3F61]">
+
+        <Icon
+          size={19}
+        />
+
+      </div>
+
+
+      <div className="min-w-0 flex-1">
+
+        <p className="font-semibold text-slate-900">
+
+          {title}
+
+        </p>
+
+
+        <p className="mt-1 text-sm leading-6 text-slate-500">
+
+          {description}
+
+        </p>
+
+      </div>
+
+
+      <ChevronRight
+        size={19}
+        className="shrink-0 text-slate-400"
+      />
+
+    </button>
+  );
+
+}

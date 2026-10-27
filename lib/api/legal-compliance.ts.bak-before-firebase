@@ -1,0 +1,361 @@
+import {
+  supabase,
+} from "@/lib/supabase/client";
+
+
+// =============================================================================
+// MEMBER COMPLIANCE STATUS
+// =============================================================================
+
+export interface MemberComplianceStatus {
+  studio_member_id: string;
+  studio_id: string;
+  profile_id: string;
+  role_id: string;
+  role_code: string;
+  is_photoos_admin: boolean;
+  compliance_required: boolean;
+  is_compliant: boolean;
+}
+
+
+export async function getCurrentMemberComplianceStatus(
+  studioId: string,
+): Promise<MemberComplianceStatus> {
+
+  const {
+    data,
+    error,
+  } =
+    await supabase.rpc(
+      "get_current_member_compliance_status",
+      {
+        p_studio_id:
+          studioId,
+      },
+    );
+
+
+  if (error) {
+
+    throw error;
+
+  }
+
+
+  if (
+    !data ||
+    !Array.isArray(
+      data,
+    ) ||
+    !data[0]
+  ) {
+
+    throw new Error(
+      "Unable to resolve member compliance status.",
+    );
+
+  }
+
+
+  return data[0] as
+    MemberComplianceStatus;
+
+}
+
+
+// =============================================================================
+// ACCEPT LEGAL COMPLIANCE
+// =============================================================================
+
+export interface AcceptLegalComplianceResponse {
+  acceptance_id: string;
+  studio_member_id: string;
+  studio_id: string;
+  agreement_version_id: string;
+  accepted_at: string;
+  is_compliant: boolean;
+}
+
+
+export async function acceptCurrentMemberLegalCompliance(
+  studioId: string,
+): Promise<AcceptLegalComplianceResponse> {
+
+  const userAgent =
+    typeof window !==
+    "undefined"
+      ? window.navigator.userAgent
+      : "";
+
+
+  const {
+    data,
+    error,
+  } =
+    await supabase.rpc(
+      "accept_current_member_legal_compliance",
+      {
+        p_studio_id:
+          studioId,
+
+        p_user_agent:
+          userAgent,
+      },
+    );
+
+
+  if (error) {
+
+    throw error;
+
+  }
+
+
+  if (
+    !data ||
+    !Array.isArray(
+      data,
+    ) ||
+    !data[0]
+  ) {
+
+    throw new Error(
+      "Legal compliance acceptance returned an empty response.",
+    );
+
+  }
+
+
+  return data[0] as
+    AcceptLegalComplianceResponse;
+
+}
+// =============================================================================
+// CURRENT LEGAL COMPLIANCE AGREEMENTS
+// =============================================================================
+
+export type LegalLanguageCode =
+  | "en"
+  | "mr";
+
+
+export const LEGAL_LANGUAGE_OPTIONS = [
+  {
+    code: "en" as const,
+    label: "English",
+    nativeLabel: "English",
+  },
+  {
+    code: "mr" as const,
+    label: "Marathi",
+    nativeLabel: "मराठी",
+  },
+];
+
+
+export interface CurrentLegalComplianceAgreement {
+  id: string;
+  agreement_type: string;
+  version: string;
+  title: string;
+  language_code: string;
+  status: string;
+  content_markdown: string;
+  effective_from: string | null;
+  is_required: boolean;
+  metadata: Record<string, unknown>;
+}
+
+
+const REQUIRED_LEGAL_AGREEMENT_TYPES = [
+  "terms_of_service",
+  "privacy_policy",
+  "platform_agreement",
+] as const;
+
+
+export async function getCurrentLegalComplianceAgreements(
+  languageCode: LegalLanguageCode = "en",
+):
+  Promise<CurrentLegalComplianceAgreement[]> {
+
+  const {
+    data,
+    error,
+  } =
+    await supabase
+      .from(
+        "agreement_versions",
+      )
+      .select(
+        `
+          id,
+          agreement_type,
+          version,
+          title,
+          language_code,
+          status,
+          content_markdown,
+          effective_from,
+          is_required,
+          metadata
+        `,
+      )
+      .in(
+        "agreement_type",
+        REQUIRED_LEGAL_AGREEMENT_TYPES,
+      )
+      .eq(
+        "status",
+        "published",
+      )
+      .eq(
+        "is_required",
+        true,
+      )
+      .eq(
+        "language_code",
+        languageCode,
+      )
+      .order(
+        "effective_from",
+        {
+          ascending:
+            false,
+          nullsFirst:
+            false,
+        },
+      );
+
+
+  if (
+    error
+  ) {
+
+    throw error;
+
+  }
+
+
+  if (
+    !data ||
+    !Array.isArray(data)
+  ) {
+
+    throw new Error(
+      "Unable to load current legal compliance agreements.",
+    );
+
+  }
+
+
+  const agreements =
+    data as CurrentLegalComplianceAgreement[];
+
+
+  const missingAgreementTypes =
+    REQUIRED_LEGAL_AGREEMENT_TYPES.filter(
+      (agreementType) =>
+        !agreements.some(
+          (agreement) =>
+            agreement.agreement_type ===
+            agreementType,
+        ),
+    );
+
+
+  if (
+    missingAgreementTypes.length > 0
+  ) {
+
+    const languageName =
+      languageCode === "mr"
+        ? "Marathi"
+        : "English";
+
+
+    throw new Error(
+      `Required ${languageName} legal compliance agreements are unavailable: ${missingAgreementTypes.join(", ")}.`,
+    );
+
+  }
+
+
+  return REQUIRED_LEGAL_AGREEMENT_TYPES.map(
+    (agreementType) =>
+      agreements.find(
+        (agreement) =>
+          agreement.agreement_type ===
+          agreementType,
+      )!,
+  );
+
+}
+
+
+export async function getCurrentBilingualLegalComplianceAgreements(): Promise<{
+  en: CurrentLegalComplianceAgreement[];
+  mr: CurrentLegalComplianceAgreement[];
+}> {
+
+  const [
+    english,
+    marathi,
+  ] =
+    await Promise.all([
+      getCurrentLegalComplianceAgreements(
+        "en",
+      ),
+      getCurrentLegalComplianceAgreements(
+        "mr",
+      ),
+    ]);
+
+
+  return {
+    en: english,
+    mr: marathi,
+  };
+
+}
+
+
+// Backward-compatible singular export.
+// New Legal & Compliance UI should use
+// getCurrentLegalComplianceAgreements().
+
+export async function getCurrentLegalComplianceAgreement(
+  languageCode: LegalLanguageCode = "en",
+):
+  Promise<CurrentLegalComplianceAgreement> {
+
+  const agreements =
+    await getCurrentLegalComplianceAgreements(
+      languageCode,
+    );
+
+  const platformAgreement =
+    agreements.find(
+      (agreement) =>
+        agreement.agreement_type ===
+        "platform_agreement",
+    );
+
+
+  if (!platformAgreement) {
+
+    throw new Error(
+      `No active ${
+        languageCode === "mr"
+          ? "Marathi"
+          : "English"
+      } platform agreement is currently available.`,
+    );
+
+  }
+
+
+  return platformAgreement;
+
+}

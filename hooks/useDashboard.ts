@@ -1,64 +1,51 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-
-import {
-  dashboardRepository,
-} from "@/lib/repositories/dashboard.repository";
+import { useBootstrapContext } from "@/context/BootstrapContext";
+import { useAppQuery } from "@/hooks/useAppQuery";
+import { QUERY_KEYS } from "@/hooks/query-keys";
+import { dashboardRepository } from "@/lib/repositories/dashboard.repository";
 
 import type {
   DashboardSummaryResponse,
 } from "@/types/dashboard/summary";
 
-const DASHBOARD_QUERY_KEY = [
-  "dashboard-summary",
-];
-
 export function useDashboard() {
+  const bootstrap =
+    useBootstrapContext();
 
   const query =
-    useQuery<
+    useAppQuery<
       DashboardSummaryResponse,
       Error
     >({
-      queryKey:
-        DASHBOARD_QUERY_KEY,
+      queryKey: QUERY_KEYS.dashboard,
+
+      enabled:
+        !!bootstrap.data &&
+        !bootstrap.loading,
 
       queryFn: () =>
         dashboardRepository.load(),
 
-      staleTime:
-        1000 * 60,
-
-      gcTime:
-        1000 *
-        60 *
-        10,
-
-      retry: 2,
-
-      refetchOnWindowFocus:
-        false,
+      retry: 1,
     });
 
   return {
-
-    data:
-      query.data ?? null,
+    data: query.data ?? null,
 
     loading:
+      bootstrap.loading ||
       query.isPending,
 
+    refreshing:
+      query.isFetching,
+
     error:
-      query.error ?? null,
+      bootstrap.error ??
+      query.error ??
+      null,
 
     reload:
-      async () => {
-
-        await query.refetch();
-
-      },
-
+      query.refetch,
   };
-
 }

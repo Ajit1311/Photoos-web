@@ -23,13 +23,13 @@ export default function PageHeader() {
   const title = titles[pathname] ?? "Dashboard";
 
   return (
-    <div>
+    <div className="mb-6 space-y-1">
 
-      <h1 className="text-3xl font-bold text-slate-900">
+      <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
         {title}
       </h1>
 
-      <p className="mt-1 text-sm text-slate-500">
+      <p className="text-sm leading-6 text-muted-foreground sm:text-base">
         Welcome back to PhotoOS.
       </p>
 

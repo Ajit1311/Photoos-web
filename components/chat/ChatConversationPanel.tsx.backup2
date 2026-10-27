@@ -1,0 +1,1504 @@
+"use client";
+
+import {
+  ArrowLeft,
+  CheckCheck,
+  Download,
+  File,
+  FileArchive,
+  FileImage,
+  FileText,
+  Paperclip,
+  Pin,
+  Search,
+  Send,
+  Smile,
+  X,
+} from "lucide-react";
+
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+
+import type {
+  ChatConversation,
+  ChatMessage,
+} from "@/types/chat";
+
+import {
+  completeChatAttachmentUpload,
+  getChatMessageAttachments,
+  getChatPinnedMessages,
+  markChatMessageRead,
+  pinChatMessage,
+  prepareChatAttachmentUpload,
+  sendChatMessage,
+  unpinChatMessage,
+  type ChatMessageAttachment,
+  type ChatPinnedMessage,
+} from "@/lib/api/chat";
+
+import {
+  useChatMessages,
+} from "@/hooks/chat/useChatMessages";
+
+import {
+  supabase,
+} from "@/lib/supabase/client";
+
+interface ChatConversationPanelProps {
+  conversation: ChatConversation;
+  onBack?: () => void;
+}
+
+type MessageAttachmentsMap =
+  Record<string, ChatMessageAttachment[]>;
+
+const EMOJIS = [
+  "😀",
+  "😂",
+  "😍",
+  "😊",
+  "😎",
+  "👍",
+  "👏",
+  "🙏",
+  "❤️",
+  "🔥",
+  "🎉",
+  "✨",
+  "📸",
+  "📷",
+  "💯",
+  "🙂",
+  "😉",
+  "😢",
+  "😮",
+  "🤍",
+];
+
+const MAX_FILE_SIZE =
+  25 * 1024 * 1024;
+
+function getConversationName(
+  conversation: ChatConversation,
+) {
+  return (
+    conversation.title ||
+    "Client Conversation"
+  );
+}
+
+function formatMessageTime(
+  value: string,
+) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return date.toLocaleTimeString(
+    "en-IN",
+    {
+      hour: "2-digit",
+      minute: "2-digit",
+    },
+  );
+}
+
+function getInitials(
+  value: string,
+) {
+  return value
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(
+      (part) =>
+        part[0]?.toUpperCase() ?? "",
+    )
+    .join("");
+}
+
+function formatFileSize(
+  size: number | null | undefined,
+) {
+  if (!size || size <= 0) {
+    return "";
+  }
+
+  if (size < 1024) {
+    return `${size} B`;
+  }
+
+  if (size < 1024 * 1024) {
+    return `${(
+      size / 1024
+    ).toFixed(1)} KB`;
+  }
+
+  if (
+    size <
+    1024 * 1024 * 1024
+  ) {
+    return `${(
+      size /
+      (1024 * 1024)
+    ).toFixed(1)} MB`;
+  }
+
+  return `${(
+    size /
+    (1024 * 1024 * 1024)
+  ).toFixed(1)} GB`;
+}
+
+function isImageFile(
+  attachment: ChatMessageAttachment,
+) {
+  return Boolean(
+    attachment.file_type?.startsWith(
+      "image/",
+    ),
+  );
+}
+
+function getFileIcon(
+  attachment: ChatMessageAttachment,
+) {
+  const type =
+    attachment.file_type ?? "";
+
+  if (type.startsWith("image/")) {
+    return FileImage;
+  }
+
+  if (
+    type.includes("pdf") ||
+    type.includes("document") ||
+    type.includes("text") ||
+    type.includes("word")
+  ) {
+    return FileText;
+  }
+
+  if (
+    type.includes("zip") ||
+    type.includes("rar") ||
+    type.includes("archive") ||
+    type.includes("compressed")
+  ) {
+    return FileArchive;
+  }
+
+  return File;
+}
+
+function getAttachmentMessage(
+  attachment: ChatMessageAttachment,
+) {
+  return attachment.file_name;
+}
+
+export default function ChatConversationPanel({
+  conversation,
+  onBack,
+}: ChatConversationPanelProps) {
+  const [message, setMessage] =
+    useState("");
+
+  const [sending, setSending] =
+    useState(false);
+
+  const [uploading, setUploading] =
+    useState(false);
+
+  const [uploadProgress, setUploadProgress] =
+    useState(0);
+
+  const [currentUserId, setCurrentUserId] =
+    useState<string | null>(null);
+
+  const [attachments, setAttachments] =
+    useState<MessageAttachmentsMap>({});
+
+  const [emojiOpen, setEmojiOpen] =
+    useState(false);
+
+  const [attachmentError, setAttachmentError] =
+    useState<string | null>(null);
+
+  const [pinnedMessages, setPinnedMessages] =
+    useState<ChatPinnedMessage[]>([]);
+
+  const [pinningMessageId, setPinningMessageId] =
+    useState<string | null>(null);
+
+  const [pinnedPanelOpen, setPinnedPanelOpen] =
+    useState(false);
+
+  const [highlightedMessageId, setHighlightedMessageId] =
+    useState<string | null>(null);
+
+  const messagesEndRef =
+    useRef<HTMLDivElement | null>(null);
+
+  const messageRefs =
+    useRef<Record<string, HTMLDivElement | null>>({});
+
+  const fileInputRef =
+    useRef<HTMLInputElement | null>(null);
+
+  const textareaRef =
+    useRef<HTMLTextAreaElement | null>(null);
+
+  const {
+    conversation: details,
+    messages,
+    loading,
+    error,
+    refresh,
+  } = useChatMessages(
+    conversation.id,
+  );
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadCurrentUser() {
+      const {
+        data,
+      } = await supabase.auth.getUser();
+
+      if (
+        mounted &&
+        data.user
+      ) {
+        setCurrentUserId(
+          data.user.id,
+        );
+      }
+    }
+
+    void loadCurrentUser();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const conversationTitle =
+    getConversationName(
+      details ?? conversation,
+    );
+
+  const clientId =
+    details?.client_id ??
+    conversation.client_id ??
+    null;
+
+  const sortedMessages =
+    useMemo(
+      () =>
+        [...messages].sort(
+          (a, b) =>
+            new Date(
+              a.created_at,
+            ).getTime() -
+            new Date(
+              b.created_at,
+            ).getTime(),
+        ),
+      [messages],
+    );
+
+  /*
+   * --------------------------------------------------------------------------
+   * Mark client messages as read
+   * --------------------------------------------------------------------------
+   */
+
+  useEffect(() => {
+    if (
+      loading ||
+      error ||
+      !currentUserId ||
+      !sortedMessages.length
+    ) {
+      return;
+    }
+
+    const clientMessages =
+      sortedMessages.filter(
+        (item) => {
+          const metadata =
+            item.metadata ?? {};
+
+          const isGalleryComment =
+            metadata.source ===
+            "client_gallery_comment";
+
+          const isStudioMessage =
+            !isGalleryComment &&
+            item.sender_id ===
+              currentUserId;
+
+          return !isStudioMessage;
+        },
+      );
+
+    if (!clientMessages.length) {
+      return;
+    }
+
+    void Promise.all(
+      clientMessages.map(
+        (item) =>
+          markChatMessageRead(
+            item.id,
+          ),
+      ),
+    ).catch(() => {});
+  }, [
+    currentUserId,
+    loading,
+    error,
+    sortedMessages,
+  ]);
+
+  /*
+   * --------------------------------------------------------------------------
+   * Load message attachments
+   * --------------------------------------------------------------------------
+   */
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAttachments() {
+      if (!sortedMessages.length) {
+        setAttachments({});
+        return;
+      }
+
+      const results =
+        await Promise.all(
+          sortedMessages.map(
+            async (item) => {
+              try {
+                const data =
+                  await getChatMessageAttachments(
+                    item.id,
+                  );
+
+                return {
+                  messageId: item.id,
+                  attachments: data,
+                };
+              } catch {
+                return {
+                  messageId: item.id,
+                  attachments: [],
+                };
+              }
+            },
+          ),
+        );
+
+      if (cancelled) {
+        return;
+      }
+
+      const next: MessageAttachmentsMap =
+        {};
+
+      for (const result of results) {
+        if (
+          result.attachments.length
+        ) {
+          next[result.messageId] =
+            result.attachments;
+        }
+      }
+
+      setAttachments(next);
+    }
+
+    void loadAttachments();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sortedMessages]);
+
+  /*
+   * --------------------------------------------------------------------------
+   * Load pinned messages
+   * --------------------------------------------------------------------------
+   */
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPinnedMessages() {
+      try {
+        const data = await getChatPinnedMessages(
+          conversation.id,
+        );
+
+        if (!cancelled) {
+          setPinnedMessages(data);
+        }
+      } catch {
+        if (!cancelled) {
+          setPinnedMessages([]);
+        }
+      }
+    }
+
+    void loadPinnedMessages();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [conversation.id]);
+
+  /*
+   * --------------------------------------------------------------------------
+   * Pin / Unpin message
+   * --------------------------------------------------------------------------
+   */
+
+  async function handleTogglePin(
+    messageId: string,
+  ) {
+    if (pinningMessageId) {
+      return;
+    }
+
+    setPinningMessageId(messageId);
+    setAttachmentError(null);
+
+    try {
+      const isPinned = pinnedMessages.some(
+        (item) => item.message_id === messageId,
+      );
+
+      if (isPinned) {
+        await unpinChatMessage(messageId);
+
+        setPinnedMessages((current) =>
+          current.filter(
+            (item) =>
+              item.message_id !== messageId,
+          ),
+        );
+      } else {
+        await pinChatMessage(messageId);
+
+        const refreshed =
+          await getChatPinnedMessages(
+            conversation.id,
+          );
+
+        setPinnedMessages(refreshed);
+      }
+    } catch (error) {
+      setAttachmentError(
+        error instanceof Error
+          ? error.message
+          : "Unable to update message pin.",
+      );
+    } finally {
+      setPinningMessageId(null);
+    }
+  }
+
+  /*
+   * --------------------------------------------------------------------------
+   * Pinned message navigation
+   * --------------------------------------------------------------------------
+   */
+
+  function handleScrollToPinnedMessage(
+    messageId: string,
+  ) {
+    setPinnedPanelOpen(false);
+
+    const target =
+      messageRefs.current[messageId];
+
+    if (!target) {
+      return;
+    }
+
+    target.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+
+    setHighlightedMessageId(messageId);
+
+    window.setTimeout(() => {
+      setHighlightedMessageId(
+        (current) =>
+          current === messageId
+            ? null
+            : current,
+      );
+    }, 1800);
+  }
+
+  /*
+   * --------------------------------------------------------------------------
+   * Scroll
+   * --------------------------------------------------------------------------
+   */
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView(
+      {
+        behavior: "smooth",
+      },
+    );
+  }, [
+    messages.length,
+    uploading,
+  ]);
+
+  /*
+   * --------------------------------------------------------------------------
+   * Send text
+   * --------------------------------------------------------------------------
+   */
+
+  async function handleSend() {
+    const content =
+      message.trim();
+
+    if (
+      !content ||
+      sending ||
+      uploading
+    ) {
+      return;
+    }
+
+    setSending(true);
+    setAttachmentError(null);
+
+    try {
+      await sendChatMessage(
+        conversation.id,
+        content,
+      );
+
+      setMessage("");
+
+      await refresh();
+    } catch (error) {
+      setAttachmentError(
+        error instanceof Error
+          ? error.message
+          : "Unable to send message.",
+      );
+    } finally {
+      setSending(false);
+    }
+  }
+
+  /*
+   * --------------------------------------------------------------------------
+   * Emoji
+   * --------------------------------------------------------------------------
+   */
+
+  function handleEmojiSelect(
+    emoji: string,
+  ) {
+    setMessage(
+      (current) =>
+        `${current}${emoji}`,
+    );
+
+    setEmojiOpen(false);
+
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+    });
+  }
+
+  /*
+   * --------------------------------------------------------------------------
+   * File picker
+   * --------------------------------------------------------------------------
+   */
+
+  function openFilePicker() {
+    if (
+      sending ||
+      uploading
+    ) {
+      return;
+    }
+
+    setAttachmentError(null);
+
+    fileInputRef.current?.click();
+  }
+
+  /*
+   * --------------------------------------------------------------------------
+   * File upload
+   * --------------------------------------------------------------------------
+   */
+
+  async function handleFileSelect(
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) {
+    const file =
+      event.target.files?.[0];
+
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    if (file.size <= 0) {
+      setAttachmentError(
+        "The selected file is empty.",
+      );
+      return;
+    }
+
+    if (
+      file.size >
+      MAX_FILE_SIZE
+    ) {
+      setAttachmentError(
+        "Maximum file size is 25 MB.",
+      );
+      return;
+    }
+
+    setAttachmentError(null);
+    setUploading(true);
+    setUploadProgress(10);
+
+    try {
+      /*
+       * Step 1:
+       *
+       * Create the chat message first.
+       *
+       * The backend attachment completion RPC requires
+       * the message_id.
+       */
+      const messageId =
+        await sendChatMessage(
+          conversation.id,
+          getAttachmentMessage({
+            id: "",
+            asset_id: null,
+            file_name: file.name,
+            file_path: "",
+            file_type:
+              file.type || null,
+            file_size: file.size,
+            metadata: {},
+            created_at:
+              new Date().toISOString(),
+          }),
+          {
+            messageType:
+              file.type.startsWith(
+                "image/",
+              )
+                ? "image"
+                : "file",
+            metadata: {
+              attachment_uploading:
+                true,
+              file_name:
+                file.name,
+              file_type:
+                file.type || null,
+              file_size:
+                file.size,
+            },
+          },
+        );
+
+      setUploadProgress(25);
+
+      /*
+       * Step 2:
+       *
+       * Ask PhotoOS backend for canonical
+       * chat attachment storage path.
+       *
+       * NO albumId is required.
+       */
+      const prepared =
+        await prepareChatAttachmentUpload(
+          conversation.id,
+          file,
+        );
+
+      setUploadProgress(40);
+
+      /*
+       * Step 3:
+       *
+       * Upload the actual file to Supabase Storage.
+       */
+      const {
+        error: uploadError,
+      } =
+        await supabase.storage
+          .from(prepared.bucket)
+          .upload(
+            prepared.storage_path,
+            file,
+            {
+              contentType:
+                file.type ||
+                "application/octet-stream",
+              upsert: false,
+            },
+          );
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      setUploadProgress(75);
+
+      /*
+       * Step 4:
+       *
+       * Complete the attachment.
+       *
+       * Backend verifies that the storage object
+       * really exists before creating the attachment row.
+       */
+      await completeChatAttachmentUpload({
+        messageId,
+        attachmentId:
+          prepared.attachment_id,
+        storagePath:
+          prepared.storage_path,
+        fileName:
+          file.name,
+        fileType:
+          file.type || null,
+        fileSize:
+          file.size,
+        metadata: {
+          original_name:
+            file.name,
+          mime_type:
+            file.type || null,
+          size:
+            file.size,
+        },
+      });
+
+      setUploadProgress(100);
+
+      await refresh();
+
+      setUploadProgress(0);
+    } catch (error) {
+      console.error(
+        "CHAT ATTACHMENT UPLOAD ERROR:",
+        error,
+      );
+
+      setAttachmentError(
+        error instanceof Error
+          ? error.message
+          : "Unable to upload attachment.",
+      );
+
+      setUploadProgress(0);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  /*
+   * --------------------------------------------------------------------------
+   * Keyboard
+   * --------------------------------------------------------------------------
+   */
+
+  function handleKeyDown(
+    event: React.KeyboardEvent<HTMLTextAreaElement>,
+  ) {
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey
+    ) {
+      event.preventDefault();
+
+      void handleSend();
+    }
+  }
+
+  /*
+   * --------------------------------------------------------------------------
+   * Render attachment
+   * --------------------------------------------------------------------------
+   */
+
+  function renderAttachment(
+    attachment: ChatMessageAttachment,
+    isStudioMessage: boolean,
+  ) {
+    if (
+      isImageFile(attachment) &&
+      attachment.signed_url
+    ) {
+      return (
+        <a
+          href={
+            attachment.signed_url
+          }
+          target="_blank"
+          rel="noreferrer"
+          className="mb-2 block overflow-hidden rounded-xl"
+        >
+          <img
+            src={
+              attachment.signed_url
+            }
+            alt={
+              attachment.file_name
+            }
+            className="max-h-80 w-full max-w-sm object-cover"
+          />
+        </a>
+      );
+    }
+
+    const Icon =
+      getFileIcon(attachment);
+
+    return (
+      <a
+        href={
+          attachment.signed_url ??
+          "#"
+        }
+        target="_blank"
+        rel="noreferrer"
+        download={
+          attachment.file_name
+        }
+        className={[
+          "mb-2 flex items-center gap-3 rounded-xl border px-3 py-3 transition",
+          isStudioMessage
+            ? "border-[#c6e6bc] bg-[#cfe9c5] hover:bg-[#c5e0bb]"
+            : "border-slate-200 bg-slate-50 hover:bg-slate-100",
+        ].join(" ")}
+      >
+        <div
+          className={[
+            "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
+            isStudioMessage
+              ? "bg-white/70"
+              : "bg-white",
+          ].join(" ")}
+        >
+          <Icon className="h-5 w-5" />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <p
+            className={[
+              "truncate text-sm font-medium",
+              isStudioMessage
+                ? "text-[#111b21]"
+                : "text-slate-800",
+            ].join(" ")}
+          >
+            {attachment.file_name}
+          </p>
+
+          <p
+            className={[
+              "mt-0.5 text-[11px]",
+              isStudioMessage
+                ? "text-[#667781]"
+                : "text-slate-400",
+            ].join(" ")}
+          >
+            {attachment.file_type ||
+              "File"}
+
+            {attachment.file_size
+              ? ` • ${formatFileSize(
+                  attachment.file_size,
+                )}`
+              : ""}
+          </p>
+        </div>
+
+        <Download className="h-4 w-4 shrink-0 opacity-70" />
+      </a>
+    );
+  }
+
+  return (
+    <section className="flex min-h-0 flex-1 flex-col bg-[#efeae2]">
+      {/* HEADER */}
+
+      <header className="flex h-[72px] shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-4 sm:px-5">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 lg:hidden"
+            aria-label="Back"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+        )}
+
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#00a884] text-sm font-semibold text-white">
+          {getInitials(
+            conversationTitle,
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-sm font-semibold text-slate-900">
+            {conversationTitle}
+          </h2>
+
+          <p className="truncate text-xs text-slate-500">
+            {clientId
+              ? "Client conversation"
+              : "Conversation"}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100"
+          aria-label="Search conversation"
+        >
+          <Search className="h-5 w-5" />
+        </button>
+      </header>
+
+      {/* PINNED MESSAGES */}
+
+      {pinnedMessages.length > 0 && (
+        <div className="relative z-10 shrink-0 border-b border-slate-200 bg-white">
+          <button
+            type="button"
+            onClick={() =>
+              setPinnedPanelOpen(
+                (current) => !current,
+              )
+            }
+            className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-slate-50 sm:px-5"
+            aria-expanded={pinnedPanelOpen}
+            aria-label="View pinned messages"
+          >
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#e7f7e5] text-[#00a884]">
+              <Pin className="h-4 w-4" />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-slate-800">
+                {pinnedMessages.length === 1
+                  ? "1 pinned message"
+                  : `${pinnedMessages.length} pinned messages`}
+              </p>
+
+              <p className="truncate text-[11px] text-slate-500">
+                {(() => {
+                  const latestPinned =
+                    [...pinnedMessages].sort(
+                      (a, b) =>
+                        new Date(
+                          b.pinned_at,
+                        ).getTime() -
+                        new Date(
+                          a.pinned_at,
+                        ).getTime(),
+                    )[0];
+
+                  const pinnedMessage =
+                    sortedMessages.find(
+                      (item) =>
+                        item.id ===
+                        latestPinned?.message_id,
+                    );
+
+                  return (
+                    pinnedMessage?.content ||
+                    "Open pinned messages"
+                  );
+                })()}
+              </p>
+            </div>
+
+            <span className="shrink-0 text-xs font-medium text-[#00a884]">
+              {pinnedPanelOpen ? "Close" : "View"}
+            </span>
+          </button>
+
+          {pinnedPanelOpen && (
+            <div className="absolute left-0 right-0 top-full border-b border-slate-200 bg-white p-2 shadow-lg">
+              <div className="max-h-64 overflow-y-auto">
+                {[...pinnedMessages]
+                  .sort(
+                    (a, b) =>
+                      new Date(
+                        b.pinned_at,
+                      ).getTime() -
+                      new Date(
+                        a.pinned_at,
+                      ).getTime(),
+                  )
+                  .map((pin) => {
+                    const pinnedMessage =
+                      sortedMessages.find(
+                        (item) =>
+                          item.id ===
+                          pin.message_id,
+                      );
+
+                    return (
+                      <button
+                        key={pin.message_id}
+                        type="button"
+                        onClick={() =>
+                          handleScrollToPinnedMessage(
+                            pin.message_id,
+                          )
+                        }
+                        className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-slate-50"
+                      >
+                        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#e7f7e5] text-[#00a884]">
+                          <Pin className="h-3.5 w-3.5" />
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-semibold text-slate-700">
+                            Pinned message
+                          </p>
+
+                          <p className="mt-0.5 line-clamp-2 break-words text-xs text-slate-500">
+                            {pinnedMessage?.content ||
+                              "Message unavailable in current view"}
+                          </p>
+                        </div>
+
+                        <span className="mt-1 shrink-0 text-[10px] text-slate-400">
+                          {pinnedMessage
+                            ? formatMessageTime(
+                                pinnedMessage.created_at,
+                              )
+                            : ""}
+                        </span>
+                      </button>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+
+      {/* MESSAGES */}
+
+      <div className="chat-whatsapp-wallpaper min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-8">
+        {loading && (
+          <div className="flex h-full items-center justify-center">
+            <div className="rounded-xl bg-white px-5 py-4 text-sm text-slate-500 shadow-sm">
+              Loading messages...
+            </div>
+          </div>
+        )}
+
+        {!loading && error && (
+          <div className="flex h-full items-center justify-center">
+            <div className="rounded-xl bg-white px-5 py-4 text-sm text-red-600 shadow-sm">
+              Unable to load messages.
+            </div>
+          </div>
+        )}
+
+        {!loading &&
+          !error &&
+          !sortedMessages.length && (
+            <div className="flex h-full items-center justify-center">
+              <div className="rounded-xl bg-white px-5 py-4 text-sm text-slate-500 shadow-sm">
+                Start the conversation.
+              </div>
+            </div>
+          )}
+
+        {!loading &&
+          !error &&
+          sortedMessages.length > 0 && (
+            <div className="mx-auto flex w-full max-w-4xl flex-col gap-2">
+              {sortedMessages.map(
+                (item) => {
+                  const metadata =
+                    item.metadata ?? {};
+
+                  const isGalleryComment =
+                    metadata.source ===
+                    "client_gallery_comment";
+
+                  const isStudioMessage =
+                    !isGalleryComment &&
+                    currentUserId !== null &&
+                    item.sender_id ===
+                      currentUserId;
+
+                  const messageAttachments =
+                    attachments[
+                      item.id
+                    ] ?? [];
+
+                  return (
+                    <div
+                      key={item.id}
+                      ref={(node) => {
+                        messageRefs.current[item.id] =
+                          node;
+                      }}
+                      className={[
+                        "flex w-full rounded-2xl px-1 py-0.5 transition-all duration-500",
+                        isStudioMessage
+                          ? "justify-end"
+                          : "justify-start",
+                        highlightedMessageId ===
+                          item.id
+                          ? "bg-[#cfe9c5]/70 ring-2 ring-[#00a884]/35"
+                          : "",
+                      ].join(" ")}
+                    >
+                      <div
+                        className={[
+                          "max-w-[82%]",
+                          "px-3.5",
+                          "py-2.5",
+                          "shadow-sm",
+                          "sm:max-w-[72%]",
+                          isStudioMessage
+                            ? "rounded-2xl rounded-br-md bg-[#d9fdd3]"
+                            : "rounded-2xl rounded-bl-md bg-white",
+                        ].join(" ")}
+                      >
+                        {messageAttachments.map(
+                          (
+                            attachment,
+                          ) => (
+                            <div
+                              key={
+                                attachment.id
+                              }
+                            >
+                              {renderAttachment(
+                                attachment,
+                                isStudioMessage,
+                              )}
+                            </div>
+                          ),
+                        )}
+
+                        {pinnedMessages.some(
+                          (pin) =>
+                            pin.message_id ===
+                            item.id,
+                        ) && (
+                          <div
+                            className={[
+                              "mb-1 flex items-center gap-1 text-[10px] font-medium",
+                              isStudioMessage
+                                ? "text-[#667781]"
+                                : "text-slate-400",
+                            ].join(" ")}
+                          >
+                            <span>📌</span>
+                            <span>Pinned</span>
+                          </div>
+                        )}
+
+                        {item.content && (
+                          <p
+                            className={[
+                              "whitespace-pre-wrap",
+                              "break-words",
+                              "text-sm",
+                              "leading-5",
+                              isStudioMessage
+                                ? "text-[#111b21]"
+                                : "text-slate-800",
+                            ].join(" ")}
+                          >
+                            {/*
+                             * Attachment-only messages currently use
+                             * the filename as content.
+                             */}
+                            {item.content}
+                          </p>
+                        )}
+
+                        <div
+                          className={[
+                            "mt-1",
+                            "flex",
+                            "items-center",
+                            "justify-end",
+                            "gap-1",
+                            isStudioMessage
+                              ? "text-[#667781]"
+                              : "text-slate-400",
+                          ].join(" ")}
+                        >
+                          <span className="text-[10px] leading-none">
+                            {formatMessageTime(
+                              item.created_at,
+                            )}
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void handleTogglePin(
+                                item.id,
+                              )
+                            }
+                            disabled={
+                              pinningMessageId ===
+                              item.id
+                            }
+                            className={[
+                              "ml-1 rounded px-1 text-[10px] transition disabled:opacity-40",
+                              isStudioMessage
+                                ? "text-white/60 hover:bg-white/10 hover:text-white"
+                                : "text-slate-400 hover:bg-slate-100 hover:text-slate-700",
+                            ].join(" ")}
+                            aria-label={
+                              pinnedMessages.some(
+                                (pin) =>
+                                  pin.message_id ===
+                                  item.id,
+                              )
+                                ? "Unpin message"
+                                : "Pin message"
+                            }
+                            title={
+                              pinnedMessages.some(
+                                (pin) =>
+                                  pin.message_id ===
+                                  item.id,
+                              )
+                                ? "Unpin message"
+                                : "Pin message"
+                            }
+                          >
+                            📌
+                          </button>
+
+                          {isStudioMessage && (
+                            <CheckCheck className="h-3.5 w-3.5 text-white/75" />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                },
+              )}
+
+              <div
+                ref={
+                  messagesEndRef
+                }
+                className="h-px"
+              />
+            </div>
+          )}
+      </div>
+
+      {/* ATTACHMENT ERROR */}
+
+      {attachmentError && (
+        <div className="shrink-0 border-t border-red-100 bg-red-50 px-4 py-2">
+          <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
+            <p className="text-xs text-red-700">
+              {attachmentError}
+            </p>
+
+            <button
+              type="button"
+              onClick={() =>
+                setAttachmentError(
+                  null,
+                )
+              }
+              className="shrink-0 rounded-full p-1 text-red-500 hover:bg-red-100"
+              aria-label="Close error"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* COMPOSER */}
+
+      <div className="relative shrink-0 border-t border-slate-200 bg-[#f0f2f5] px-3 py-3 sm:px-5">
+        {/* Emoji picker */}
+
+        {emojiOpen && (
+          <div className="absolute bottom-[76px] left-3 z-20 w-[280px] rounded-2xl border border-slate-200 bg-white p-3 shadow-xl sm:left-5">
+            <div className="grid grid-cols-5 gap-1">
+              {EMOJIS.map(
+                (emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() =>
+                      handleEmojiSelect(
+                        emoji,
+                      )
+                    }
+                    className="flex h-10 w-10 items-center justify-center rounded-lg text-xl transition hover:bg-slate-100"
+                  >
+                    {emoji}
+                  </button>
+                ),
+              )}
+            </div>
+          </div>
+        )}
+
+        {uploading && (
+          <div className="mx-auto mb-2 max-w-4xl">
+            <div className="flex items-center justify-between text-[11px] text-slate-500">
+              <span>
+                Uploading attachment...
+              </span>
+
+              <span>
+                {uploadProgress}%
+              </span>
+            </div>
+
+            <div className="mt-1 h-1 overflow-hidden rounded-full bg-slate-200">
+              <div
+                className="h-full rounded-full bg-[#00a884] transition-all"
+                style={{
+                  width: `${uploadProgress}%`,
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="mx-auto flex max-w-4xl items-end gap-2">
+          {/* Emoji */}
+
+          <button
+            type="button"
+            onClick={() =>
+              setEmojiOpen(
+                (current) =>
+                  !current,
+              )
+            }
+            disabled={
+              sending ||
+              uploading
+            }
+            className="mb-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-200 disabled:opacity-40"
+            aria-label="Emoji"
+          >
+            <Smile className="h-5 w-5" />
+          </button>
+
+          {/* Hidden file input */}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            onChange={
+              handleFileSelect
+            }
+          />
+
+          {/* Attach */}
+
+          <button
+            type="button"
+            onClick={
+              openFilePicker
+            }
+            disabled={
+              sending ||
+              uploading
+            }
+            className="mb-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-200 disabled:opacity-40"
+            aria-label="Attach file"
+          >
+            <Paperclip className="h-5 w-5" />
+          </button>
+
+          {/* Text */}
+
+          <textarea
+            ref={textareaRef}
+            value={message}
+            onChange={(event) =>
+              setMessage(
+                event.target.value,
+              )
+            }
+            onKeyDown={
+              handleKeyDown
+            }
+            rows={1}
+            disabled={uploading}
+            placeholder="Type a message"
+            className="max-h-32 min-h-11 flex-1 resize-none rounded-2xl border-0 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm outline-none placeholder:text-slate-400 focus:ring-0 disabled:bg-slate-100"
+          />
+
+          {/* Send */}
+
+          <button
+            type="button"
+            onClick={() =>
+              void handleSend()
+            }
+            disabled={
+              !message.trim() ||
+              sending ||
+              uploading
+            }
+            className="mb-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#00a884] text-white shadow-sm transition hover:bg-[#008f72] disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label="Send message"
+          >
+            <Send className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}

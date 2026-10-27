@@ -1,0 +1,429 @@
+"use client";
+
+import {
+  Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Building2, MapPin, Phone, User, Mail } from "lucide-react";
+import { onAuthStateChanged } from "firebase/auth";
+import { firebaseAuth } from "@/lib/firebase/client";
+import { getBootstrap } from "@/lib/api/bootstrap";
+import { updateStudioProfile } from "@/lib/api/studio-profile";
+
+type StudioForm = {
+  fullName: string;
+  phone: string;
+  email: string;
+  studioName: string;
+  location: string;
+};
+
+function OnboardingStudioPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const planId = searchParams.get("planId");
+  const planCode = searchParams.get("planCode");
+  const billingCycle = searchParams.get("billingCycle");
+  const mode = searchParams.get("mode");
+
+  const [form, setForm] = useState<StudioForm>({
+    fullName: "",
+    phone: "",
+    email: "",
+    studioName: "",
+    location: "",
+  });
+
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadUser() {
+      try {
+        const user = await new Promise<
+          import("firebase/auth").User | null
+        >((resolve) => {
+          const unsubscribe = onAuthStateChanged(
+            firebaseAuth,
+            (currentUser) => {
+              unsubscribe();
+              resolve(currentUser);
+            },
+          );
+        });
+
+        if (!user) {
+          const nextParams = new URLSearchParams({
+            planId: planId ?? "",
+            planCode: planCode ?? "",
+            billingCycle: billingCycle ?? "",
+          });
+
+          if (mode === "trial") {
+            nextParams.set("mode", "trial");
+          }
+
+          const nextPath =
+            `/onboarding/studio?${nextParams.toString()}`;
+
+          router.replace(
+            `/login?next=${encodeURIComponent(nextPath)}`,
+          );
+          return;
+        }
+
+        if (!cancelled) {
+          setForm((current) => ({
+            ...current,
+            email: user.email ?? "",
+          }));
+          setLoading(false);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Unable to load your account.",
+          );
+          setLoading(false);
+        }
+      }
+    }
+
+    loadUser();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router, planId, planCode, billingCycle, mode]);
+
+  function updateField(
+    field: keyof StudioForm,
+    value: string,
+  ) {
+    setForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  }
+
+  async function startTrial() {
+    if (!planId) {
+      setError("Selected subscription plan is missing.");
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const firebaseUser = await new Promise<
+        import("firebase/auth").User | null
+      >((resolve) => {
+        const unsubscribe = onAuthStateChanged(
+          firebaseAuth,
+          (currentUser) => {
+            unsubscribe();
+            resolve(currentUser);
+          },
+        );
+      });
+
+      if (!firebaseUser) {
+        router.replace("/login");
+        return;
+      }
+
+      const bootstrap = await getBootstrap();
+
+      const studioId =
+        bootstrap.workspace.studio?.id ??
+        null;
+
+      const hasStudioDetails =
+        form.fullName.trim() ||
+        form.phone.trim() ||
+        form.email.trim() ||
+        form.studioName.trim() ||
+        form.location.trim();
+
+      if (studioId && hasStudioDetails) {
+        await updateStudioProfile(
+          studioId,
+          {
+            name: form.studioName,
+            owner_name: form.fullName,
+            contact_email: form.email,
+            contact_phone: form.phone,
+            city: form.location,
+          },
+        );
+      }
+
+      const token = await firebaseUser.getIdToken(true);
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-subscription-trial`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            plan_id: planId,
+          }),
+        },
+      );
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok || data?.success !== true) {
+        throw new Error(
+          data?.error ??
+            data?.message ??
+            "Unable to start your free trial.",
+        );
+      }
+
+      router.replace("/legal-compliance");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to start your free trial.",
+      );
+      setSubmitting(false);
+    }
+  }
+
+  function continueToPayment() {
+    if (!planId || !planCode) {
+      setError("Selected subscription plan is missing.");
+      return;
+    }
+
+    if (mode === "trial") {
+      void startTrial();
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    const params = new URLSearchParams({
+      planId,
+      planCode,
+      billingCycle: billingCycle ?? "",
+      fullName: form.fullName,
+      phone: form.phone,
+      email: form.email,
+      studioName: form.studioName,
+      location: form.location,
+    });
+
+    router.push(
+      `/onboarding/studio/payment?${params.toString()}`,
+    );
+  }
+
+  function skipInformation() {
+    if (!planId || !planCode) {
+      setError("Selected subscription plan is missing.");
+      return;
+    }
+
+    if (mode === "trial") {
+      void startTrial();
+      return;
+    }
+
+    const params = new URLSearchParams({
+      planId,
+      planCode,
+      billingCycle: billingCycle ?? "",
+      skipped: "true",
+    });
+
+    router.push(
+      `/onboarding/studio/payment?${params.toString()}`,
+    );
+  }
+
+
+  if (loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto h-9 w-9 animate-spin rounded-full border-4 border-muted border-t-primary" />
+          <p className="mt-4 text-sm text-muted-foreground">
+            Preparing your account...
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-background px-4 py-10">
+      <div className="mx-auto w-full max-w-2xl">
+        <div className="rounded-3xl border bg-card p-6 shadow-sm sm:p-8">
+          <div className="mb-8">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+              <Building2 className="h-6 w-6 text-primary" />
+            </div>
+
+            <h1 className="text-2xl font-semibold">
+              Tell us about your studio
+            </h1>
+
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Add your details now or skip and complete them later from
+              your dashboard.
+            </p>
+          </div>
+
+          {error ? (
+            <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {error}
+            </div>
+          ) : null}
+
+          <div className="space-y-5">
+            <Field
+              icon={<User className="h-4 w-4" />}
+              label="Full name"
+              value={form.fullName}
+              onChange={(value) =>
+                updateField("fullName", value)
+              }
+              placeholder="Your full name"
+            />
+
+            <Field
+              icon={<Phone className="h-4 w-4" />}
+              label="Phone number"
+              value={form.phone}
+              onChange={(value) =>
+                updateField("phone", value)
+              }
+              placeholder="+91"
+              type="tel"
+            />
+
+            <Field
+              icon={<Mail className="h-4 w-4" />}
+              label="Email"
+              value={form.email}
+              onChange={(value) =>
+                updateField("email", value)
+              }
+              placeholder="you@example.com"
+              type="email"
+            />
+
+            <Field
+              icon={<Building2 className="h-4 w-4" />}
+              label="Studio name"
+              value={form.studioName}
+              onChange={(value) =>
+                updateField("studioName", value)
+              }
+              placeholder="Your studio name"
+            />
+
+            <Field
+              icon={<MapPin className="h-4 w-4" />}
+              label="Studio location"
+              value={form.location}
+              onChange={(value) =>
+                updateField("location", value)
+              }
+              placeholder="City, State"
+            />
+          </div>
+
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row-reverse">
+            <button
+              type="button"
+              onClick={continueToPayment}
+              disabled={submitting}
+              className="h-12 flex-1 rounded-xl bg-[#0a3f61] px-6 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+            >
+              {submitting
+                ? "Starting..."
+                : mode === "trial"
+                  ? "Start Free Trial"
+                  : "Continue to Payment"}
+            </button>
+
+            <button
+              type="button"
+              onClick={skipInformation}
+              disabled={submitting}
+              className="h-12 flex-1 rounded-xl border px-6 text-sm font-semibold hover:bg-muted disabled:opacity-60"
+            >
+              Skip for now
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function Field({
+  icon,
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  type?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 flex items-center gap-2 text-sm font-medium">
+        {icon}
+        {label}
+      </span>
+
+      <input
+        type={type}
+        value={value}
+        onChange={(event) =>
+          onChange(event.target.value)
+        }
+        placeholder={placeholder}
+        className="h-12 w-full rounded-xl border bg-background px-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+      />
+    </label>
+  );
+}
+
+
+export default function OnboardingStudioPageWrapper() {
+  return (
+    <Suspense
+      fallback={
+        <main className="flex min-h-screen items-center justify-center">
+          <div className="text-sm text-muted-foreground">
+            Loading...
+          </div>
+        </main>
+      }
+    >
+      <OnboardingStudioPage />
+    </Suspense>
+  );
+}

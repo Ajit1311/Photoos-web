@@ -2,87 +2,136 @@
 
 import GalleryWorkspace from "../gallery/GalleryWorkspace";
 import OverviewDashboard from "../overview/OverviewDashboard";
-// WorkspaceTab टाईप इथून इम्पोर्ट केला आहे
-import type { WorkspaceTab } from "@/types/events/workspace"; 
+import EventSettings from "../settings/EventSettings";
+import EventChatWorkspace from "../chat/EventChatWorkspace";
+import ReminderWorkspace from "../reminder/ReminderWorkspace";
+import PaymentWorkspace from "../payments/PaymentWorkspace";
 
-// activeTab चा टाईप `string` वरून `WorkspaceTab` केला आहे
+import {
+  FaceGalleryWorkspace,
+} from "../face-gallery";
+
+import type {
+  WorkspaceTab,
+} from "@/types/events/workspace";
+
+
 export interface WorkspaceContentProps {
-  activeTab: WorkspaceTab; 
+
+  activeTab:
+    WorkspaceTab;
+
+  eventId:
+    string;
+
+  clientId:
+    string
+    | null;
+
+  workspaceId:
+    string
+    | null;
+
 }
+
 
 export default function WorkspaceContent({
   activeTab,
+  eventId,
+  clientId,
+  workspaceId,
 }: WorkspaceContentProps) {
-  switch (activeTab) {
+
+  switch (
+    activeTab
+  ) {
+
     case "overview":
-      return <OverviewDashboard />;
+
+      return (
+        <OverviewDashboard
+          eventId={
+            eventId
+          }
+        />
+      );
+
 
     case "gallery":
-      return <GalleryWorkspace />;
+
+      return (
+        <GalleryWorkspace />
+      );
+
+
+    case "face-gallery":
+
+      return (
+        <FaceGalleryWorkspace
+          eventId={
+            eventId
+          }
+          workspaceId={
+            workspaceId
+          }
+        />
+      );
+
 
     case "payments":
+
       return (
-        <ComingSoon
-          title="Payment Transactions"
-          description="Payment ledger, invoices and transaction history will appear here."
+        <PaymentWorkspace
+          eventId={
+            eventId
+          }
         />
       );
 
-    case "delivery":
-      return (
-        <ComingSoon
-          title="Delivery"
-          description="Gallery publishing, QR sharing and delivery tools will appear here."
-        />
-      );
 
     case "chat":
+
       return (
-        <ComingSoon
-          title="Chat"
-          description="Internal team chat and client conversations will appear here."
+        <EventChatWorkspace
+          clientId={
+            clientId
+          }
         />
       );
+
 
     case "reminder":
+
       return (
-        <ComingSoon
-          title="Reminder"
-          description="WhatsApp, Email and SMS reminders will appear here."
+        <ReminderWorkspace
+          eventId={
+            eventId
+          }
         />
       );
+
 
     case "settings":
+
       return (
-        <ComingSoon
-          title="Settings"
-          description="Gallery settings, permissions and watermark configuration."
+        <EventSettings
+          eventId={
+            eventId
+          }
         />
       );
 
+
     default:
-      return <OverviewDashboard />;
+
+      return (
+        <OverviewDashboard
+          eventId={
+            eventId
+          }
+        />
+      );
+
   }
-}
 
-interface ComingSoonProps {
-  title: string;
-  description: string;
-}
-
-function ComingSoon({
-  title,
-  description,
-}: ComingSoonProps) {
-  return (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center shadow-sm">
-      <h2 className="text-2xl font-semibold text-slate-900">
-        {title}
-      </h2>
-
-      <p className="mt-3 text-sm text-slate-500">
-        {description}
-      </p>
-    </div>
-  );
 }

@@ -1,37 +1,44 @@
-export type TeamMemberRole =
-  | "owner"
-  | "admin"
-  | "manager"
-  | "photographer"
-  | "cinematographer"
-  | "drone_operator"
-  | "editor"
-  | "designer"
-  | "sales"
-  | "assistant";
-
 export type TeamMemberStatus =
   | "active"
-  | "inactive";
+  | "suspended";
 
-export interface TeamMember {
+export type InvitationStatus =
+  | "pending"
+  | "accepted"
+  | "declined"
+  | "expired"
+  | "cancelled";
 
+export type TeamMember = {
   id: string;
 
-  fullName: string;
+  studioId: string;
+
+  profileId: string;
 
   email: string | null;
 
-  phone: string | null;
+  employeeCode: string | null;
 
-  avatarUrl: string | null;
+  roleId: string;
 
-  role: TeamMemberRole;
+  roleCode: string;
 
-  status: TeamMemberStatus;
+  roleName: string;
+
+  roleDescription: string | null;
+
+  roleLevel: number;
+
+  roleStatus: string | null;
+
+  memberStatus: TeamMemberStatus;
+
+  invitationStatus: InvitationStatus;
+
+  joinedAt: string | null;
 
   createdAt: string;
 
   updatedAt: string;
-
-}
+};

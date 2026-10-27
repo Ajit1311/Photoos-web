@@ -4,6 +4,8 @@ import type {
 
 import type {
   CreateTeamMemberRequest,
+  CreateTeamMemberResponse,
+  StudioRoleDto,
   UpdateTeamMemberRequest,
 } from "@/types/api/team-member";
 
@@ -11,6 +13,7 @@ import {
   teamMemberService,
   type TeamMemberListResult,
 } from "@/lib/services/team-member.service";
+
 
 class TeamMemberRepository {
 
@@ -27,8 +30,8 @@ class TeamMemberRepository {
       limit,
       search,
     );
-
   }
+
 
   async getById(
     studioId: string,
@@ -39,20 +42,30 @@ class TeamMemberRepository {
       studioId,
       memberId,
     );
-
   }
+
+
+  async getRoles(
+    studioId: string,
+  ): Promise<StudioRoleDto[]> {
+
+    return teamMemberService.getRoles(
+      studioId,
+    );
+  }
+
 
   async create(
     studioId: string,
     payload: CreateTeamMemberRequest,
-  ): Promise<TeamMember> {
+  ): Promise<CreateTeamMemberResponse> {
 
     return teamMemberService.create(
       studioId,
       payload,
     );
-
   }
+
 
   async update(
     studioId: string,
@@ -65,10 +78,9 @@ class TeamMemberRepository {
       memberId,
       payload,
     );
-
   }
-
 }
+
 
 export const teamMemberRepository =
   new TeamMemberRepository();

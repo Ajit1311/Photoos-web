@@ -1,0 +1,55 @@
+"use client";
+
+type ProjectsPaginationProps = {
+  page: number;
+  totalPages: number;
+  onPrevious: () => void;
+  onNext: () => void;
+};
+
+export default function ProjectsPagination({
+  page,
+  totalPages,
+  onPrevious,
+  onNext,
+}: ProjectsPaginationProps) {
+
+  if (totalPages <= 1) {
+    return null;
+  }
+
+  return (
+
+    <div className="mt-8 flex items-center justify-between">
+
+      <button
+        onClick={onPrevious}
+        disabled={page === 1}
+        className="rounded-lg border px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+
+        Previous
+
+      </button>
+
+      <span className="text-sm text-slate-500">
+
+        Page {page} of {totalPages}
+
+      </span>
+
+      <button
+        onClick={onNext}
+        disabled={page === totalPages}
+        className="rounded-lg border px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+
+        Next
+
+      </button>
+
+    </div>
+
+  );
+
+}

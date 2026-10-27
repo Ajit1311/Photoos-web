@@ -1,0 +1,134 @@
+"use client";
+
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  useAppQuery,
+} from "@/hooks/useAppQuery";
+
+import {
+  bootstrapRepository,
+} from "@/lib/repositories/bootstrap.repository";
+
+import {
+  getFirebaseCurrentUser,
+  subscribeToFirebaseAuth,
+} from "@/lib/auth/firebase-auth.service";
+
+import type {
+  BootstrapResponse,
+} from "@/types/bootstrap/bootstrap";
+
+
+export function useBootstrap() {
+
+  const [
+    userId,
+    setUserId,
+  ] =
+    useState<
+      string | null
+    >(
+      () =>
+        getFirebaseCurrentUser()?.uid ??
+        null,
+    );
+
+
+  useEffect(
+    () => {
+
+      const unsubscribe =
+        subscribeToFirebaseAuth(
+          (user) => {
+
+            setUserId(
+              user?.uid ??
+              null,
+            );
+
+          },
+        );
+
+      return () => {
+
+        unsubscribe();
+
+      };
+
+    },
+    [],
+  );
+
+
+  const query =
+    useAppQuery<
+      BootstrapResponse
+    >({
+
+      queryKey:
+        [
+          "bootstrap",
+          userId,
+        ],
+
+      queryFn:
+        async () => {
+
+          if (!userId) {
+
+            throw new Error(
+              "User is not authenticated.",
+            );
+
+          }
+
+          return bootstrapRepository.load();
+
+        },
+
+      enabled:
+        Boolean(
+          userId,
+        ),
+
+      retry: 1,
+
+      staleTime: 1000 * 30,
+
+    });
+
+
+  return {
+
+    data:
+      query.data ??
+      null,
+
+    loading:
+      Boolean(
+        userId,
+      )
+        ? query.isPending
+        : true,
+
+    refreshing:
+      query.isFetching,
+
+    error:
+      query.error ??
+      null,
+
+    reload:
+      async () => {
+
+        await query.refetch();
+
+      },
+
+  };
+
+}

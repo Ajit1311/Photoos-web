@@ -1,149 +1,114 @@
 "use client";
 
-import { useState } from "react";
-
 import { useQuery } from "@tanstack/react-query";
 
-import { useBootstrapContext } from "@/context/BootstrapContext";
-import { useDebounce } from "@/hooks/useDebounce";
+import {
+  useBootstrapContext,
+} from "@/context/BootstrapContext";
 
-import { eventRepository } from "@/lib/repositories/event.repository";
+import {
+  getEvents,
+} from "@/lib/api/events";
 
-import type { Event } from "@/types/event";
-import type { PaginationDto } from "@/types/api/project";
+import type {
+  Event,
+} from "@/types/api/event";
 
-const PAGE_SIZE = 25;
 
-const EMPTY_PAGINATION: PaginationDto = {
-  page: 1,
-  limit: PAGE_SIZE,
-  total: 0,
-  totalPages: 1,
-};
+const EVENTS_QUERY_KEY = [
+  "events",
+] as const;
 
-export function useEvents() {
+
+export interface UseEventsOptions {
+  projectId?: string;
+}
+
+
+export function useEvents(
+  options?: UseEventsOptions,
+) {
 
   const {
-    data,
+    data: bootstrap,
     loading: bootstrapLoading,
-  } = useBootstrapContext();
+  } =
+    useBootstrapContext();
 
+
+  // Use the same studio ID source
+  // used by the authenticated workspace hooks.
   const studioId =
-    data?.workspace.membership.studioId;
+    bootstrap?.workspace?.membership?.studioId;
 
-  const [page, setPage] =
-    useState(1);
 
-  const [search, setSearchState] =
-    useState("");
+  const projectId =
+    options?.projectId;
 
-  const debouncedSearch =
-    useDebounce(search);
-
-  const setSearch = (
-    value: string,
-  ) => {
-
-    setSearchState(value);
-
-    if (page !== 1) {
-      setPage(1);
-    }
-
-  };
 
   const query =
-    useQuery({
+    useQuery<Event[], Error>({
+
       queryKey: [
-        "events",
+        ...EVENTS_QUERY_KEY,
         studioId,
-        page,
-        debouncedSearch,
+        projectId,
       ],
+
 
       enabled:
         !bootstrapLoading &&
-        !!studioId,
+        Boolean(studioId) &&
+        Boolean(projectId),
 
-      queryFn: () =>
-        eventRepository.getAll(
-          studioId!,
-          page,
-          PAGE_SIZE,
-          debouncedSearch,
-        ),
 
-      staleTime: 60_000,
+      queryFn:
+        () =>
+          getEvents(
+            studioId!,
+            projectId!,
+          ),
 
-      gcTime: 600_000,
 
-      retry: 2,
+      staleTime:
+        1000 * 60,
 
-      refetchOnWindowFocus: false,
+
+      gcTime:
+        1000 * 60 * 10,
+
+
+      retry:
+        2,
+
+
+      refetchOnWindowFocus:
+        false,
+
     });
 
-  const events: Event[] =
-    query.data?.events ?? [];
-
-  const pagination =
-    query.data?.pagination ??
-    EMPTY_PAGINATION;
-
-  function nextPage() {
-
-    setPage((current) =>
-      Math.min(
-        current + 1,
-        pagination.totalPages,
-      ),
-    );
-
-  }
-
-  function previousPage() {
-
-    setPage((current) =>
-      Math.max(
-        current - 1,
-        1,
-      ),
-    );
-
-  }
 
   return {
 
-    events,
+    events:
+      query.data ?? [],
 
-    search,
-
-    setSearch,
-
-    page,
-
-    setPage,
-
-    pagination,
-
-    nextPage,
-
-    previousPage,
 
     loading:
       bootstrapLoading ||
       query.isPending,
 
+
+    refreshing:
+      query.isFetching,
+
+
     error:
-      query.error
-        ? query.error.message
-        : null,
+      query.error ?? null,
+
 
     reload:
-      async () => {
-
-        await query.refetch();
-
-      },
+      query.refetch,
 
   };
 

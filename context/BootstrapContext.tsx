@@ -2,12 +2,14 @@
 
 import {
   createContext,
-  ReactNode,
+  type ReactNode,
   useContext,
   useMemo,
 } from "react";
 
-import { useBootstrap } from "@/hooks/useBootstrap";
+import {
+  useBootstrap,
+} from "@/hooks/useBootstrap";
 
 import type {
   BootstrapResponse,
@@ -16,6 +18,7 @@ import type {
 type BootstrapContextValue = {
   data: BootstrapResponse | null;
   loading: boolean;
+  refreshing: boolean;
   error: Error | null;
   reload: () => Promise<void>;
 };
@@ -25,29 +28,38 @@ const BootstrapContext =
     null,
   );
 
-type Props = {
+type BootstrapProviderProps = {
   children: ReactNode;
 };
 
 export function BootstrapProvider({
   children,
-}: Props) {
+}: BootstrapProviderProps) {
   const bootstrap = useBootstrap();
 
-  const value = useMemo(
-    () => ({
-      data: bootstrap.data,
-      loading: bootstrap.loading,
-      error: bootstrap.error,
-      reload: bootstrap.reload,
-    }),
-    [
-      bootstrap.data,
-      bootstrap.loading,
-      bootstrap.error,
-      bootstrap.reload,
-    ],
-  );
+  const value =
+    useMemo<BootstrapContextValue>(
+      () => ({
+        data: bootstrap.data,
+
+        loading: bootstrap.loading,
+
+        refreshing: bootstrap.refreshing,
+
+        error: bootstrap.error,
+
+        reload: async () => {
+          await bootstrap.reload();
+        },
+      }),
+      [
+        bootstrap.data,
+        bootstrap.loading,
+        bootstrap.refreshing,
+        bootstrap.error,
+        bootstrap.reload,
+      ],
+    );
 
   return (
     <BootstrapContext.Provider value={value}>
@@ -57,7 +69,8 @@ export function BootstrapProvider({
 }
 
 export function useBootstrapContext() {
-  const context = useContext(BootstrapContext);
+  const context =
+    useContext(BootstrapContext);
 
   if (!context) {
     throw new Error(

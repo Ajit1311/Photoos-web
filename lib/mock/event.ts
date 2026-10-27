@@ -3,6 +3,8 @@ import { Event } from "@/types/event";
 export const mockEvent: Event = {
   id: "evt_001",
 
+  projectId: "evt_001",
+
   title: "Rahul & Priya Wedding",
 
   status: "published",
@@ -32,36 +34,14 @@ export const mockEvent: Event = {
     watermark: false,
     expiresAt: "2026-08-09",
   },
+
+  financial: {
+    budget: 250000,
+    received: 150000,
+    balance: 100000,
+  },
 };
 
 export const mockEvents: Event[] = [
   mockEvent,
-  {
-    ...mockEvent,
-    id: "evt_002",
-    title: "Sneha & Amit Pre Wedding",
-    date: "2026-07-15",
-    venue: "Goa",
-    status: "active",
-    client: {
-      id: "cli_002",
-      name: "Sneha Patil",
-      phone: "+91 9876500000",
-      email: "sneha@gmail.com",
-    },
-  },
-  {
-    ...mockEvent,
-    id: "evt_003",
-    title: "Joshi Family Function",
-    date: "2026-08-02",
-    venue: "Pune",
-    status: "completed",
-    client: {
-      id: "cli_003",
-      name: "Mahesh Joshi",
-      phone: "+91 9876511111",
-      email: "mahesh@gmail.com",
-    },
-  },
 ];

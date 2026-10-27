@@ -1,5 +1,6 @@
 import {
   createTeamMember,
+  getStudioTeamRoles,
   getTeamMember,
   getTeamMembers,
   updateTeamMember,
@@ -11,25 +12,24 @@ import {
 } from "@/lib/mappers/team-member.mapper";
 
 import type {
+  CreateTeamMemberRequest,
+  CreateTeamMemberResponse,
   PaginationDto,
-} from "@/types/api/project";
+  StudioRoleDto,
+  UpdateTeamMemberRequest,
+} from "@/types/api/team-member";
 
 import type {
   TeamMember,
 } from "@/types/team-member";
 
-import type {
-  CreateTeamMemberRequest,
-  UpdateTeamMemberRequest,
-} from "@/types/api/team-member";
 
 export type TeamMemberListResult = {
-
   members: TeamMember[];
 
   pagination: PaginationDto;
-
 };
+
 
 class TeamMemberService {
 
@@ -49,7 +49,6 @@ class TeamMemberService {
       );
 
     return {
-
       members:
         mapTeamMemberDtosToTeamMembers(
           response.members,
@@ -57,10 +56,9 @@ class TeamMemberService {
 
       pagination:
         response.pagination,
-
     };
-
   }
+
 
   async getById(
     studioId: string,
@@ -76,25 +74,30 @@ class TeamMemberService {
     return mapTeamMemberDtoToTeamMember(
       dto,
     );
-
   }
+
+
+  async getRoles(
+    studioId: string,
+  ): Promise<StudioRoleDto[]> {
+
+    return getStudioTeamRoles(
+      studioId,
+    );
+  }
+
 
   async create(
     studioId: string,
     payload: CreateTeamMemberRequest,
-  ): Promise<TeamMember> {
+  ): Promise<CreateTeamMemberResponse> {
 
-    const dto =
-      await createTeamMember(
-        studioId,
-        payload,
-      );
-
-    return mapTeamMemberDtoToTeamMember(
-      dto,
+    return createTeamMember(
+      studioId,
+      payload,
     );
-
   }
+
 
   async update(
     studioId: string,
@@ -112,10 +115,9 @@ class TeamMemberService {
     return mapTeamMemberDtoToTeamMember(
       dto,
     );
-
   }
-
 }
+
 
 export const teamMemberService =
   new TeamMemberService();

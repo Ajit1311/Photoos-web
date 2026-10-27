@@ -1,0 +1,270 @@
+"use client";
+
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import Link from "next/link";
+
+import {
+  getSubscriptionPlans,
+} from "@/lib/api/subscription/plans";
+
+import type {
+  SubscriptionPlan,
+} from "@/types/subscription/plan";
+
+
+function formatPrice(
+  price: number,
+  currency: string,
+) {
+  return new Intl.NumberFormat(
+    "en-IN",
+    {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 0,
+    },
+  ).format(price);
+}
+
+
+export default function PricingPage() {
+
+  const [
+    plans,
+    setPlans,
+  ] =
+    useState<SubscriptionPlan[]>([]);
+
+  const [
+    loading,
+    setLoading,
+  ] =
+    useState(true);
+
+  const [
+    error,
+    setError,
+  ] =
+    useState<string | null>(null);
+
+
+  useEffect(() => {
+
+    async function loadPlans() {
+
+      try {
+
+        const result =
+          await getSubscriptionPlans();
+
+        setPlans(
+          result.filter(
+            (plan) =>
+              plan.plan_type !==
+              "marketplace",
+          ),
+        );
+
+      } catch (err) {
+
+        console.error(
+          "PRICING LOAD ERROR:",
+          err,
+        );
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Unable to load pricing.",
+        );
+
+      } finally {
+
+        setLoading(false);
+
+      }
+
+    }
+
+    loadPlans();
+
+  }, []);
+
+
+  return (
+    <main className="min-h-screen bg-[#F6F8FB] px-6 py-16">
+
+      <div className="mx-auto max-w-6xl">
+
+        <div className="mx-auto max-w-2xl text-center">
+
+          <p className="text-sm font-semibold text-[#0a3f61]">
+            PhotoOS
+          </p>
+
+          <h1 className="mt-3 text-4xl font-bold tracking-tight">
+            Choose your PhotoOS plan
+          </h1>
+
+          <p className="mt-4 text-muted-foreground">
+            Select a plan to create your workspace and continue
+            with account setup.
+          </p>
+
+        </div>
+
+
+        {loading && (
+          <div className="mt-16 text-center text-sm text-muted-foreground">
+            Loading plans...
+          </div>
+        )}
+
+
+        {error && (
+          <div className="mx-auto mt-16 max-w-xl rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+
+        {!loading &&
+          !error &&
+          plans.length === 0 && (
+            <div className="mt-16 text-center text-sm text-muted-foreground">
+              No active subscription plans available.
+            </div>
+          )}
+
+
+        {!loading &&
+          !error &&
+          plans.length > 0 && (
+            <div className="mt-14 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+
+              {plans.map(
+                (plan) => (
+
+                  <div
+                    key={plan.id}
+                    className="flex flex-col rounded-2xl border bg-white p-6 shadow-sm"
+                  >
+
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      {plan.plan_code}
+                    </p>
+
+                    <h2 className="mt-3 text-2xl font-bold">
+                      {plan.name}
+                    </h2>
+
+                    {plan.description && (
+                      <p className="mt-3 min-h-12 text-sm leading-6 text-muted-foreground">
+                        {plan.description}
+                      </p>
+                    )}
+
+                    <div className="mt-6">
+
+                      <span className="text-3xl font-bold">
+                        {formatPrice(
+                          plan.price,
+                          plan.currency,
+                        )}
+                      </span>
+
+                      <span className="ml-2 text-sm text-muted-foreground">
+                        / {plan.billing_cycle}
+                      </span>
+
+                    </div>
+
+
+                    {plan.trial_days > 0 && (
+                      <p className="mt-3 text-sm font-medium text-[#0a3f61]">
+                        {plan.trial_days} day free trial
+                      </p>
+                    )}
+
+
+                    <div className="mt-auto pt-8">
+
+                      {plan.trial_days > 0 ? (
+                        <div className="space-y-3">
+                          <Link
+                            href={`/onboarding/studio?planId=${encodeURIComponent(
+                              plan.id,
+                            )}&planCode=${encodeURIComponent(
+                              plan.plan_code,
+                            )}&billingCycle=${encodeURIComponent(
+                              plan.billing_cycle,
+                            )}&mode=trial`}
+                            className="inline-flex w-full items-center justify-center rounded-xl bg-[#0a3f61] px-4 py-3 text-sm font-semibold text-white hover:opacity-90"
+                          >
+                            Start Free Trial
+                          </Link>
+
+                          <Link
+                            href={`/onboarding/studio?planId=${encodeURIComponent(
+                              plan.id,
+                            )}&planCode=${encodeURIComponent(
+                              plan.plan_code,
+                            )}&billingCycle=${encodeURIComponent(
+                              plan.billing_cycle,
+                            )}`}
+                            className="inline-flex w-full items-center justify-center rounded-xl border px-4 py-3 text-sm font-semibold hover:bg-muted"
+                          >
+                            Choose Paid Plan
+                          </Link>
+                        </div>
+                      ) : (
+                        <Link
+                          href={`/onboarding/studio?planId=${encodeURIComponent(
+                            plan.id,
+                          )}&planCode=${encodeURIComponent(
+                            plan.plan_code,
+                          )}&billingCycle=${encodeURIComponent(
+                            plan.billing_cycle,
+                          )}`}
+                          className="inline-flex w-full items-center justify-center rounded-xl bg-[#0a3f61] px-4 py-3 text-sm font-semibold text-white hover:opacity-90"
+                        >
+                          Choose Plan
+                        </Link>
+                      )}
+
+                    </div>
+
+                  </div>
+
+                ),
+              )}
+
+            </div>
+          )}
+
+
+        <div className="mt-12 text-center">
+
+          <p className="text-sm text-muted-foreground">
+            Already have an account?
+          </p>
+
+          <Link
+            href="/login"
+            className="mt-2 inline-block text-sm font-semibold text-[#0a3f61]"
+          >
+            Login
+          </Link>
+
+        </div>
+
+      </div>
+
+    </main>
+  );
+
+}

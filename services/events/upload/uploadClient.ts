@@ -1,9 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { supabase } from "@/lib/supabase/client";
 
 const STORAGE_BUCKET = "assets";
 
-// नवीन UploadRequest interface
 export interface UploadRequest {
   path: string;
   file: File;
@@ -20,20 +20,45 @@ export interface StorageUploadResponse {
 
 export class UploadClient {
   constructor(
-    private readonly client: SupabaseClient = supabase
+    private readonly client: SupabaseClient = supabase,
   ) {}
 
   async upload(
-    request: UploadRequest
-  ): Promise<StorageUploadResponse> {
-    // नवीन properties (contentType आणि signal) destructured केल्या आहेत
-    const { data, error } = await this.client.storage
+  request: UploadRequest
+): Promise<StorageUploadResponse> {
+
+  const {
+    data: {
+      session,
+    },
+  } = await this.client.auth.getSession();
+
+  if (!session) {
+    return {
+      success: false,
+      error: "Authentication session required for upload.",
+    };
+  }
+
+  const { data, error } =
+    await this.client.storage
       .from(STORAGE_BUCKET)
-      .upload(request.path, request.file, {
-        contentType: request.contentType,
-        upsert: false,
-    
-      });
+      .upload(
+        request.path,
+        request.file,
+        {
+          contentType:
+            request.contentType,
+          upsert: false,
+        },
+      );
+
+    if (request.signal?.aborted) {
+      throw new DOMException(
+        "Upload cancelled.",
+        "AbortError",
+      );
+    }
 
     if (error) {
       return {
@@ -63,15 +88,16 @@ export class UploadClient {
 
   async createSignedUrl(
     path: string,
-    expiresIn = 3600
+    expiresIn = 3600,
   ) {
     return this.client.storage
       .from(STORAGE_BUCKET)
       .createSignedUrl(
         path,
-        expiresIn
+        expiresIn,
       );
   }
 }
 
-export const uploadClient = new UploadClient();
+export const uploadClient =
+  new UploadClient();

@@ -14,13 +14,13 @@ export function mapClientDtoToClient(
 
     id: dto.id,
 
-    name: dto.name,
+    name: dto.display_name,
 
-    phone: dto.phone,
+    phone: dto.phone ?? "",
 
-    email: dto.email,
+    email: dto.email ?? "",
 
-    address: dto.address,
+    address: "",
 
     status:
       dto.status === "inactive"

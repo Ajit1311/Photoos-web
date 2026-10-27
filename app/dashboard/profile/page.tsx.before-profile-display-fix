@@ -1,0 +1,2342 @@
+"use client";
+
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+import Cropper, {
+  type Area,
+} from "react-easy-crop";
+
+import {
+  ArrowLeft,
+  Check,
+  Globe,
+  ImageIcon,
+  Loader2,
+  Mail,
+  MapPin,
+  Phone,
+  Save,
+  User,
+  X,
+} from "lucide-react";
+
+import {
+  useRouter,
+} from "next/navigation";
+
+import {
+  useBootstrapContext,
+} from "@/context/BootstrapContext";
+
+import {
+  supabase,
+} from "@/lib/supabase/client";
+
+import {
+  getStudioProfile,
+  updateStudioProfile,
+  type StudioProfile,
+  type UpdateStudioProfileInput,
+} from "@/lib/api/studio-profile";
+
+
+function getInitial(
+  name:
+    string | null | undefined,
+) {
+
+  const value =
+    name?.trim() ?? "";
+
+  return (
+    value.charAt(
+      0,
+    ).toUpperCase() ||
+    "S"
+  );
+
+}
+
+
+function normalizeValue(
+  value:
+    string | null | undefined,
+) {
+
+  return value ?? "";
+
+}
+
+
+function createInitialForm(): UpdateStudioProfileInput {
+
+  return {
+    name: "",
+    owner_name: "",
+    description: "",
+    contact_email: "",
+    contact_phone: "",
+    address: "",
+    city: "",
+    state: "",
+    country: "India",
+    postal_code: "",
+    website: "",
+    instagram_url: "",
+    facebook_url: "",
+    youtube_url: "",
+    logo_url: "",
+  };
+
+}
+
+
+function profileToForm(
+  profile:
+    StudioProfile,
+): UpdateStudioProfileInput {
+
+  return {
+    name:
+      profile.name ??
+      "",
+
+    owner_name:
+      normalizeValue(
+        profile.owner_name,
+      ),
+
+    description:
+      normalizeValue(
+        profile.description,
+      ),
+
+    contact_email:
+      normalizeValue(
+        profile.contact_email,
+      ),
+
+    contact_phone:
+      normalizeValue(
+        profile.contact_phone,
+      ),
+
+    address:
+      normalizeValue(
+        profile.address,
+      ),
+
+    city:
+      normalizeValue(
+        profile.city,
+      ),
+
+    state:
+      normalizeValue(
+        profile.state,
+      ),
+
+    country:
+      normalizeValue(
+        profile.country,
+      ) ||
+      "India",
+
+    postal_code:
+      normalizeValue(
+        profile.postal_code,
+      ),
+
+    website:
+      normalizeValue(
+        profile.website,
+      ),
+
+    instagram_url:
+      normalizeValue(
+        profile.instagram_url,
+      ),
+
+    facebook_url:
+      normalizeValue(
+        profile.facebook_url,
+      ),
+
+    youtube_url:
+      normalizeValue(
+        profile.youtube_url,
+      ),
+
+    logo_url:
+      normalizeValue(
+        profile.logo_url,
+      ),
+  };
+
+}
+
+
+async function createImage(
+  url:
+    string,
+): Promise<HTMLImageElement> {
+
+  return new Promise(
+    (
+      resolve,
+      reject,
+    ) => {
+
+      const image =
+        new Image();
+
+      image.addEventListener(
+        "load",
+        () =>
+          resolve(
+            image,
+          ),
+      );
+
+      image.addEventListener(
+        "error",
+        (
+          error
+        ) =>
+          reject(
+            error,
+          ),
+      );
+
+      image.src =
+        url;
+
+    },
+  );
+
+}
+
+
+async function getCroppedImageBlob(
+  imageSource:
+    string,
+  crop:
+    Area,
+): Promise<Blob> {
+
+  const image =
+    await createImage(
+      imageSource,
+    );
+
+
+  const canvas =
+    document.createElement(
+      "canvas",
+    );
+
+
+  canvas.width =
+    Math.round(
+      crop.width,
+    );
+
+
+  canvas.height =
+    Math.round(
+      crop.height,
+    );
+
+
+  const context =
+    canvas.getContext(
+      "2d",
+    );
+
+
+  if (!context) {
+
+    throw new Error(
+      "Unable to prepare image crop.",
+    );
+
+  }
+
+
+  context.drawImage(
+    image,
+    crop.x,
+    crop.y,
+    crop.width,
+    crop.height,
+    0,
+    0,
+    crop.width,
+    crop.height,
+  );
+
+
+  return new Promise(
+    (
+      resolve,
+      reject,
+    ) => {
+
+      canvas.toBlob(
+        (
+          blob
+        ) => {
+
+          if (!blob) {
+
+            reject(
+              new Error(
+                "Unable to create cropped image.",
+              ),
+            );
+
+            return;
+
+          }
+
+
+          resolve(
+            blob,
+          );
+
+        },
+        "image/webp",
+        0.92,
+      );
+
+    },
+  );
+
+}
+
+
+export default function StudioProfilePage() {
+
+  const router =
+    useRouter();
+
+
+  const bootstrap =
+    useBootstrapContext();
+
+
+  const studioId =
+    bootstrap.data
+      ?.workspace
+      ?.studio
+      ?.id ??
+    null;
+
+
+  const [
+    profile,
+    setProfile,
+  ] =
+    useState<
+      StudioProfile | null
+    >(
+      null,
+    );
+
+
+  const [
+    form,
+    setForm,
+  ] =
+    useState<
+      UpdateStudioProfileInput
+    >(
+      createInitialForm,
+    );
+
+
+  const [
+    loading,
+    setLoading,
+  ] =
+    useState(
+      true,
+    );
+
+
+  const [
+    saving,
+    setSaving,
+  ] =
+    useState(
+      false,
+    );
+
+
+  const [
+    uploadingLogo,
+    setUploadingLogo,
+  ] =
+    useState(
+      false,
+    );
+
+
+  const [
+    editing,
+    setEditing,
+  ] =
+    useState(
+      false,
+    );
+
+
+  const [
+    error,
+    setError,
+  ] =
+    useState<
+      string | null
+    >(
+      null,
+    );
+
+
+  const [
+    success,
+    setSuccess,
+  ] =
+    useState<
+      string | null
+    >(
+      null,
+    );
+
+
+  const [
+    cropImage,
+    setCropImage,
+  ] =
+    useState<
+      string | null
+    >(
+      null,
+    );
+
+
+  const [
+    crop,
+    setCrop,
+  ] =
+    useState({
+      x: 0,
+      y: 0,
+    });
+
+
+  const [
+    zoom,
+    setZoom,
+  ] =
+    useState(
+      1,
+    );
+
+
+  const [
+    croppedAreaPixels,
+    setCroppedAreaPixels,
+  ] =
+    useState<
+      Area | null
+    >(
+      null,
+    );
+
+
+  const loadProfileData =
+    useCallback(
+      async () => {
+
+        if (!studioId) {
+
+          setLoading(
+            false,
+          );
+
+
+          setError(
+            "Studio information is not available.",
+          );
+
+          return;
+
+        }
+
+
+        try {
+
+          setLoading(
+            true,
+          );
+
+
+          setError(
+            null,
+          );
+
+
+          const studioProfile =
+            await getStudioProfile(
+              studioId,
+            );
+
+
+          setProfile(
+            studioProfile,
+          );
+
+
+          setForm(
+            profileToForm(
+              studioProfile,
+            ),
+          );
+
+
+        } catch (
+          loadError
+        ) {
+
+          console.error(
+            "STUDIO PROFILE LOAD ERROR:",
+            loadError,
+          );
+
+
+          setError(
+            "Unable to load studio profile.",
+          );
+
+
+        } finally {
+
+          setLoading(
+            false,
+          );
+
+        }
+
+      },
+      [
+        studioId,
+      ],
+    );
+
+
+  useEffect(
+    () => {
+
+      void loadProfileData();
+
+    },
+    [
+      loadProfileData,
+    ],
+  );
+
+
+  const studioName =
+    profile?.name?.trim() ||
+    bootstrap.data
+      ?.workspace
+      ?.studio
+      ?.name
+      ?.trim() ||
+    "Studio";
+
+
+  const avatarInitial =
+    useMemo(
+      () =>
+        getInitial(
+          studioName,
+        ),
+      [
+        studioName,
+      ],
+    );
+
+
+  function updateField(
+    field:
+      keyof UpdateStudioProfileInput,
+    value:
+      string,
+  ) {
+
+    setForm(
+      (
+        current
+      ) => ({
+        ...current,
+
+        [
+          field
+        ]:
+          value,
+      }),
+    );
+
+  }
+
+
+  function handleLogoFileChange(
+    event:
+      React.ChangeEvent<HTMLInputElement>,
+  ) {
+
+    const file =
+      event.target.files?.[0] ??
+      null;
+
+
+    event.target.value =
+      "";
+
+
+    if (!file) {
+      return;
+    }
+
+
+    if (
+      !file.type.startsWith(
+        "image/",
+      )
+    ) {
+
+      setError(
+        "Please select a valid image file.",
+      );
+
+      return;
+
+    }
+
+
+    if (
+      file.size >
+      20 * 1024 * 1024
+    ) {
+
+      setError(
+        "Logo image must be smaller than 20 MB.",
+      );
+
+      return;
+
+    }
+
+
+    setError(
+      null,
+    );
+
+
+    setSuccess(
+      null,
+    );
+
+
+    const reader =
+      new FileReader();
+
+
+    reader.onload =
+      () => {
+
+        const result =
+          reader.result;
+
+
+        if (
+          typeof result !==
+          "string"
+        ) {
+          return;
+        }
+
+
+        setCropImage(
+          result,
+        );
+
+
+        setCrop({
+          x: 0,
+          y: 0,
+        });
+
+
+        setZoom(
+          1,
+        );
+
+
+        setCroppedAreaPixels(
+          null,
+        );
+
+      };
+
+
+    reader.onerror =
+      () => {
+
+        setError(
+          "Unable to read the selected image.",
+        );
+
+      };
+
+
+    reader.readAsDataURL(
+      file,
+    );
+
+  }
+
+
+  function handleCropComplete(
+    _croppedArea:
+      Area,
+    croppedPixels:
+      Area,
+  ) {
+
+    setCroppedAreaPixels(
+      croppedPixels,
+    );
+
+  }
+
+
+  function closeLogoCropper() {
+
+    setCropImage(
+      null,
+    );
+
+
+    setCrop({
+      x: 0,
+      y: 0,
+    });
+
+
+    setZoom(
+      1,
+    );
+
+
+    setCroppedAreaPixels(
+      null,
+    );
+
+  }
+
+
+
+
+  // ==========================================================
+  // PROFILE DATA HYDRATION
+  // ==========================================================
+
+  const applyStudioProfileData =
+    useCallback(
+      (
+        incomingProfile: StudioProfile | null | undefined,
+      ) => {
+
+        if (
+          !incomingProfile
+        ) {
+          return;
+        }
+
+
+        const normalizedProfile: StudioProfile = {
+          id:
+            incomingProfile.id ?? "",
+
+          name:
+            incomingProfile.name ??
+            "",
+
+          owner_name:
+            incomingProfile.owner_name ??
+            null,
+
+          description:
+            incomingProfile.description ??
+            null,
+
+          contact_email:
+            incomingProfile.contact_email ??
+            null,
+
+          contact_phone:
+            incomingProfile.contact_phone ??
+            null,
+
+          address:
+            incomingProfile.address ??
+            null,
+
+          city:
+            incomingProfile.city ??
+            null,
+
+          state:
+            incomingProfile.state ??
+            null,
+
+          country:
+            incomingProfile.country ??
+            null,
+
+          postal_code:
+            incomingProfile.postal_code ??
+            null,
+
+          website:
+            incomingProfile.website ??
+            null,
+
+          instagram_url:
+            incomingProfile.instagram_url ??
+            null,
+
+          facebook_url:
+            incomingProfile.facebook_url ??
+            null,
+
+          youtube_url:
+            incomingProfile.youtube_url ??
+            null,
+
+          logo_url:
+            incomingProfile.logo_url ??
+            null,
+        };
+
+
+        setProfile(
+          normalizedProfile,
+        );
+
+
+        setForm(
+          profileToForm(
+            normalizedProfile,
+          ),
+        );
+
+      },
+      [],
+    );
+
+
+
+  const refreshStudioProfile =
+    useCallback(
+      async () => {
+
+        if (
+          !studioId
+        ) {
+          return;
+        }
+
+
+        try {
+
+          const profile =
+            await getStudioProfile(
+              studioId,
+            );
+
+
+          console.log(
+            "PROFILE DATA LOADED:",
+            profile,
+          );
+
+
+          applyStudioProfileData(
+            profile,
+          );
+
+        } catch (
+          error
+        ) {
+
+          console.error(
+            "PROFILE LOAD ERROR:",
+            error,
+          );
+
+        }
+
+      },
+      [
+        studioId,
+        applyStudioProfileData,
+      ],
+    );
+
+
+  useEffect(
+    () => {
+
+      void refreshStudioProfile();
+
+    },
+    [
+      refreshStudioProfile,
+    ],
+  );
+
+
+  useEffect(
+    () => {
+
+      function handleProfileUpdated(
+        event: Event,
+      ) {
+
+        const customEvent =
+          event as CustomEvent;
+
+
+        const profile =
+          customEvent.detail;
+
+
+        if (
+          profile
+        ) {
+
+          applyStudioProfileData(
+            profile,
+          );
+
+        }
+
+
+        void refreshStudioProfile();
+
+      }
+
+
+      window.addEventListener(
+        "studio-profile-updated",
+        handleProfileUpdated,
+      );
+
+
+      return () => {
+
+        window.removeEventListener(
+          "studio-profile-updated",
+          handleProfileUpdated,
+        );
+
+      };
+
+    },
+    [
+      applyStudioProfileData,
+      refreshStudioProfile,
+    ],
+  );
+
+
+  async function confirmLogoCrop() {
+
+    if (
+      !studioId ||
+      !cropImage ||
+      !croppedAreaPixels
+    ) {
+      return;
+    }
+
+
+    try {
+
+      setUploadingLogo(
+        true,
+      );
+
+
+      setError(
+        null,
+      );
+
+
+      const croppedBlob =
+        await getCroppedImageBlob(
+          cropImage,
+          croppedAreaPixels,
+        );
+
+
+      const fileName =
+        `${studioId}/logo-${Date.now()}.webp`;
+
+
+      const {
+        error:
+          uploadError,
+      } =
+        await supabase.storage
+          .from(
+            "studio-branding",
+          )
+          .upload(
+            fileName,
+            croppedBlob,
+            {
+              contentType:
+                "image/webp",
+
+              upsert:
+                true,
+            },
+          );
+
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+
+      const {
+        data:
+          publicUrlData,
+      } =
+        supabase.storage
+          .from(
+            "studio-branding",
+          )
+          .getPublicUrl(
+            fileName,
+          );
+
+
+      const cacheBustedUrl =
+        `${publicUrlData.publicUrl}?v=${Date.now()}`;
+
+
+      setForm(
+        (
+          current
+        ) => ({
+          ...current,
+
+          logo_url:
+            cacheBustedUrl,
+              logo_path:
+                cacheBustedUrl,
+        }),
+      );
+
+
+      setSuccess(
+        "Logo uploaded. Click Save changes to update your studio profile.",
+      );
+
+
+      closeLogoCropper();
+
+
+    } catch (
+      uploadError
+    ) {
+
+      console.error(
+        "STUDIO LOGO UPLOAD ERROR:",
+        uploadError,
+      );
+
+
+      setError(
+        "Unable to upload studio logo.",
+      );
+
+
+    } finally {
+
+      setUploadingLogo(
+        false,
+      );
+
+    }
+
+  }
+
+
+  async function handleSave() {
+
+    if (!studioId) {
+      return;
+    }
+
+
+    
+
+
+    try {
+
+      setSaving(
+        true,
+      );
+
+
+      setError(
+        null,
+      );
+
+
+      setSuccess(
+        null,
+      );
+
+
+      const updatedProfile =
+        await updateStudioProfile(
+          studioId,
+          form,
+        );
+
+
+      setProfile(
+        updatedProfile,
+      );
+
+
+      setForm(
+        profileToForm(
+          updatedProfile,
+        ),
+      );
+
+
+      setEditing(
+        false,
+      );
+
+
+      setSuccess(
+        "Studio profile updated successfully.",
+      );
+
+
+    } catch (
+      saveError
+    ) {
+
+      console.error(
+        "STUDIO PROFILE SAVE ERROR:",
+        saveError,
+      );
+
+
+      setError(
+        "Unable to save studio profile.",
+      );
+
+
+    } finally {
+
+      setSaving(
+        false,
+      );
+
+    }
+
+  }
+
+
+  function handleCancelEdit() {
+
+    if (profile) {
+
+      setForm(
+        profileToForm(
+          profile,
+        ),
+      );
+
+    }
+
+
+    setEditing(
+      false,
+    );
+
+
+    setError(
+      null,
+    );
+
+
+    setSuccess(
+      null,
+    );
+
+  }
+
+
+  if (loading) {
+
+    return (
+
+      <div className="flex min-h-[60vh] items-center justify-center">
+
+        <div className="flex items-center gap-3 text-sm text-slate-500">
+
+          <Loader2
+            size={20}
+            className="animate-spin"
+          />
+
+          Loading studio profile...
+
+        </div>
+
+      </div>
+
+    );
+
+  }
+
+
+
+  // PROFILE_COMPLETION_START
+
+  
+const completionSource =
+    editing
+      ? form
+      : (
+          profile ??
+          form
+        );
+
+  const profileCompletionFields = [
+    completionSource?.name,
+    completionSource?.owner_name,
+    completionSource?.description,
+    completionSource?.contact_email,
+    completionSource?.contact_phone,
+    completionSource?.website,
+    completionSource?.city,
+    completionSource?.state,
+    completionSource?.logo_url,
+  ];
+
+
+  const completedProfileFields =
+    profileCompletionFields.filter(
+      (
+        value,
+      ) => {
+        if (
+          typeof value === "string"
+        ) {
+
+          return (
+            value.trim().length > 0
+          );
+
+        }
+
+        return Boolean(
+          value,
+        );
+      },
+    ).length;
+
+  const profileCompletion =
+    Math.round(
+      (
+        completedProfileFields /
+        profileCompletionFields.length
+      ) * 100,
+    );
+
+  // PROFILE_COMPLETION_END
+
+
+
+
+  return (
+
+    <div className="mx-auto w-full max-w-6xl space-y-6 pb-10">
+
+      {/* PROFILE_COMPLETION_BAR_START */}
+
+      <div className="mb-6 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+
+        <div className="mb-3 flex items-start justify-between gap-4">
+
+          <div>
+
+            <p className="text-sm font-semibold text-slate-900">
+
+              Profile completion
+
+            </p>
+
+            <p className="mt-1 text-xs text-slate-500">
+
+              Complete your studio profile to improve marketplace visibility.
+
+            </p>
+
+          </div>
+
+
+          <span className="shrink-0 text-lg font-bold text-[#0A3F61]">
+
+            {profileCompletion}%
+
+          </span>
+
+        </div>
+
+
+        <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200">
+
+          <div
+            className="h-full rounded-full bg-green-500 transition-all duration-500"
+            style={{
+              width:
+                `${profileCompletion}%`,
+            }}
+          />
+
+        </div>
+
+      </div>
+
+      {/* PROFILE_COMPLETION_BAR_END */}
+
+
+
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+
+        <div className="flex items-center gap-4">
+
+          <button
+            type="button"
+            onClick={
+              () =>
+                router.back()
+            }
+            className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+          >
+
+            <ArrowLeft
+              size={20}
+            />
+
+          </button>
+
+
+          <div>
+
+            <p className="text-sm font-medium text-slate-500">
+
+              Studio settings
+
+            </p>
+
+
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+
+              Studio Profile
+
+            </h1>
+
+          </div>
+
+        </div>
+
+
+        {!editing
+          ? (
+
+            <button
+              type="button"
+              onClick={
+                () =>
+                  setEditing(
+                    true,
+                  )
+              }
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#16A34A] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#083652]"
+            >
+
+              Edit profile
+
+            </button>
+
+          )
+          : (
+
+            <div className="flex items-center gap-3">
+
+              <button
+                type="button"
+                onClick={
+                  handleCancelEdit
+                }
+                disabled={
+                  saving ||
+                  uploadingLogo
+                }
+                className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+              >
+
+                Cancel
+
+              </button>
+
+
+              <button
+                type="button"
+                onClick={
+                  handleSave
+                }
+                disabled={
+                  saving ||
+                  uploadingLogo
+                }
+                className="inline-flex items-center gap-2 rounded-xl bg-[#16A34A] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#083652] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+
+                {saving
+                  ? (
+
+                    <Loader2
+                      size={18}
+                      className="animate-spin"
+                    />
+
+                  )
+                  : (
+
+                    <Save
+                      size={18}
+                    />
+
+                  )}
+
+                Save changes
+
+              </button>
+
+            </div>
+
+          )}
+
+      </div>
+
+
+      {error && (
+
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
+
+          {error}
+
+        </div>
+
+      )}
+
+
+      {success && (
+
+        <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-700">
+
+          <Check
+            size={18}
+          />
+
+          {success}
+
+        </div>
+
+      )}
+
+
+      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+
+        <div className="border-b border-slate-100 px-6 py-6 sm:px-8">
+
+          <h2 className="text-lg font-bold text-slate-900">
+
+            Studio identity
+
+          </h2>
+
+
+          <p className="mt-1 text-sm text-slate-500">
+
+            Your studio name, logo and basic information.
+
+          </p>
+
+        </div>
+
+
+        <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[260px_1fr]">
+
+          <div className="space-y-5">
+
+            <div className="flex aspect-square w-full max-w-[240px] items-center justify-center overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 relative">
+
+
+
+
+              {form.logo_url
+                ? (
+
+                  <img
+                    src={
+                      form.logo_url
+                    }
+                    alt="Studio logo"
+                    className="h-full w-full object-cover"
+                  />
+
+                )
+                : (
+
+                  <div className="flex h-full w-full items-center justify-center bg-[#16A34A] text-6xl font-bold text-white">
+
+                    {avatarInitial}
+
+                  </div>
+
+                )}
+
+            </div>
+
+
+            {editing && (
+
+              <div>
+
+                <label className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+
+                  {uploadingLogo
+                    ? (
+
+                      <Loader2
+                        size={18}
+                        className="animate-spin"
+                      />
+
+                    )
+                    : (
+
+                      <ImageIcon
+                        size={18}
+                      />
+
+                    )}
+
+                  {uploadingLogo
+                    ? "Uploading..."
+                    : "Upload and crop logo"}
+
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/avif,image/svg+xml"
+                    onChange={
+                      handleLogoFileChange
+                    }
+                    disabled={
+                      uploadingLogo
+                    }
+                    className="hidden"
+                  />
+
+                </label>
+
+
+                <p className="mt-2 text-center text-xs text-slate-500">
+
+                  JPG, PNG, WebP, AVIF or SVG. Maximum 20 MB.
+
+                </p>
+
+              </div>
+
+            )}
+
+          </div>
+
+
+          <div className="space-y-5">
+
+            <div>
+
+              <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
+
+                <User
+                  size={16}
+                />
+
+                Studio name
+
+              </label>
+
+
+              <input
+                value={
+                  normalizeValue(
+                    form.name,
+                  )
+                }
+                disabled={
+                  !editing
+                }
+                onChange={
+                  (
+                    event
+                  ) =>
+                    updateField(
+                      "name",
+                      event.target.value,
+                    )
+                }
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[#0A3F61] disabled:bg-slate-50"
+              />
+
+            </div>
+
+
+            <div>
+
+              <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
+
+                <User
+                  size={16}
+                />
+
+                Owner name
+
+              </label>
+
+
+              <input
+                value={
+                  normalizeValue(
+                    form.owner_name,
+                  )
+                }
+                disabled={
+                  !editing
+                }
+                onChange={
+                  (
+                    event
+                  ) =>
+                    updateField(
+                      "owner_name",
+                      event.target.value,
+                    )
+                }
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[#0A3F61] disabled:bg-slate-50"
+              />
+
+            </div>
+
+
+            <div>
+
+              <label className="mb-2 block text-sm font-semibold text-slate-700">
+
+                Studio description
+
+              </label>
+
+
+              <textarea
+                rows={6}
+                value={
+                  normalizeValue(
+                    form.description,
+                  )
+                }
+                disabled={
+                  !editing
+                }
+                onChange={
+                  (
+                    event
+                  ) =>
+                    updateField(
+                      "description",
+                      event.target.value,
+                    )
+                }
+                className="w-full resize-none rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[#0A3F61] disabled:bg-slate-50"
+              />
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </section>
+
+
+      <section className="rounded-3xl border border-slate-200 bg-white shadow-sm">
+
+        <div className="border-b border-slate-100 px-6 py-6 sm:px-8">
+
+          <h2 className="text-lg font-bold text-slate-900">
+
+            Contact information
+
+          </h2>
+
+
+          <p className="mt-1 text-sm text-slate-500">
+
+            Details clients can use to contact your studio.
+
+          </p>
+
+        </div>
+
+
+        <div className="grid gap-5 p-6 sm:grid-cols-2 sm:p-8">
+
+          <div>
+
+            <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
+
+              <Mail
+                size={16}
+              />
+
+              Email
+
+            </label>
+
+
+            <input
+              type="email"
+              value={
+                normalizeValue(
+                  form.contact_email,
+                )
+              }
+              disabled={
+                !editing
+              }
+              onChange={
+                (
+                  event
+                ) =>
+                  updateField(
+                    "contact_email",
+                    event.target.value,
+                  )
+              }
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[#0A3F61] disabled:bg-slate-50"
+            />
+
+          </div>
+
+
+          <div>
+
+            <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
+
+              <Phone
+                size={16}
+              />
+
+              Phone
+
+            </label>
+
+
+            <input
+              type="tel"
+              value={
+                normalizeValue(
+                  form.contact_phone,
+                )
+              }
+              disabled={
+                !editing
+              }
+              onChange={
+                (
+                  event
+                ) =>
+                  updateField(
+                    "contact_phone",
+                    event.target.value,
+                  )
+              }
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[#0A3F61] disabled:bg-slate-50"
+            />
+
+          </div>
+
+
+          <div className="sm:col-span-2">
+
+            <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
+
+              <Globe
+                size={16}
+              />
+
+              Website
+
+            </label>
+
+
+            <input
+              type="url"
+              placeholder="https://example.com"
+              value={
+                normalizeValue(
+                  form.website,
+                )
+              }
+              disabled={
+                !editing
+              }
+              onChange={
+                (
+                  event
+                ) =>
+                  updateField(
+                    "website",
+                    event.target.value,
+                  )
+              }
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[#0A3F61] disabled:bg-slate-50"
+            />
+
+          </div>
+
+        </div>
+
+      </section>
+
+
+      <section className="rounded-3xl border border-slate-200 bg-white shadow-sm">
+
+        <div className="border-b border-slate-100 px-6 py-6 sm:px-8">
+
+          <h2 className="text-lg font-bold text-slate-900">
+
+            Studio address
+
+          </h2>
+
+        </div>
+
+
+        <div className="grid gap-5 p-6 sm:grid-cols-2 sm:p-8">
+
+          <div className="sm:col-span-2">
+
+            <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
+
+              <MapPin
+                size={16}
+              />
+
+              Address
+
+            </label>
+
+
+            <input
+              value={
+                normalizeValue(
+                  form.address,
+                )
+              }
+              disabled={
+                !editing
+              }
+              onChange={
+                (
+                  event
+                ) =>
+                  updateField(
+                    "address",
+                    event.target.value,
+                  )
+              }
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[#0A3F61] disabled:bg-slate-50"
+            />
+
+          </div>
+
+
+          {[
+            [
+              "City",
+              "city",
+            ],
+            [
+              "State",
+              "state",
+            ],
+            [
+              "Country",
+              "country",
+            ],
+            [
+              "Postal code",
+              "postal_code",
+            ],
+          ].map(
+            (
+              [
+                label,
+                field,
+              ]
+            ) => (
+
+              <div
+                key={
+                  field
+                }
+              >
+
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+
+                  {label}
+
+                </label>
+
+
+                <input
+                  value={
+                    normalizeValue(
+                      form[
+                        field as keyof UpdateStudioProfileInput
+                      ] as string | null | undefined,
+                    )
+                  }
+                  disabled={
+                    !editing
+                  }
+                  onChange={
+                    (
+                      event
+                    ) =>
+                      updateField(
+                        field as keyof UpdateStudioProfileInput,
+                        event.target.value,
+                      )
+                  }
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[#0A3F61] disabled:bg-slate-50"
+                />
+
+              </div>
+
+            ),
+          )}
+
+        </div>
+
+      </section>
+
+
+      <section className="rounded-3xl border border-slate-200 bg-white shadow-sm">
+
+        <div className="border-b border-slate-100 px-6 py-6 sm:px-8">
+
+          <h2 className="text-lg font-bold text-slate-900">
+
+            Social media links
+
+          </h2>
+
+
+          <p className="mt-1 text-sm text-slate-500">
+
+            Add your studio social profiles.
+
+          </p>
+
+        </div>
+
+
+        <div className="grid gap-5 p-6 sm:p-8">
+
+          <div>
+
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
+
+              Instagram
+
+            </label>
+
+
+            <input
+              type="url"
+              placeholder="https://instagram.com/yourstudio"
+              value={
+                normalizeValue(
+                  form.instagram_url,
+                )
+              }
+              disabled={
+                !editing
+              }
+              onChange={
+                (
+                  event
+                ) =>
+                  updateField(
+                    "instagram_url",
+                    event.target.value,
+                  )
+              }
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[#0A3F61] disabled:bg-slate-50"
+            />
+
+          </div>
+
+
+          <div>
+
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
+
+              Facebook
+
+            </label>
+
+
+            <input
+              type="url"
+              placeholder="https://facebook.com/yourstudio"
+              value={
+                normalizeValue(
+                  form.facebook_url,
+                )
+              }
+              disabled={
+                !editing
+              }
+              onChange={
+                (
+                  event
+                ) =>
+                  updateField(
+                    "facebook_url",
+                    event.target.value,
+                  )
+              }
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[#0A3F61] disabled:bg-slate-50"
+            />
+
+          </div>
+
+
+          <div>
+
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
+
+              YouTube
+
+            </label>
+
+
+            <input
+              type="url"
+              placeholder="https://youtube.com/@yourstudio"
+              value={
+                normalizeValue(
+                  form.youtube_url,
+                )
+              }
+              disabled={
+                !editing
+              }
+              onChange={
+                (
+                  event
+                ) =>
+                  updateField(
+                    "youtube_url",
+                    event.target.value,
+                  )
+              }
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[#0A3F61] disabled:bg-slate-50"
+            />
+
+          </div>
+
+        </div>
+
+      </section>
+
+
+      {editing && (
+
+        <div className="flex justify-end gap-3 pb-6">
+
+          <button
+            type="button"
+            onClick={
+              handleCancelEdit
+            }
+            disabled={
+              saving ||
+              uploadingLogo
+            }
+            className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+          >
+
+            Cancel
+
+          </button>
+
+
+          <button
+            type="button"
+            onClick={
+              handleSave
+            }
+            disabled={
+              saving ||
+              uploadingLogo
+            }
+            className="inline-flex items-center gap-2 rounded-xl bg-[#16A34A] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#083652] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+
+            {saving
+              ? (
+
+                <Loader2
+                  size={18}
+                  className="animate-spin"
+                />
+
+              )
+              : (
+
+                <Save
+                  size={18}
+                />
+
+              )}
+
+            Save profile
+
+          </button>
+
+        </div>
+
+      )}
+
+
+      {cropImage && (
+
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-4">
+
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
+
+              <div>
+
+                <h2 className="text-lg font-bold text-slate-900">
+
+                  Crop studio logo
+
+                </h2>
+
+
+                <p className="mt-1 text-sm text-slate-500">
+
+                  Adjust the image before uploading it.
+
+                </p>
+
+              </div>
+
+
+              <button
+                type="button"
+                onClick={
+                  closeLogoCropper
+                }
+                disabled={
+                  uploadingLogo
+                }
+                className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100"
+              >
+
+                <X
+                  size={20}
+                />
+
+              </button>
+
+            </div>
+
+
+            <div className="relative h-[420px] bg-slate-950">
+
+              <Cropper
+                image={
+                  cropImage
+                }
+                crop={
+                  crop
+                }
+                zoom={
+                  zoom
+                }
+                aspect={
+                  1
+                }
+                cropShape="round"
+                showGrid={
+                  false
+                }
+                onCropChange={
+                  setCrop
+                }
+                onZoomChange={
+                  setZoom
+                }
+                onCropComplete={
+                  handleCropComplete
+                }
+              />
+
+            </div>
+
+
+            <div className="space-y-3 border-t border-slate-100 px-6 py-5">
+
+              <div className="flex items-center gap-4">
+
+                <span className="text-sm font-medium text-slate-600">
+
+                  Zoom
+
+                </span>
+
+
+                <input
+                  type="range"
+                  min="1"
+                  max="3"
+                  step="0.05"
+                  value={
+                    zoom
+                  }
+                  onChange={
+                    (
+                      event
+                    ) =>
+                      setZoom(
+                        Number(
+                          event.target.value,
+                        ),
+                      )
+                  }
+                  className="flex-1 accent-[#0A3F61]"
+                />
+
+              </div>
+
+
+              <div className="flex justify-end gap-3 pt-2">
+
+                <button
+                  type="button"
+                  onClick={
+                    closeLogoCropper
+                  }
+                  disabled={
+                    uploadingLogo
+                  }
+                  className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+
+                  Cancel
+
+                </button>
+
+
+                <button
+                  type="button"
+                  onClick={
+                    confirmLogoCrop
+                  }
+                  disabled={
+                    uploadingLogo
+                  }
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#16A34A] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#083652] disabled:opacity-60"
+                >
+
+                  {uploadingLogo && (
+
+                    <Loader2
+                      size={18}
+                      className="animate-spin"
+                    />
+
+                  )}
+
+                  {uploadingLogo
+                    ? "Uploading..."
+                    : "Crop and upload"}
+
+                </button>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
+
+    </div>
+
+  );
+
+}

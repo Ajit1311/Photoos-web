@@ -3,23 +3,15 @@
 import { useEventWizard } from "@/context/EventWizardContext";
 import { CheckCircle2, Search } from "lucide-react";
 import { useClients } from "@/hooks/useClients";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 export default function StepTwoClient() {
   const { data, setField } = useEventWizard();
-  const { clients, loading, error, reload } = useClients();
   const [search, setSearch] = useState("");
 
-  // Debounced Search Logic
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      void reload(search);
-    }, 300);
-
-    return () => {
-      window.clearTimeout(timeout);
-    };
-  }, [reload, search]);
+  const { clients, loading, error } = useClients({
+    search,
+  });
 
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
@@ -130,7 +122,7 @@ export default function StepTwoClient() {
 
           {error && (
             <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-600">
-              {error}
+              {error?.message ?? "Something went wrong while loading clients."}
             </div>
           )}
 
@@ -141,15 +133,14 @@ export default function StepTwoClient() {
                   key={client.id}
                   type="button"
                   onClick={() => setField("selectedClientId", client.id)}
-                  className={`flex w-full items-center justify-between rounded-2xl border p-5 text-left transition ${
-                    data.selectedClientId === client.id
+                  className={`flex w-full items-center justify-between rounded-2xl border p-5 text-left transition ${data.selectedClientId === client.id
                       ? "border-[#0A3F61] bg-[#0A3F61]/5"
                       : "border-slate-200 hover:border-[#0A3F61] hover:bg-[#0A3F61]/5"
-                  }`}
+                    }`}
                 >
                   <div>
                     <h4 className="font-semibold text-slate-900">
-                      {client.name}
+                      {client.display_name}
                     </h4>
                     <p className="mt-1 text-sm text-slate-500">{client.phone}</p>
                     {client.email && (

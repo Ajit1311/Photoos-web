@@ -1,11 +1,10 @@
 "use client";
 
 import { useRef } from "react";
-import { FolderOpen, Images, UploadCloud } from "lucide-react";
+import { Images, UploadCloud } from "lucide-react";
 
 export interface UploadButtonProps {
   onFilesSelected: (files: File[]) => void;
-
   disabled?: boolean;
 }
 
@@ -16,9 +15,11 @@ export default function UploadButton({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFiles = (
-    event: React.ChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>,
   ) => {
-    const files = Array.from(event.target.files ?? []);
+    const files = Array.from(
+      event.target.files ?? [],
+    );
 
     if (files.length > 0) {
       onFilesSelected(files);
@@ -40,12 +41,8 @@ export default function UploadButton({
         type="file"
         hidden
         multiple
-        accept="image/*"
+        accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif,image/gif,image/tiff"
         onChange={handleFiles}
-        {...({
-          webkitdirectory: true,
-          directory: true,
-        } as React.InputHTMLAttributes<HTMLInputElement>)}
       />
 
       <button
@@ -79,14 +76,7 @@ export default function UploadButton({
 
         <div className="ml-2 flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs">
           <Images className="h-3.5 w-3.5" />
-
           <span>Multiple</span>
-        </div>
-
-        <div className="flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs">
-          <FolderOpen className="h-3.5 w-3.5" />
-
-          <span>Folder</span>
         </div>
       </button>
     </>

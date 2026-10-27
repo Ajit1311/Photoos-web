@@ -65,14 +65,14 @@ class ClientService {
     clientId: string,
   ): Promise<Client> {
 
-    const dto =
+    const response =
       await getClient(
         studioId,
         clientId,
       );
 
     return mapClientDtoToClient(
-      dto,
+      response.client,
     );
 
   }

@@ -1,0 +1,142 @@
+import { supabase } from "@/lib/supabase/client";
+import { getAccessToken } from "@/lib/auth/session";
+import type { SubscriptionAccessDetails } from "@/types/subscription/subscription";
+
+export async function getSubscriptionAccessDetails(
+  _studioId: string,
+): Promise<SubscriptionAccessDetails | null> {
+
+  console.log(
+    "[SUBSCRIPTION ACCESS] requesting Supabase access token",
+  );
+
+  const accessToken =
+    await getAccessToken();
+
+  console.log(
+    "[SUBSCRIPTION ACCESS] Supabase access token:",
+    accessToken ? "PRESENT" : "MISSING",
+  );
+
+  if (!accessToken) {
+    throw new Error(
+      "You must be signed in to load subscription access.",
+    );
+  }
+
+  console.log(
+    "[SUBSCRIPTION ACCESS] invoking Edge Function",
+  );
+
+  const {
+    data,
+    error,
+  } = await supabase.functions.invoke(
+    "get-subscription-access-details",
+    {
+      method: "GET",
+      headers: {
+        Authorization:
+          `Bearer ${accessToken}`,
+      },
+    },
+  );
+
+  if (error) {
+    console.error(
+      "[SUBSCRIPTION ACCESS] Edge Function ERROR:",
+      error,
+    );
+    throw error;
+  }
+
+  console.log(
+    "[SUBSCRIPTION ACCESS] Edge Function RESPONSE:",
+    data,
+  );
+
+  if (!data?.success) {
+    throw new Error(
+      data?.error?.message ??
+      data?.error ??
+      "Unable to load subscription access.",
+    );
+  }
+
+  return (
+    data?.data?.subscription ??
+    null
+  ) as SubscriptionAccessDetails | null;
+}
+
+export type SubscriptionCancellationResult = {
+  success: boolean;
+  message: string;
+  cancellation: {
+    success: boolean;
+    subscription_id: string;
+    studio_id: string;
+    previous_status: string;
+    status: string;
+    access_closed: boolean;
+    cancelled_at: string;
+    ticket_id: string;
+    ticket_status: string;
+    refund_status: string;
+  };
+};
+
+export async function cancelSubscription(
+  subscriptionId: string,
+): Promise<SubscriptionCancellationResult> {
+  const accessToken =
+    await getAccessToken();
+
+  if (!accessToken) {
+    throw new Error(
+      "You must be signed in to cancel your subscription.",
+    );
+  }
+
+  if (!subscriptionId?.trim()) {
+    throw new Error(
+      "Subscription ID is required.",
+    );
+  }
+
+  const {
+    data,
+    error,
+  } =
+    await supabase.functions.invoke(
+      "cancel-subscription",
+      {
+        method: "POST",
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
+        },
+        body: {
+          subscription_id:
+            subscriptionId.trim(),
+        },
+      },
+    );
+
+  if (error) {
+    throw error;
+  }
+
+  if (
+    !data?.success ||
+    !data?.data?.cancellation
+  ) {
+    throw new Error(
+      data?.error?.message ??
+        data?.error ??
+        "Subscription cancellation failed.",
+    );
+  }
+
+  return data as SubscriptionCancellationResult;
+}

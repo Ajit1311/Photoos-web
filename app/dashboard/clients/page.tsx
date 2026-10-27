@@ -56,7 +56,9 @@ export default function ClientsPage() {
                     <h2 className="text-lg font-semibold text-red-700">
                         Unable to load clients
                     </h2>
-                    <p className="mt-2 text-red-600">{error}</p>
+                    <p className="mt-2 text-red-600">
+                        {error?.message ?? "Something went wrong."}
+                    </p>
                 </div>
             </main>
         );

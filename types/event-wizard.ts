@@ -9,6 +9,7 @@ export interface EventWizardData {
   // ===========================================================================
   // Basic Details
   // ===========================================================================
+  projectId: string; // <-- नवीन field add केले
   title: string;
   eventType: string;
   eventDate: string;
@@ -43,22 +44,31 @@ export interface EventWizardData {
   paymentDueDate: string;
   paymentStatus: PaymentStatus;
 
+
   // ===========================================================================
   // Gallery
   // ===========================================================================
-  watermark: boolean;
+  generateQrGallery: boolean;
+  enableClientGallery: boolean;
   allowDownload: boolean;
+  lockDownloadsUntilPayment: boolean;
+  watermark: boolean;
+  enableFavouriteSelection: boolean;
   expiryDate: string | null;
 
   // ===========================================================================
   // AI
   // ===========================================================================
   faceRecognition: boolean;
-  autoCulling: boolean;
-  autoEnhancement: boolean;
+  duplicateDetection: boolean;
+  blurDetection: boolean;
+  bestPhotoSelection: boolean;
+  albumSuggestions: boolean;
+  smartTagGeneration: boolean;
 }
 
 export const defaultEventWizardData: EventWizardData = {
+  projectId: "", // <-- Default value set केली
   title: "",
   eventType: "Wedding",
   eventDate: "",
@@ -84,11 +94,18 @@ export const defaultEventWizardData: EventWizardData = {
   paymentDueDate: "",
   paymentStatus: "pending",
 
-  watermark: true,
+  generateQrGallery: true,
+  enableClientGallery: true,
   allowDownload: false,
+  lockDownloadsUntilPayment: true,
+  watermark: true,
+  enableFavouriteSelection: true,
   expiryDate: null,
 
   faceRecognition: true,
-  autoCulling: true,
-  autoEnhancement: true,
+  duplicateDetection: true,
+  blurDetection: true,
+  bestPhotoSelection: true,
+  albumSuggestions: true,
+  smartTagGeneration: true,
 };

@@ -1,0 +1,2742 @@
+"use client";
+
+import {
+  ArrowLeft,
+  CheckCheck,
+  ChevronDown,
+  Download,
+  File,
+  FileArchive,
+  FileImage,
+  FileText,
+  Forward,
+  Paperclip,
+  Pin,
+  Reply,
+  Search,
+  Send,
+  Smile,
+  Trash2,
+  UserPlus,
+  X,
+} from "lucide-react";
+
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+
+import type {
+  ChatConversation,
+  ChatMessage,
+} from "@/types/chat";
+
+import {
+  listChatConversationMembers,
+  completeChatAttachmentUpload,
+  deleteChatMessage,
+  getChatPinnedMessages,
+  markChatMessageRead,
+  pinChatMessage,
+  prepareChatAttachmentUpload,
+  removeChatConversation,
+  sendChatMessage,
+  unpinChatMessage,
+  type ChatMessageAttachment,
+  type ChatPinnedMessage,
+} from "@/lib/api/chat";
+
+import {
+  useChatMessages,
+} from "@/hooks/chat/useChatMessages";
+
+import {
+  useClients,
+} from "@/hooks/useClients";
+
+import {
+  useTeamMembers,
+} from "@/hooks/useTeamMembers";
+
+import {
+  resolveUserStudio,
+} from "@/lib/auth/resolve-user-studio";
+
+import {
+  supabase,
+} from "@/lib/supabase/client";
+
+import {
+  useNotificationContext,
+} from "@/context/NotificationContext";
+
+import {
+  ChatAddMemberDialog,
+} from "./ChatAddMemberDialog";
+
+interface ChatConversationPanelProps {
+  conversation: ChatConversation;
+  onBack?: () => void;
+}
+
+type MessageAttachmentsMap =
+  Record<string, ChatMessageAttachment[]>;
+
+type ChatConversationMemberRow = {
+  id: string;
+  profile_id: string | null;
+  client_id: string | null;
+  display_name?: string | null;
+  role: string | null;
+  joined_at: string | null;
+  last_read_at: string | null;
+  muted: boolean | null;
+  metadata: Record<string, unknown> | null;
+};
+
+type ConversationParticipant = {
+  memberId: string | null;
+  id: string;
+  name: string;
+  email: string | null;
+  type: "employee" | "client" | "member";
+};
+
+const EMOJIS = [
+  "😀",
+  "😃",
+  "😄",
+  "😁",
+  "😆",
+  "😅",
+  "🤣",
+  "😂",
+  "🙂",
+  "🙃",
+  "😉",
+  "😊",
+  "😇",
+  "🥰",
+  "😍",
+  "🤩",
+  "😘",
+  "😗",
+  "😚",
+  "😙",
+  "😋",
+  "😛",
+  "😜",
+  "🤪",
+  "😝",
+  "🤑",
+  "🤗",
+  "🤭",
+  "🤫",
+  "🤔",
+  "🤐",
+  "🤨",
+  "😐",
+  "😑",
+  "😶",
+  "😏",
+  "😒",
+  "🙄",
+  "😬",
+  "🤥",
+  "😌",
+  "😔",
+  "😪",
+  "🤤",
+  "😴",
+  "😷",
+  "🤒",
+  "🤕",
+  "🤢",
+  "🤮",
+  "🤧",
+  "🥵",
+  "🥶",
+  "🥴",
+  "😵",
+  "🤯",
+  "🤠",
+  "🥳",
+  "🥸",
+  "😎",
+  "🤓",
+  "🧐",
+  "😕",
+  "😟",
+  "🙁",
+  "😮",
+  "😯",
+  "😲",
+  "😳",
+  "🥺",
+  "😦",
+  "😧",
+  "😨",
+  "😰",
+  "😥",
+  "😢",
+  "😭",
+  "😱",
+  "😖",
+  "😣",
+  "😞",
+  "😓",
+  "😩",
+  "😫",
+  "🥱",
+  "😤",
+  "😡",
+  "😠",
+  "🤬",
+  "😈",
+  "👿",
+  "💀",
+  "☠️",
+  "💩",
+  "🤡",
+  "👹",
+  "👺",
+  "👻",
+  "👽",
+  "👾",
+  "🤖",
+
+  "👋",
+  "🤚",
+  "🖐️",
+  "✋",
+  "🖖",
+  "👌",
+  "🤌",
+  "🤏",
+  "✌️",
+  "🤞",
+  "🤟",
+  "🤘",
+  "🤙",
+  "👈",
+  "👉",
+  "👆",
+  "🖕",
+  "👇",
+  "☝️",
+  "👍",
+  "👎",
+  "✊",
+  "👊",
+  "🤛",
+  "🤜",
+  "👏",
+  "🙌",
+  "👐",
+  "🤲",
+  "🤝",
+  "🙏",
+  "✍️",
+  "💅",
+  "🤳",
+  "💪",
+  "🦾",
+  "🦿",
+  "🦵",
+  "🦶",
+  "👂",
+  "🦻",
+  "👃",
+  "🧠",
+  "🫀",
+  "🫁",
+  "🦷",
+  "🦴",
+  "👀",
+  "👁️",
+  "👅",
+  "👄",
+
+  "❤️",
+  "🧡",
+  "💛",
+  "💚",
+  "💙",
+  "💜",
+  "🖤",
+  "🤍",
+  "🤎",
+  "💔",
+  "❤️‍🔥",
+  "❤️‍🩹",
+  "💕",
+  "💞",
+  "💓",
+  "💗",
+  "💖",
+  "💘",
+  "💝",
+  "💟",
+  "💌",
+  "💋",
+  "💯",
+  "💢",
+  "💥",
+  "💫",
+  "💦",
+  "💨",
+  "🕳️",
+  "💣",
+  "💬",
+  "💭",
+
+  "🎉",
+  "🎊",
+  "🎈",
+  "🎁",
+  "🏆",
+  "🥇",
+  "🥈",
+  "🥉",
+  "🏅",
+  "🎖️",
+  "🎫",
+  "🎟️",
+  "✨",
+  "⭐",
+  "🌟",
+  "🔥",
+  "⚡",
+  "☄️",
+  "🚀",
+  "🎯",
+  "🎲",
+  "🎮",
+  "🕹️",
+  "🎨",
+  "🎬",
+  "🎤",
+  "🎧",
+  "🎼",
+  "🎹",
+  "🥁",
+  "🎷",
+  "🎺",
+  "🎸",
+
+  "📸",
+  "📷",
+  "📹",
+  "🎥",
+  "📽️",
+  "🎞️",
+  "💻",
+  "🖥️",
+  "📱",
+  "📲",
+  "💡",
+  "🔦",
+  "🕯️",
+  "⏰",
+  "⏱️",
+  "⏳",
+  "⌛",
+  "💰",
+  "💵",
+  "💳",
+  "💎",
+  "🔑",
+  "🗝️",
+  "🔒",
+  "🔓",
+  "🔔",
+  "📦",
+  "📁",
+  "📂",
+  "📅",
+  "📆",
+  "📌",
+  "📍",
+  "📎",
+  "🔗",
+  "🔍",
+  "🔎",
+  "🛠️",
+  "⚙️",
+];
+
+const MAX_FILE_SIZE =
+  25 * 1024 * 1024;
+
+function getConversationName(
+  conversation: ChatConversation,
+) {
+  const metadata = conversation.metadata ?? {};
+
+  const clientName =
+    typeof metadata.client_display_name === "string"
+      ? metadata.client_display_name.trim()
+      : "";
+
+  return clientName || "Client Conversation";
+}
+
+function formatMessageTime(
+  value: string,
+) {
+  const date =
+    new Date(value);
+
+  if (
+    Number.isNaN(
+      date.getTime(),
+    )
+  ) {
+    return "";
+  }
+
+  return date.toLocaleTimeString(
+    "en-IN",
+    {
+      hour: "2-digit",
+      minute: "2-digit",
+    },
+  );
+}
+
+function getInitials(
+  value: string,
+) {
+  return value
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(
+      (part) =>
+        part[0]?.toUpperCase() ?? "",
+    )
+    .join("");
+}
+
+function formatFileSize(
+  size: number | null | undefined,
+) {
+  if (
+    !size ||
+    size <= 0
+  ) {
+    return "";
+  }
+
+  if (size < 1024) {
+    return `${size} B`;
+  }
+
+  if (size < 1024 * 1024) {
+    return `${(
+      size / 1024
+    ).toFixed(1)} KB`;
+  }
+
+  if (
+    size <
+    1024 * 1024 * 1024
+  ) {
+    return `${(
+      size /
+      (1024 * 1024)
+    ).toFixed(1)} MB`;
+  }
+
+  return `${(
+    size /
+    (1024 * 1024 * 1024)
+  ).toFixed(1)} GB`;
+}
+
+function isImageFile(
+  attachment: ChatMessageAttachment,
+) {
+  return Boolean(
+    attachment.file_type?.startsWith(
+      "image/",
+    ),
+  );
+}
+
+function getFileIcon(
+  attachment: ChatMessageAttachment,
+) {
+  const type =
+    attachment.file_type ?? "";
+
+  if (
+    type.startsWith(
+      "image/",
+    )
+  ) {
+    return FileImage;
+  }
+
+  if (
+    type.includes("pdf") ||
+    type.includes("document") ||
+    type.includes("text") ||
+    type.includes("word")
+  ) {
+    return FileText;
+  }
+
+  if (
+    type.includes("zip") ||
+    type.includes("rar") ||
+    type.includes("archive") ||
+    type.includes("compressed")
+  ) {
+    return FileArchive;
+  }
+
+  return File;
+}
+
+export default function ChatConversationPanel({
+  conversation,
+  onBack,
+}: ChatConversationPanelProps) {
+
+  const {
+    reload: reloadNotifications,
+  } =
+    useNotificationContext();
+  const [
+    message,
+    setMessage,
+  ] = useState("");
+
+  const [
+    sending,
+    setSending,
+  ] = useState(false);
+
+  const [
+    uploading,
+    setUploading,
+  ] = useState(false);
+
+  const [
+    uploadProgress,
+    setUploadProgress,
+  ] = useState(0);
+
+  const [
+    currentUserId,
+    setCurrentUserId,
+  ] = useState<string | null>(
+    null,
+  );
+
+  const [
+    attachments,
+    setAttachments,
+  ] = useState<MessageAttachmentsMap>(
+    {},
+  );
+
+  const [
+    emojiOpen,
+    setEmojiOpen,
+  ] = useState(false);
+
+  const [
+    attachmentError,
+    setAttachmentError,
+  ] = useState<string | null>(
+    null,
+  );
+
+  const [
+    pinnedMessages,
+    setPinnedMessages,
+  ] = useState<
+    ChatPinnedMessage[]
+  >([]);
+
+  const [
+    pinningMessageId,
+    setPinningMessageId,
+  ] = useState<string | null>(
+    null,
+  );
+
+  const [
+    pinnedPanelOpen,
+    setPinnedPanelOpen,
+  ] = useState(false);
+
+  const [
+    highlightedMessageId,
+    setHighlightedMessageId,
+  ] = useState<string | null>(
+    null,
+  );
+
+  const [
+    messageMenuId,
+    setMessageMenuId,
+  ] = useState<string | null>(
+    null,
+  );
+
+  const [
+    replyingTo,
+    setReplyingTo,
+  ] = useState<ChatMessage | null>(
+    null,
+  );
+
+  const [
+    addMemberOpen,
+    setAddMemberOpen,
+  ] = useState(false);
+
+  const [
+    participantsOpen,
+    setParticipantsOpen,
+  ] = useState(false);
+
+  const [
+    removingMemberId,
+    setRemovingMemberId,
+  ] = useState<string | null>(
+    null,
+  );
+
+  const [
+    memberActionError,
+    setMemberActionError,
+  ] = useState<string | null>(
+    null,
+  );
+
+  const [
+    conversationMembers,
+    setConversationMembers,
+  ] = useState<ChatConversationMemberRow[]>([]);
+
+  const existingProfileIds =
+    useMemo(
+      () =>
+        conversationMembers
+          .map((member) => member.profile_id)
+          .filter(
+            (value): value is string =>
+              typeof value === "string",
+          ),
+      [conversationMembers],
+    );
+
+  const existingClientIds =
+    useMemo(
+      () =>
+        conversationMembers
+          .map((member) => member.client_id)
+          .filter(
+            (value): value is string =>
+              typeof value === "string",
+          ),
+      [conversationMembers],
+    );
+
+  const [
+    locallyAddedMemberIds,
+    setLocallyAddedMemberIds,
+  ] = useState<string[]>([]);
+
+  const [
+    memberRefreshKey,
+    setMemberRefreshKey,
+  ] = useState(0);
+
+  const messagesEndRef =
+    useRef<HTMLDivElement | null>(
+      null,
+    );
+
+  const messageRefs =
+    useRef<
+      Record<
+        string,
+        HTMLDivElement | null
+      >
+    >({});
+
+  const fileInputRef =
+    useRef<HTMLInputElement | null>(
+      null,
+    );
+
+  const textareaRef =
+    useRef<HTMLTextAreaElement | null>(
+      null,
+    );
+
+  const {
+    conversation: details,
+    messages,
+    loading,
+    error,
+    refresh,
+  } = useChatMessages(
+    conversation.id,
+  );
+
+  const {
+    clients,
+  } = useClients({
+    page: 1,
+    limit: 100,
+    allPages: true,
+  });
+
+  const {
+    members: teamMembers,
+  } = useTeamMembers({
+    page: 1,
+    limit: 100,
+  });
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadCurrentUser() {
+      try {
+        const membership =
+          await resolveUserStudio();
+
+        if (
+          mounted &&
+          membership?.profileId
+        ) {
+          setCurrentUserId(
+            membership.profileId,
+          );
+        }
+      } catch (error) {
+        console.error(
+          "CHAT CURRENT PROFILE LOAD ERROR:",
+          error,
+        );
+      }
+    }
+
+    void loadCurrentUser();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const employeeOptions =
+    useMemo(
+      () =>
+        teamMembers.map(
+          (member) => ({
+            id: member.profileId,
+            name:
+              member.email ||
+              member.employeeCode ||
+              member.roleName ||
+              "Employee",
+            email: member.email,
+            type: "employee" as const,
+          }),
+        ),
+      [teamMembers],
+    );
+
+  /*
+   * IMPORTANT:
+   *
+   * Do not query clients.profile_id.
+   *
+   * The current client DTO already contains metadata.
+   * Querying a non-existent / unavailable profile_id column was causing:
+   *
+   * LOAD CLIENT PROFILES ERROR: {}
+   *
+   * We resolve the profile ID from the client metadata only.
+   */
+  const clientOptions =
+    useMemo(
+      () =>
+        clients.map(
+          (client) => ({
+            id: client.id,
+            name:
+              client.display_name ||
+              [
+                client.first_name,
+                client.last_name,
+              ]
+                .filter(Boolean)
+                .join(" ") ||
+              "Client",
+            email: client.email,
+            type: "client" as const,
+          }),
+        ),
+      [clients],
+    );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadConversationMembers() {
+      let data;
+let membersError: any = null;
+
+try {
+  data =
+    await listChatConversationMembers(
+      conversation.id,
+    );
+} catch (error) {
+  membersError = error;
+}
+
+if (cancelled) {
+  return;
+}
+
+if (membersError) {
+  console.error(
+    "LOAD CHAT MEMBERS ERROR:",
+    {
+      message:
+        membersError.message,
+      details:
+        membersError.details,
+      hint:
+        membersError.hint,
+      code:
+        membersError.code,
+      raw:
+        membersError,
+    },
+  );
+
+  setConversationMembers([]);
+
+  setMemberActionError(
+    membersError.message ||
+      membersError.details ||
+      membersError.hint ||
+      "Unable to load conversation members.",
+  );
+
+  return;
+}
+
+const rows: unknown[] =
+  Array.isArray(data)
+    ? data
+    : [];
+
+setConversationMembers(
+  rows
+    .filter(
+      (
+        item,
+      ): item is Record<string, unknown> =>
+        Boolean(item) &&
+        typeof item === "object" &&
+        !Array.isArray(item),
+    )
+    .map(
+      (item) => ({
+        id:
+          typeof item.id === "string"
+            ? item.id
+            : typeof item.member_id === "string"
+              ? item.member_id
+              : "",
+        profile_id:
+          typeof item.profile_id === "string"
+            ? item.profile_id
+            : null,
+        client_id:
+          typeof item.client_id === "string"
+            ? item.client_id
+            : null,
+        member_type:
+          typeof item.member_type === "string"
+            ? item.member_type
+            : null,
+        display_name:
+          typeof item.display_name === "string"
+            ? item.display_name.trim()
+            : "",
+        role:
+          typeof item.role === "string"
+            ? item.role
+            : null,
+        joined_at:
+          typeof item.joined_at === "string"
+            ? item.joined_at
+            : null,
+        last_read_at:
+          typeof item.last_read_at === "string"
+            ? item.last_read_at
+            : null,
+        muted:
+          typeof item.muted === "boolean"
+            ? item.muted
+            : null,
+        metadata:
+          item.metadata &&
+          typeof item.metadata === "object" &&
+          !Array.isArray(
+            item.metadata,
+          )
+            ? item.metadata as Record<
+                string,
+                unknown
+              >
+            : null,
+      }),
+    )
+    .filter(
+      (member) =>
+        Boolean(member.id) &&
+        Boolean(
+          member.profile_id ||
+            member.client_id,
+        ),
+    ),
+);
+
+setMemberActionError(null);
+    }
+
+    void loadConversationMembers();
+
+    const channel =
+      supabase
+        .channel(
+          `chat-members-${conversation.id}`,
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table:
+              "chat_conversation_members",
+            filter:
+              `conversation_id=eq.${conversation.id}`,
+          },
+          () => {
+            void loadConversationMembers();
+          },
+        )
+        .subscribe();
+
+    return () => {
+      cancelled = true;
+      void supabase.removeChannel(channel);
+    };
+  }, [
+    conversation.id,
+    memberRefreshKey,
+  ]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(
+        `chat-messages-${conversation.id}`,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "chat_messages",
+          filter:
+            `conversation_id=eq.${conversation.id}`,
+        },
+        () => {
+          void refresh();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [
+    conversation.id,
+    refresh,
+  ]);
+
+  const isStudioOwner =
+    useMemo(
+      () =>
+        Boolean(
+          currentUserId &&
+          teamMembers.some(
+            (member) =>
+              member.profileId ===
+                currentUserId &&
+              member.roleCode ===
+                "studio_owner",
+          ),
+        ),
+      [
+        currentUserId,
+        teamMembers,
+      ],
+    );
+
+  const clientId =
+    details?.client_id ??
+    conversation.client_id ??
+    null;
+
+  const rpcClientMember =
+    conversationMembers.find(
+      (member) =>
+        Boolean(clientId) &&
+        member.client_id === clientId,
+    );
+
+
+  const clientRecord = clientId
+    ? clients.find(
+        (item) => item.id === clientId,
+      )
+    : null;
+
+  const clientDisplayName =
+    clientRecord?.display_name?.trim() ||
+    [
+      clientRecord?.first_name,
+      clientRecord?.last_name,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+
+  const conversationTitle =
+    clientId
+      ? clientDisplayName || "Client"
+      : getConversationName(
+          details ?? conversation,
+        );
+
+  const baselineProfileIds =
+    useMemo(
+      () =>
+        new Set(
+          [
+            details?.created_by ??
+              currentUserId,
+          ].filter(
+            (value): value is string =>
+              Boolean(value),
+          ),
+        ),
+      [
+        details?.created_by,
+        currentUserId,
+      ],
+    );
+
+  const addedParticipants =
+    useMemo(
+      () =>
+        conversationMembers
+          .filter((member) => {
+            /*
+             * The primary Client is already represented
+             * by conversation.client_id.
+             *
+             * Do NOT show the client member again as an
+             * added participant.
+             */
+            if (member.client_id) {
+              return false;
+            }
+
+            return (
+              Boolean(member.profile_id) &&
+              !baselineProfileIds.has(
+                member.profile_id!,
+              )
+            );
+          })
+          .map(
+            (member) => {
+              const employee =
+                employeeOptions.find(
+                  (item) =>
+                    item.id ===
+                    member.profile_id,
+                );
+
+              return {
+                memberId: member.id,
+                id:
+                  member.profile_id!,
+                name:
+                  employee?.name ??
+                  "Conversation member",
+                email:
+                  employee?.email ??
+                  null,
+                type: "employee" as const,
+              };
+            },
+          ),
+      [
+        baselineProfileIds,
+        conversationMembers,
+        employeeOptions,
+      ],
+    );
+
+  const additionalMemberCount =
+    addedParticipants.length;
+
+  const participantTitle =
+    conversationTitle;
+
+  async function handleRemoveMember(
+    memberId: string | null,
+  ) {
+    if (
+      !isStudioOwner ||
+      !memberId ||
+      removingMemberId
+    ) {
+      return;
+    }
+
+    try {
+      setRemovingMemberId(memberId);
+      setMemberActionError(null);
+
+      const {
+        error: removeError,
+      } = await supabase.rpc(
+        "remove_chat_conversation_member",
+        {
+          p_conversation_id:
+            conversation.id,
+          p_member_id:
+            memberId,
+        },
+      );
+
+      if (removeError) {
+        throw removeError;
+      }
+
+      setConversationMembers(
+        (current) =>
+          current.filter(
+            (member) =>
+              member.id !== memberId,
+          ),
+      );
+
+      setMemberRefreshKey(
+        (current) =>
+          current + 1,
+      );
+    } catch (caughtError) {
+      setMemberActionError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Unable to remove member.",
+      );
+    } finally {
+      setRemovingMemberId(null);
+    }
+  }
+
+  const sortedMessages =
+    useMemo(
+      () =>
+        [...messages].sort(
+          (a, b) =>
+            new Date(
+              a.created_at,
+            ).getTime() -
+            new Date(
+              b.created_at,
+            ).getTime(),
+        ),
+      [messages],
+    );
+
+  const messageIdsKey =
+    messages
+      .map((item) => item.id)
+      .join("|");
+
+
+  useEffect(() => {
+    if (
+      loading ||
+      error ||
+      !currentUserId ||
+      !sortedMessages.length
+    ) {
+      return;
+    }
+
+    const unreadMessages =
+      sortedMessages.filter(
+        (item) =>
+          item.sender_id !==
+          currentUserId,
+      );
+
+    if (!unreadMessages.length) {
+      return;
+    }
+
+    void (
+      async () => {
+
+        try {
+
+          await Promise.all(
+            unreadMessages.map(
+              (item) =>
+                markChatMessageRead(
+                  item.id,
+                ),
+            ),
+          );
+
+
+          await reloadNotifications();
+
+        } catch (
+          markReadError
+        ) {
+
+          console.error(
+            "CHAT MARK READ ERROR:",
+            markReadError,
+          );
+
+        }
+
+      }
+    )();
+  }, [
+    currentUserId,
+    loading,
+    error,
+    sortedMessages,
+    reloadNotifications,
+  ]);
+
+  useEffect(() => {
+    const next: MessageAttachmentsMap = {};
+
+    for (const item of sortedMessages) {
+      if (item.attachments?.length) {
+        next[item.id] = item.attachments;
+      }
+    }
+
+    setAttachments(next);
+  }, [messageIdsKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPinnedMessages() {
+      try {
+        const data =
+          await getChatPinnedMessages(
+            conversation.id,
+          );
+
+        if (!cancelled) {
+          setPinnedMessages(
+            data,
+          );
+        }
+      } catch {
+        if (!cancelled) {
+          setPinnedMessages([]);
+        }
+      }
+    }
+
+    void loadPinnedMessages();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [conversation.id]);
+
+  useEffect(() => {
+    function closeMessageMenu(
+      event: MouseEvent,
+    ) {
+      const target =
+        event.target as
+          | HTMLElement
+          | null;
+
+      if (
+        target?.closest(
+          "[data-chat-message-menu]",
+        )
+      ) {
+        return;
+      }
+
+      setMessageMenuId(null);
+    }
+
+    document.addEventListener(
+      "mousedown",
+      closeMessageMenu,
+    );
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        closeMessageMenu,
+      );
+    };
+  }, []);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView(
+      {
+        behavior: "smooth",
+      },
+    );
+  }, [
+    messages.length,
+    uploading,
+  ]);
+
+  async function handleTogglePin(
+    messageId: string,
+  ) {
+    if (pinningMessageId) {
+      return;
+    }
+
+    setPinningMessageId(
+      messageId,
+    );
+
+    try {
+      const isPinned =
+        pinnedMessages.some(
+          (item) =>
+            item.message_id ===
+            messageId,
+        );
+
+      if (isPinned) {
+        await unpinChatMessage(
+          messageId,
+        );
+
+        setPinnedMessages(
+          (current) =>
+            current.filter(
+              (item) =>
+                item.message_id !==
+                messageId,
+            ),
+        );
+      } else {
+        await pinChatMessage(
+          messageId,
+        );
+
+        const refreshed =
+          await getChatPinnedMessages(
+            conversation.id,
+          );
+
+        setPinnedMessages(
+          refreshed,
+        );
+      }
+    } finally {
+      setPinningMessageId(null);
+    }
+  }
+
+  function handleScrollToPinnedMessage(
+    messageId: string,
+  ) {
+    setPinnedPanelOpen(false);
+
+    const target =
+      messageRefs.current[
+        messageId
+      ];
+
+    if (!target) {
+      return;
+    }
+
+    target.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+
+    setHighlightedMessageId(
+      messageId,
+    );
+
+    window.setTimeout(() => {
+      setHighlightedMessageId(
+        null,
+      );
+    }, 1800);
+  }
+
+  async function handleSend() {
+    const content =
+      message.trim();
+
+    if (
+      !content ||
+      sending ||
+      uploading
+    ) {
+      return;
+    }
+
+    setSending(true);
+    setAttachmentError(null);
+
+    try {
+      await sendChatMessage(
+        conversation.id,
+        content,
+        {
+          replyToId:
+            replyingTo?.id ?? null,
+        },
+      );
+
+      setMessage("");
+      setReplyingTo(null);
+
+      await refresh();
+    } catch (caughtError) {
+      setAttachmentError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Unable to send message.",
+      );
+    } finally {
+      setSending(false);
+    }
+  }
+
+  function handleEmojiSelect(
+    emoji: string,
+  ) {
+    setMessage(
+      (current) =>
+        `${current}${emoji}`,
+    );
+
+    setEmojiOpen(false);
+
+    window.requestAnimationFrame(
+      () => {
+        textareaRef.current?.focus();
+      },
+    );
+  }
+
+  function openFilePicker() {
+    if (
+      sending ||
+      uploading
+    ) {
+      return;
+    }
+
+    setAttachmentError(null);
+
+    fileInputRef.current?.click();
+  }
+
+  async function uploadOneFile(
+    file: File,
+  ) {
+    if (file.size <= 0) {
+      throw new Error(
+        `${file.name} is empty.`,
+      );
+    }
+
+    if (
+      file.size >
+      MAX_FILE_SIZE
+    ) {
+      throw new Error(
+        `${file.name} is larger than 25 MB.`,
+      );
+    }
+
+    const mediaType =
+      file.type.startsWith(
+        "image/",
+      )
+        ? "image"
+        : "file";
+
+    const messageId =
+      await sendChatMessage(
+        conversation.id,
+        file.name,
+        {
+          messageType:
+            mediaType,
+          replyToId:
+            replyingTo?.id ?? null,
+          metadata: {
+            attachment_uploading:
+              true,
+            file_name:
+              file.name,
+            file_type:
+              file.type || null,
+            file_size:
+              file.size,
+            media_kind:
+              file.type.startsWith(
+                "video/",
+              )
+                ? "video"
+                : file.type.startsWith(
+                      "audio/",
+                    )
+                  ? "audio"
+                  : file.type.startsWith(
+                        "image/",
+                      )
+                    ? "image"
+                    : "file",
+          },
+        },
+      );
+
+    const prepared =
+      await prepareChatAttachmentUpload(
+        conversation.id,
+        file,
+      );
+
+    /*
+     * Always upload as application/octet-stream.
+     *
+     * This avoids StorageApiError for types such as:
+     * audio/mpeg
+     *
+     * The original MIME type is preserved in
+     * attachment metadata and file_type.
+     */
+    const storageContentType =
+      "application/octet-stream";
+
+    const {
+      error: uploadError,
+    } =
+      await supabase.storage
+        .from(
+          prepared.bucket,
+        )
+        .upload(
+          prepared.storage_path,
+          file,
+          {
+            contentType:
+              storageContentType,
+            upsert: false,
+          },
+        );
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    await completeChatAttachmentUpload({
+      messageId,
+      attachmentId:
+        prepared.attachment_id,
+      storagePath:
+        prepared.storage_path,
+      fileName:
+        prepared.storage_filename ||
+        file.name,
+      fileType:
+        file.type || null,
+      fileSize:
+        file.size,
+      metadata: {
+        original_name:
+          file.name,
+        mime_type:
+          file.type || null,
+        storage_content_type:
+          storageContentType,
+        size:
+          file.size,
+      },
+    });
+  }
+
+  async function handleFileChange(
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) {
+    const selectedFiles =
+      Array.from(
+        event.target.files ?? [],
+      );
+
+    event.target.value = "";
+
+    if (
+      !selectedFiles.length ||
+      sending ||
+      uploading
+    ) {
+      return;
+    }
+
+    setAttachmentError(null);
+    setUploading(true);
+    setUploadProgress(0);
+
+    try {
+      for (
+        let index = 0;
+        index < selectedFiles.length;
+        index += 1
+      ) {
+        const file =
+          selectedFiles[index];
+
+        setUploadProgress(
+          Math.round(
+            (index /
+              selectedFiles.length) *
+              100,
+          ),
+        );
+
+        await uploadOneFile(file);
+
+        setUploadProgress(
+          Math.round(
+            ((index + 1) /
+              selectedFiles.length) *
+              100,
+          ),
+        );
+      }
+
+      setReplyingTo(null);
+
+      await refresh();
+
+      window.setTimeout(() => {
+        setUploadProgress(0);
+      }, 500);
+    } catch (caughtError) {
+      console.error(
+        "CHAT ATTACHMENT UPLOAD ERROR:",
+        caughtError,
+      );
+
+      setAttachmentError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Unable to upload attachment.",
+      );
+
+      setUploadProgress(0);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function handleReplyToMessage(
+    item: ChatMessage,
+  ) {
+    setReplyingTo(item);
+    setMessageMenuId(null);
+
+    window.requestAnimationFrame(
+      () => {
+        textareaRef.current?.focus();
+      },
+    );
+  }
+
+  function handleForwardMessage(
+    item: ChatMessage,
+  ) {
+    setMessageMenuId(null);
+
+    const forwardedText =
+      item.content?.trim();
+
+    if (!forwardedText) {
+      setAttachmentError(
+        "This message does not contain text to forward.",
+      );
+
+      return;
+    }
+
+    setMessage(
+      (current) =>
+        current.trim()
+          ? `${current}\n\nForwarded message:\n${forwardedText}`
+          : `Forwarded message:\n${forwardedText}`,
+    );
+
+    window.requestAnimationFrame(
+      () => {
+        textareaRef.current?.focus();
+      },
+    );
+  }
+
+  async function handleDeleteMessage(
+    item: ChatMessage,
+  ) {
+    if (
+      !currentUserId ||
+      item.sender_id !== currentUserId
+    ) {
+      setAttachmentError(
+        "You can only remove your own messages.",
+      );
+
+      setMessageMenuId(null);
+
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        "Delete this message?",
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setMessageMenuId(null);
+
+    try {
+      await deleteChatMessage(
+        item.id,
+      );
+
+      setPinnedMessages(
+        (current) =>
+          current.filter(
+            (pin) =>
+              pin.message_id !==
+              item.id,
+          ),
+      );
+
+      setAttachments(
+        (current) => {
+          const next = {
+            ...current,
+          };
+
+          delete next[item.id];
+
+          return next;
+        },
+      );
+
+      await refresh();
+    } catch (caughtError) {
+      setAttachmentError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Unable to delete message.",
+      );
+    }
+  }
+
+  async function handleRemoveChat() {
+    const confirmed =
+      window.confirm(
+        "Remove this chat from your chat list? The conversation and message history will not be deleted.",
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await removeChatConversation(
+        conversation.id,
+      );
+
+      onBack?.();
+    } catch (caughtError) {
+      setAttachmentError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Unable to remove this chat.",
+      );
+    }
+  }
+
+  function cancelReply() {
+    setReplyingTo(null);
+  }
+
+  function getReplyPreview(
+    item: ChatMessage,
+  ) {
+    return (
+      item.content?.trim() ||
+      "Attachment"
+    );
+  }
+
+  function handleKeyDown(
+    event: React.KeyboardEvent<HTMLTextAreaElement>,
+  ) {
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey
+    ) {
+      event.preventDefault();
+
+      void handleSend();
+    }
+  }
+
+  function renderAttachment(
+    attachment: ChatMessageAttachment,
+    isStudioMessage: boolean,
+  ) {
+    const signedUrl =
+      attachment.signed_url;
+
+    if (
+      isImageFile(
+        attachment,
+      ) &&
+      signedUrl
+    ) {
+      return (
+        <div className="mb-2 overflow-hidden rounded-xl">
+          <a
+            href={signedUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <img
+              src={signedUrl}
+              alt={attachment.file_name}
+              className="max-h-80 w-full max-w-sm object-cover"
+            />
+          </a>
+
+          <a
+            href={signedUrl}
+            target="_blank"
+            rel="noreferrer"
+            download={
+              attachment.file_name
+            }
+            className="flex items-center gap-2 px-3 py-2 text-xs text-slate-600 hover:bg-black/5"
+          >
+            <Download className="h-4 w-4" />
+            Download
+          </a>
+        </div>
+      );
+    }
+
+    if (
+      attachment.file_type?.startsWith(
+        "video/",
+      ) &&
+      signedUrl
+    ) {
+      return (
+        <div className="mb-2 overflow-hidden rounded-xl bg-black">
+          <video
+            src={signedUrl}
+            controls
+            className="max-h-96 w-full max-w-lg"
+          />
+
+          <a
+            href={signedUrl}
+            target="_blank"
+            rel="noreferrer"
+            download={
+              attachment.file_name
+            }
+            className="flex items-center gap-2 px-3 py-2 text-xs text-white/90 hover:bg-white/10"
+          >
+            <Download className="h-4 w-4" />
+            Download{" "}
+            {attachment.file_name}
+          </a>
+        </div>
+      );
+    }
+
+    if (
+      attachment.file_type?.startsWith(
+        "audio/",
+      ) &&
+      signedUrl
+    ) {
+      return (
+        <div className="mb-2 rounded-xl border border-black/10 bg-white/70 p-3">
+          <p className="mb-2 truncate text-xs font-medium text-slate-700">
+            {attachment.file_name}
+          </p>
+
+          <audio
+            src={signedUrl}
+            controls
+            className="w-full"
+          />
+
+          <a
+            href={signedUrl}
+            target="_blank"
+            rel="noreferrer"
+            download={
+              attachment.file_name
+            }
+            className="mt-2 inline-flex items-center gap-2 text-xs text-[#0A3F61] hover:underline"
+          >
+            <Download className="h-4 w-4" />
+            Download audio
+          </a>
+        </div>
+      );
+    }
+
+    const Icon =
+      getFileIcon(
+        attachment,
+      );
+
+    return (
+      <a
+        href={
+          signedUrl ?? "#"
+        }
+        target="_blank"
+        rel="noreferrer"
+        download={
+          attachment.file_name
+        }
+        className={[
+          "mb-2 flex items-center gap-3 rounded-xl border px-3 py-3 transition",
+          isStudioMessage
+            ? "border-[#c6e6bc] bg-[#cfe9c5] hover:bg-[#c5e0bb]"
+            : "border-slate-200 bg-slate-50 hover:bg-slate-100",
+        ].join(" ")}
+      >
+        <div
+          className={[
+            "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
+            isStudioMessage
+              ? "bg-white/70"
+              : "bg-white",
+          ].join(" ")}
+        >
+          <Icon className="h-5 w-5" />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-slate-800">
+            {attachment.file_name}
+          </p>
+
+          <p className="mt-0.5 text-[11px] text-slate-500">
+            {
+              attachment.file_type ||
+              "File"
+            }
+
+            {attachment.file_size
+              ? ` • ${formatFileSize(
+                  attachment.file_size,
+                )}`
+              : ""}
+          </p>
+        </div>
+
+        <Download className="h-4 w-4 shrink-0 opacity-70" />
+      </a>
+    );
+  }
+
+  return (
+    <>
+      <section className="flex min-h-0 flex-1 flex-col bg-[#efeae2]">
+        <header className="flex h-[72px] shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-4 sm:px-5">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 lg:hidden"
+              aria-label="Back"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+          )}
+
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#00a884] text-sm font-semibold text-white">
+            {getInitials(
+              conversationTitle,
+            )}
+          </div>
+
+          <div className="relative min-w-0 flex-1">
+            <button
+              type="button"
+              onClick={() =>
+                setParticipantsOpen(
+                  (current) =>
+                    !current,
+                )
+              }
+              className="block max-w-full cursor-pointer text-left"
+              aria-expanded={
+                participantsOpen
+              }
+              aria-label="View conversation members"
+            >
+              <span className="block truncate text-sm font-semibold text-slate-900">
+                {participantTitle}
+              </span>
+            </button>
+
+            <p className="truncate text-xs text-slate-500">
+              {clientId
+                ? "Client conversation"
+                : "Conversation"}
+            </p>
+
+            {participantsOpen && (
+              <div className="absolute left-0 top-[calc(100%+10px)] z-50 w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      Conversation info
+                    </p>
+
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      {additionalMemberCount ===
+                      0
+                        ? "No additional members"
+                        : additionalMemberCount ===
+                            1
+                          ? "1 added member"
+                          : `${additionalMemberCount} added members`}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setParticipantsOpen(
+                        false,
+                      )
+                    }
+                    className="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="max-h-[360px] overflow-y-auto p-2">
+                  <div className="flex items-center gap-3 rounded-xl px-3 py-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#00a884] text-xs font-semibold text-white">
+                      {getInitials(
+                        conversationTitle,
+                      )}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-900">
+                        {conversationTitle}
+                      </p>
+
+                      <p className="truncate text-xs text-slate-500">
+                        Client
+                      </p>
+                    </div>
+                  </div>
+
+                  {addedParticipants.length >
+                    0 && (
+                    <div className="mx-3 border-t border-slate-100" />
+                  )}
+
+                  {memberActionError && (
+                    <div className="mx-2 mb-2 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700">
+                      {memberActionError}
+                    </div>
+                  )}
+
+                  {addedParticipants.map(
+                    (participant) => (
+                      <div
+                        key={
+                          participant.id
+                        }
+                        className="flex items-center gap-3 rounded-xl px-3 py-3 transition hover:bg-slate-50"
+                      >
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">
+                          {getInitials(
+                            participant.name,
+                          )}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-slate-800">
+                            {participant.name}
+                          </p>
+
+                          <p className="truncate text-xs text-slate-500">
+                            {participant.type ===
+                            "employee"
+                              ? "Employee"
+                              : participant.type ===
+                                  "client"
+                                ? "Client"
+                                : "Conversation member"}
+
+                            {participant.email
+                              ? ` • ${participant.email}`
+                              : ""}
+                          </p>
+                        </div>
+
+                        {isStudioOwner && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void handleRemoveMember(
+                                participant.memberId,
+                              )
+                            }
+                            disabled={
+                              removingMemberId !==
+                              null
+                            }
+                            className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {removingMemberId ===
+                            participant.memberId
+                              ? "Removing..."
+                              : "Remove"}
+                          </button>
+                        )}
+                      </div>
+                    ),
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() =>
+              setAddMemberOpen(
+                true,
+              )
+            }
+            className="flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-medium text-[#0A3F61] transition hover:bg-slate-100"
+          >
+            <UserPlus className="h-5 w-5" />
+
+            <span className="hidden sm:inline">
+              Add member
+            </span>
+          </button>
+
+          <button
+            type="button"
+            className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100"
+          >
+            <Search className="h-5 w-5" />
+          </button>
+        </header>
+
+        {pinnedMessages.length >
+          0 && (
+          <div className="relative z-10 shrink-0 border-b border-slate-200 bg-white">
+            <button
+              type="button"
+              onClick={() =>
+                setPinnedPanelOpen(
+                  (current) =>
+                    !current,
+                )
+              }
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-slate-50 sm:px-5"
+            >
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#e7f7e5] text-[#00a884]">
+                <Pin className="h-4 w-4" />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold text-slate-800">
+                  {pinnedMessages.length ===
+                  1
+                    ? "1 pinned message"
+                    : `${pinnedMessages.length} pinned messages`}
+                </p>
+              </div>
+
+              <span className="text-xs font-medium text-[#00a884]">
+                {pinnedPanelOpen
+                  ? "Close"
+                  : "View"}
+              </span>
+            </button>
+
+            {pinnedPanelOpen && (
+              <div className="absolute left-0 right-0 top-full border-b border-slate-200 bg-white p-2 shadow-lg">
+                <div className="max-h-64 overflow-y-auto">
+                  {[...pinnedMessages]
+                    .sort(
+                      (a, b) =>
+                        new Date(
+                          b.pinned_at,
+                        ).getTime() -
+                        new Date(
+                          a.pinned_at,
+                        ).getTime(),
+                    )
+                    .map(
+                      (pin) => {
+                        const pinnedMessage =
+                          sortedMessages.find(
+                            (item) =>
+                              item.id ===
+                              pin.message_id,
+                          );
+
+                        return (
+                          <button
+                            key={
+                              pin.message_id
+                            }
+                            type="button"
+                            onClick={() =>
+                              handleScrollToPinnedMessage(
+                                pin.message_id,
+                              )
+                            }
+                            className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-slate-50"
+                          >
+                            <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#e7f7e5] text-[#00a884]">
+                              <Pin className="h-3.5 w-3.5" />
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[11px] font-semibold text-slate-700">
+                                Pinned message
+                              </p>
+
+                              <p className="mt-0.5 line-clamp-2 break-words text-xs text-slate-500">
+                                {pinnedMessage?.content ||
+                                  "Message unavailable in current view"}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      },
+                    )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="chat-whatsapp-wallpaper min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-8">
+          {loading && (
+            <div className="flex h-full items-center justify-center">
+              <div className="rounded-xl bg-white px-5 py-4 text-sm text-slate-500 shadow-sm">
+                Loading messages...
+              </div>
+            </div>
+          )}
+
+          {!loading &&
+            error && (
+              <div className="flex h-full items-center justify-center">
+                <div className="rounded-xl bg-white px-5 py-4 text-sm text-red-600 shadow-sm">
+                  Unable to load messages.
+                </div>
+              </div>
+            )}
+
+          {!loading &&
+            !error &&
+            !sortedMessages.length && (
+              <div className="flex h-full items-center justify-center">
+                <div className="rounded-xl bg-white px-5 py-4 text-sm text-slate-500 shadow-sm">
+                  Start the conversation.
+                </div>
+              </div>
+            )}
+
+          {!loading &&
+            !error &&
+            sortedMessages.length >
+              0 && (
+              <div className="mx-auto flex w-full max-w-4xl flex-col gap-2">
+                {sortedMessages.map(
+                  (item) => {
+                    const isStudioMessage =
+                      currentUserId !==
+                        null &&
+                      item.sender_id ===
+                        currentUserId;
+
+                    const messageAttachments =
+                      attachments[
+                        item.id
+                      ] ?? [];
+
+                    return (
+                      <div
+                        key={item.id}
+                        ref={(node) => {
+                          messageRefs.current[
+                            item.id
+                          ] = node;
+                        }}
+                        className={[
+                          "flex w-full rounded-2xl px-1 py-0.5 transition-all duration-500",
+                          isStudioMessage
+                            ? "justify-end"
+                            : "justify-start",
+                          highlightedMessageId ===
+                          item.id
+                            ? "bg-[#cfe9c5]/70 ring-2 ring-[#00a884]/35"
+                            : "",
+                        ].join(" ")}
+                      >
+                        <div
+                          className={[
+                            "relative max-w-[82%] px-3.5 py-2.5 shadow-sm sm:max-w-[72%]",
+                            isStudioMessage
+                              ? "rounded-2xl rounded-br-md bg-[#d9fdd3]"
+                              : "rounded-2xl rounded-bl-md bg-white",
+                          ].join(" ")}
+                        >
+                          {messageAttachments.map(
+                            (
+                              attachment,
+                            ) => (
+                              <div
+                                key={
+                                  attachment.id
+                                }
+                              >
+                                {renderAttachment(
+                                  attachment,
+                                  isStudioMessage,
+                                )}
+                              </div>
+                            ),
+                          )}
+
+                          {pinnedMessages.some(
+                            (pin) =>
+                              pin.message_id ===
+                              item.id,
+                          ) && (
+                            <div className="mb-1 flex items-center gap-1 text-[10px] text-slate-400">
+                              <span>📌</span>
+                              <span>
+                                Pinned
+                              </span>
+                            </div>
+                          )}
+
+                          {item.content &&
+                            !(
+                              messageAttachments.length >
+                                0 &&
+                              messageAttachments.some(
+                                (
+                                  attachment,
+                                ) =>
+                                  attachment.file_name ===
+                                  item.content,
+                              )
+                            ) && (
+                              <p className="whitespace-pre-wrap break-words text-sm leading-5 text-slate-800">
+                                {item.content}
+                              </p>
+                            )}
+
+                          <div
+                            className="absolute right-1 top-1"
+                            data-chat-message-menu
+                          >
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setMessageMenuId(
+                                  (
+                                    current,
+                                  ) =>
+                                    current ===
+                                    item.id
+                                      ? null
+                                      : item.id,
+                                )
+                              }
+                              className="flex h-7 w-7 items-center justify-center rounded-full bg-white/70 text-slate-500 shadow-sm transition hover:bg-white"
+                              aria-label="Message options"
+                            >
+                              <ChevronDown className="h-4 w-4" />
+                            </button>
+
+                            {messageMenuId ===
+                              item.id && (
+                              <div className="absolute right-0 top-8 z-40 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleReplyToMessage(
+                                      item,
+                                    )
+                                  }
+                                  className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-slate-50"
+                                >
+                                  <Reply className="h-4 w-4" />
+                                  Reply
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void handleTogglePin(
+                                      item.id,
+                                    )
+                                  }
+                                  className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-slate-50"
+                                >
+                                  <Pin className="h-4 w-4" />
+
+                                  {pinnedMessages.some(
+                                    (
+                                      pin,
+                                    ) =>
+                                      pin.message_id ===
+                                      item.id,
+                                  )
+                                    ? "Unpin message"
+                                    : "Pin message"}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleForwardMessage(
+                                      item,
+                                    )
+                                  }
+                                  className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-slate-50"
+                                >
+                                  <Forward className="h-4 w-4" />
+                                  Forward
+                                </button>
+
+                                {item.sender_id ===
+                                  currentUserId && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      void handleDeleteMessage(
+                                        item,
+                                      )
+                                    }
+                                    className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm text-red-600 hover:bg-red-50"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                    Delete message
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="mt-1 flex items-center justify-end gap-1">
+                            <span className="text-[10px] text-slate-400">
+                              {formatMessageTime(
+                                item.created_at,
+                              )}
+                            </span>
+
+                            {isStudioMessage && (
+                              <CheckCheck className="h-3.5 w-3.5 text-[#53bdeb]" />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  },
+                )}
+
+                <div
+                  ref={messagesEndRef}
+                  className="h-px"
+                />
+              </div>
+            )}
+        </div>
+
+        {attachmentError && (
+          <div className="shrink-0 border-t border-red-100 bg-red-50 px-4 py-2">
+            <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
+              <p className="text-xs text-red-700">
+                {attachmentError}
+              </p>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setAttachmentError(
+                    null,
+                  )
+                }
+                className="rounded-full p-1 text-red-500 hover:bg-red-100"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="relative shrink-0 border-t border-slate-200 bg-[#f0f2f5] px-3 py-3 sm:px-5">
+          {replyingTo && (
+            <div className="mx-auto mb-2 flex max-w-4xl items-center gap-3 rounded-xl border-l-4 border-[#00a884] bg-white px-3 py-2 shadow-sm">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-semibold text-[#00a884]">
+                  Replying to message
+                </p>
+
+                <p className="truncate text-xs text-slate-600">
+                  {getReplyPreview(
+                    replyingTo,
+                  )}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={cancelReply}
+                className="rounded-full p-1 text-slate-400 hover:bg-slate-100"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
+          {emojiOpen && (
+            <div className="absolute bottom-[76px] left-3 z-40 w-[340px] max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl sm:left-5">
+              <div className="grid max-h-[320px] grid-cols-8 gap-1 overflow-y-auto pr-1">
+                {EMOJIS.map(
+                  (emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() =>
+                        handleEmojiSelect(
+                          emoji,
+                        )
+                      }
+                      className="flex h-9 w-9 items-center justify-center rounded-lg text-xl transition hover:bg-slate-100"
+                    >
+                      {emoji}
+                    </button>
+                  ),
+                )}
+              </div>
+            </div>
+          )}
+
+          {uploading && (
+            <div className="mx-auto mb-2 max-w-4xl">
+              <div className="flex items-center justify-between text-[11px] text-slate-500">
+                <span>
+                  Uploading attachment...
+                </span>
+
+                <span>
+                  {uploadProgress}%
+                </span>
+              </div>
+
+              <div className="mt-1 h-1 overflow-hidden rounded-full bg-slate-200">
+                <div
+                  className="h-full rounded-full bg-[#00a884] transition-all"
+                  style={{
+                    width:
+                      `${uploadProgress}%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="mx-auto flex max-w-4xl items-end gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                setEmojiOpen(
+                  (current) =>
+                    !current,
+                )
+              }
+              disabled={
+                sending ||
+                uploading
+              }
+              className="mb-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-200 disabled:opacity-50"
+            >
+              <Smile className="h-5 w-5" />
+            </button>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="*/*"
+              className="hidden"
+              onChange={
+                handleFileChange
+              }
+            />
+
+            <button
+              type="button"
+              onClick={
+                openFilePicker
+              }
+              disabled={
+                sending ||
+                uploading
+              }
+              className="mb-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-200 disabled:opacity-50"
+            >
+              <Paperclip className="h-5 w-5" />
+            </button>
+
+            <textarea
+              ref={textareaRef}
+              value={message}
+              onChange={(event) =>
+                setMessage(
+                  event.target.value,
+                )
+              }
+              onKeyDown={
+                handleKeyDown
+              }
+              rows={1}
+              disabled={uploading}
+              placeholder="Type a message"
+              className="max-h-32 min-h-11 flex-1 resize-none rounded-2xl border-0 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm outline-none"
+            />
+
+            <button
+              type="button"
+              onClick={() =>
+                void handleSend()
+              }
+              disabled={
+                !message.trim() ||
+                sending ||
+                uploading
+              }
+              className="mb-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#00a884] text-white shadow-sm transition hover:bg-[#008f72] disabled:opacity-40"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <ChatAddMemberDialog
+        open={addMemberOpen}
+        onClose={() =>
+          setAddMemberOpen(
+            false,
+          )
+        }
+        conversationId={
+          conversation.id
+        }
+        employees={employeeOptions}
+        clients={clientOptions}
+        existingProfileIds={
+          existingProfileIds
+        }
+        existingClientIds={
+          existingClientIds
+        }
+        onAdded={() => {
+          setMemberActionError(
+            null,
+          );
+
+          void refresh();
+
+          setParticipantsOpen(
+            true,
+          );
+
+          setMemberRefreshKey(
+            (current) =>
+              current + 1,
+          );
+        }}
+      />
+    </>
+  );
+}

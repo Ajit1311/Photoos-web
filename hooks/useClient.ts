@@ -1,47 +1,86 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import {
+  useQuery,
+} from "@tanstack/react-query";
 
-import { useBootstrapContext } from "@/context/BootstrapContext";
+import {
+  useStudioId,
+} from "@/hooks/useStudioId";
 
-import { clientsRepository } from "@/lib/repositories/clients.repository";
+import {
+  QUERY_KEYS,
+} from "@/hooks/query-keys";
+
+import {
+  clientsRepository,
+} from "@/lib/repositories/clients.repository";
 
 import type {
+  ClientDetailsResponse,
   ClientDto,
 } from "@/types/api/client";
+
+
+export type ClientWithProjects =
+  ClientDto & {
+    projects:
+      ClientDetailsResponse["projects"];
+  };
+
 
 export function useClient(
   clientId: string,
 ) {
 
   const {
-    data: bootstrap,
-  } =
-    useBootstrapContext();
+    studioId,
+  } = useStudioId();
 
-  const studioId =
-    bootstrap?.workspace?.studio?.id;
+  return useQuery<
+    ClientWithProjects,
+    Error
+  >({
 
-  return useQuery<ClientDto, Error>({
-
-    queryKey: [
-      "client",
-      studioId,
-      clientId,
-    ],
-
-    enabled:
-      !!studioId &&
-      !!clientId,
-
-    queryFn: () =>
-      clientsRepository.get(
-        studioId!,
+    queryKey:
+      QUERY_KEYS.client(
+        studioId ?? "",
         clientId,
       ),
 
+    enabled:
+      Boolean(studioId) &&
+      Boolean(clientId),
+
+    queryFn:
+      async () => {
+
+        const response =
+          await clientsRepository.get(
+            studioId!,
+            clientId,
+          );
+
+        return {
+          ...response.client,
+
+          projects:
+            response.projects ?? [],
+        };
+
+      },
+
     staleTime:
       1000 * 60,
+
+    gcTime:
+      1000 * 60 * 10,
+
+    retry:
+      2,
+
+    refetchOnWindowFocus:
+      false,
 
   });
 

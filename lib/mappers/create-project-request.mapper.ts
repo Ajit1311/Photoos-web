@@ -24,7 +24,7 @@ export function mapWizardToCreateProjectRequest(
       data.eventDate,
 
     client_id:
-  data.selectedClientId ?? "",
+      data.selectedClientId ?? "",
 
     project_manager_id:
       data.projectManagerId,
@@ -75,11 +75,20 @@ export function mapWizardToCreateProjectRequest(
         faceRecognition:
           data.faceRecognition,
 
-        autoCulling:
-          data.autoCulling,
+        duplicateDetection:
+          data.duplicateDetection,
 
-        autoEnhancement:
-          data.autoEnhancement,
+        blurDetection:
+          data.blurDetection,
+
+        bestPhotoSelection:
+          data.bestPhotoSelection,
+
+        albumSuggestions:
+          data.albumSuggestions,
+
+        smartTagGeneration:
+          data.smartTagGeneration,
 
       },
 

@@ -1,0 +1,620 @@
+"use client";
+
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+import {
+  useBootstrapContext,
+} from "@/context/BootstrapContext";
+
+import {
+  getNotificationCenter,
+} from "@/lib/api/notification/get-notification-center";
+
+import {
+  getNotificationBadgeCount,
+} from "@/lib/api/notification/get-notification-badge-count";
+
+import {
+  markNotificationRead,
+} from "@/lib/api/notification/mark-notification-read";
+
+import {
+  markAllNotificationsRead,
+} from "@/lib/api/notification/mark-all-notifications-read";
+
+import {
+  getTotalChatUnreadCount,
+} from "@/lib/api/chat/get-total-chat-unread-count";
+
+import type {
+  NotificationBadgeCount,
+  NotificationCenterResponse,
+} from "@/types/notification/notification";
+
+
+type NotificationContextValue = {
+
+  center:
+    NotificationCenterResponse;
+
+  badge:
+    NotificationBadgeCount;
+
+  chatUnread:
+    number;
+
+  loading:
+    boolean;
+
+  refreshing:
+    boolean;
+
+  error:
+    Error
+    | null;
+
+  reload:
+    () => Promise<void>;
+
+  markAsRead:
+    (
+      notificationId: string,
+    ) => Promise<void>;
+
+  markAllAsRead:
+    () => Promise<void>;
+
+};
+
+
+const NotificationContext =
+  createContext<
+    NotificationContextValue
+    | null
+  >(
+    null,
+  );
+
+
+type NotificationProviderProps = {
+
+  children:
+    ReactNode;
+
+};
+
+
+const EMPTY_CENTER:
+  NotificationCenterResponse = {
+
+    count:
+      0,
+
+    items:
+      [],
+
+  };
+
+
+const EMPTY_BADGE:
+  NotificationBadgeCount = {
+
+    total:
+      0,
+
+    unread:
+      0,
+
+  };
+
+
+export function NotificationProvider({
+  children,
+}: NotificationProviderProps) {
+
+  const bootstrap =
+    useBootstrapContext();
+
+
+  const studioId =
+    bootstrap.data?.workspace.studio?.id ??
+    null;
+
+
+  const profileId =
+    bootstrap.data?.profile?.id ??
+    bootstrap.data?.workspace.membership.profileId ??
+    null;
+
+
+  const [
+    center,
+    setCenter,
+  ] =
+    useState<
+      NotificationCenterResponse
+    >(
+      EMPTY_CENTER,
+    );
+
+
+  const [
+    badge,
+    setBadge,
+  ] =
+    useState<
+      NotificationBadgeCount
+    >(
+      EMPTY_BADGE,
+    );
+
+
+  const [
+    chatUnread,
+    setChatUnread,
+  ] =
+    useState(
+      0,
+    );
+
+
+  const [
+    loading,
+    setLoading,
+  ] =
+    useState(
+      true,
+    );
+
+
+  const [
+    refreshing,
+    setRefreshing,
+  ] =
+    useState(
+      false,
+    );
+
+
+  const [
+    error,
+    setError,
+  ] =
+    useState<
+      Error
+      | null
+    >(
+      null,
+    );
+
+
+  const loadNotifications =
+    useCallback(
+      async (
+        mode:
+          "initial"
+          | "refresh" =
+          "initial",
+      ) => {
+
+        if (!studioId) {
+
+          setCenter(
+            EMPTY_CENTER,
+          );
+
+          setBadge(
+            EMPTY_BADGE,
+          );
+
+          setChatUnread(
+            0,
+          );
+
+          setLoading(
+            false,
+          );
+
+          setRefreshing(
+            false,
+          );
+
+          return;
+
+        }
+
+
+        if (
+          mode ===
+          "initial"
+        ) {
+
+          setLoading(
+            true,
+          );
+
+        } else {
+
+          setRefreshing(
+            true,
+          );
+
+        }
+
+
+        setError(
+          null,
+        );
+
+
+        try {
+
+          const [
+            nextCenter,
+            nextBadge,
+            nextChatUnread,
+          ] =
+            await Promise.all(
+              [
+
+                getNotificationCenter(
+                  studioId,
+                  profileId,
+                  null,
+                  50,
+                ),
+
+                getNotificationBadgeCount(
+                  studioId,
+                  profileId,
+                ),
+
+                getTotalChatUnreadCount(),
+
+              ],
+            );
+
+
+          setCenter(
+            nextCenter,
+          );
+
+          setBadge(
+            nextBadge,
+          );
+
+          setChatUnread(
+            nextChatUnread,
+          );
+
+        } catch (
+          loadError
+        ) {
+
+          const nextError =
+            loadError instanceof Error
+              ? loadError
+              : new Error(
+                  "Failed to load notifications.",
+                );
+
+
+          console.error(
+            "NOTIFICATION CONTEXT LOAD ERROR:",
+            nextError,
+          );
+
+
+          setError(
+            nextError,
+          );
+
+        } finally {
+
+          setLoading(
+            false,
+          );
+
+          setRefreshing(
+            false,
+          );
+
+        }
+
+      },
+      [
+        studioId,
+        profileId,
+      ],
+    );
+
+
+  useEffect(
+    () => {
+
+      void loadNotifications(
+        "initial",
+      );
+
+    },
+    [
+      loadNotifications,
+    ],
+  );
+
+
+  const reload =
+    useCallback(
+      async () => {
+
+        await loadNotifications(
+          "refresh",
+        );
+
+      },
+      [
+        loadNotifications,
+      ],
+    );
+
+
+  const markAsRead =
+    useCallback(
+      async (
+        notificationId: string,
+      ) => {
+
+        const target =
+          center.items.find(
+            (
+              item,
+            ) =>
+              item.id ===
+              notificationId,
+          );
+
+
+        if (
+          !target ||
+          target.read_at
+        ) {
+
+          return;
+
+        }
+
+
+        await markNotificationRead(
+          notificationId,
+        );
+
+
+        const now =
+          new Date()
+            .toISOString();
+
+
+        setCenter(
+          (
+            current,
+          ) => ({
+
+            ...current,
+
+            items:
+              current.items.map(
+                (
+                  item,
+                ) =>
+                  item.id ===
+                  notificationId
+                    ? {
+
+                        ...item,
+
+                        read_at:
+                          now,
+
+                      }
+                    : item,
+              ),
+
+          }),
+        );
+
+
+        setBadge(
+          (
+            current,
+          ) => ({
+
+            ...current,
+
+            unread:
+              Math.max(
+                0,
+                current.unread - 1,
+              ),
+
+          }),
+        );
+
+      },
+      [
+        center.items,
+      ],
+    );
+
+
+  const markAllAsRead =
+    useCallback(
+      async () => {
+
+        const unreadIds =
+          center.items
+            .filter(
+              (
+                item,
+              ) =>
+                !item.read_at,
+            )
+            .map(
+              (
+                item,
+              ) =>
+                item.id,
+            );
+
+
+        if (
+          unreadIds.length ===
+          0
+        ) {
+
+          return;
+
+        }
+
+
+        await markAllNotificationsRead(
+          unreadIds,
+        );
+
+
+        const now =
+          new Date()
+            .toISOString();
+
+
+        setCenter(
+          (
+            current,
+          ) => ({
+
+            ...current,
+
+            items:
+              current.items.map(
+                (
+                  item,
+                ) =>
+                  unreadIds.includes(
+                    item.id,
+                  )
+                    ? {
+
+                        ...item,
+
+                        read_at:
+                          now,
+
+                      }
+                    : item,
+              ),
+
+          }),
+        );
+
+
+        setBadge(
+          (
+            current,
+          ) => ({
+
+            ...current,
+
+            unread:
+              0,
+
+          }),
+        );
+
+      },
+      [
+        center.items,
+      ],
+    );
+
+
+  const value =
+    useMemo<
+      NotificationContextValue
+    >(
+      () => ({
+
+        center,
+
+        badge,
+
+        chatUnread,
+
+        loading,
+
+        refreshing,
+
+        error,
+
+        reload,
+
+        markAsRead,
+
+        markAllAsRead,
+
+      }),
+      [
+        center,
+        badge,
+        chatUnread,
+        loading,
+        refreshing,
+        error,
+        reload,
+        markAsRead,
+        markAllAsRead,
+      ],
+    );
+
+
+  return (
+
+    <NotificationContext.Provider
+      value={value}
+    >
+
+      {children}
+
+    </NotificationContext.Provider>
+
+  );
+
+}
+
+
+export function useNotificationContext() {
+
+  const context =
+    useContext(
+      NotificationContext,
+    );
+
+
+  if (!context) {
+
+    throw new Error(
+      "useNotificationContext must be used inside NotificationProvider.",
+    );
+
+  }
+
+
+  return context;
+
+}

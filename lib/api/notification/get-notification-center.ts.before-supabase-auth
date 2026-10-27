@@ -1,0 +1,66 @@
+import {
+  getFirebaseIdToken,
+} from "@/lib/auth/firebase-auth.service";
+
+import type {
+  NotificationCenterResponse,
+} from "@/types/notification/notification";
+
+export async function getNotificationCenter(
+  studioId: string,
+  profileId: string | null,
+  clientId: string | null = null,
+  limit: number = 50,
+): Promise<NotificationCenterResponse> {
+  const token = await getFirebaseIdToken();
+
+  if (!token) {
+    throw new Error("Firebase authentication token is unavailable.");
+  }
+
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/get-notification-center`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        studio_id: studioId,
+        profile_id: profileId,
+        client_id: clientId,
+        limit,
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    const body = await response.text();
+
+    console.warn(
+      "[Notifications] Notification center unavailable:",
+      response.status,
+      body,
+    );
+
+    return {
+      success: true,
+      data: [],
+    } as any;
+  }
+
+  const data =
+    (await response.json()) as NotificationCenterResponse;
+
+  return {
+    count:
+      typeof data?.count === "number"
+        ? data.count
+        : 0,
+    items:
+      Array.isArray(data?.items)
+        ? data.items
+        : [],
+  };
+}

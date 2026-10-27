@@ -49,72 +49,80 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --background: #F8FAFC;
+  --foreground: #0F172A;
+  --card: #FFFFFF;
+  --card-foreground: #0F172A;
+  --popover: #FFFFFF;
+  --popover-foreground: #0F172A;
+  --primary: #0A3F61;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F1F5F9;
+  --secondary-foreground: #0A3F61;
+  --muted: #F1F5F9;
+  --muted-foreground: #475569;
+  --accent: #EBF5FB;
+  --accent-foreground: #0A3F61;
+  --destructive: #BE123C;
+  --destructive-foreground: #FFFFFF;
+  --success: #059669;
+  --warning: #D97706;
+  --info: #0284C7;
+  --border: #E2E8F0;
+  --input: #E2E8F0;
+  --ring: #0284C7;
+  --chart-1: #0A3F61;
+  --chart-2: #0284C7;
+  --chart-3: #0D9488;
+  --chart-4: #D97706;
+  --chart-5: #64748B;
+  --radius: 0.75rem;
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #0F172A;
+  --sidebar-primary: #0A3F61;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #F1F5F9;
+  --sidebar-accent-foreground: #0A3F61;
+  --sidebar-border: #E2E8F0;
+  --sidebar-ring: #0284C7;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #090D14;
+  --foreground: #F8FAFC;
+  --card: #0F172A;
+  --card-foreground: #F8FAFC;
+  --popover: #0F172A;
+  --popover-foreground: #F8FAFC;
+  --primary: #38BDF8;
+  --primary-foreground: #090D14;
+  --secondary: #1E293B;
+  --secondary-foreground: #F1F5F9;
+  --muted: #1E293B;
+  --muted-foreground: #94A3B8;
+  --accent: #1E293B;
+  --accent-foreground: #38BDF8;
+  --destructive: #F43F5E;
+  --destructive-foreground: #FFFFFF;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --info: #38BDF8;
+  --border: #334155;
+  --input: #334155;
+  --ring: #38BDF8;
+  --chart-1: #38BDF8;
+  --chart-2: #2DD4BF;
+  --chart-3: #F59E0B;
+  --chart-4: #818CF8;
+  --chart-5: #94A3B8;
+  --sidebar: #090D14;
+  --sidebar-foreground: #F8FAFC;
+  --sidebar-primary: #38BDF8;
+  --sidebar-primary-foreground: #090D14;
+  --sidebar-accent: #1E293B;
+  --sidebar-accent-foreground: #F8FAFC;
+  --sidebar-border: #1E293B;
+  --sidebar-ring: #38BDF8;
 }
 
 @layer base {
@@ -122,9 +130,174 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary;
   }
   html {
     @apply font-sans;
   }
+  h1, h2, h3, h4, h5, h6 {
+    @apply tracking-tight font-semibold text-foreground;
+  }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Premium utility classes */
+.glass-panel {
+  background: color-mix(in srgb, var(--card) 85%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.subtle-border {
+  border: 1px solid var(--border);
+}
+
+.premium-card-shadow {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 4px 12px -2px rgba(0, 0, 0, 0.05);
+}
+
+.premium-card-hover {
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.premium-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 12px 24px -4px rgba(0, 0, 0, 0.08);
+}
+/* ==========================================================================
+   PhotoOS Chat WhatsApp Style Wallpaper
+   Pure CSS/SVG pattern. No external image required.
+   ========================================================================== */
+
+.chat-whatsapp-wallpaper {
+  position: relative;
+  isolation: isolate;
+
+  background-color: #efeae2;
+
+  background-image: url("data:image/svg+xml,%3Csvg width='320' height='320' viewBox='0 0 320 320' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23d8d0c5' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' opacity='.48'%3E%3Ccircle cx='34' cy='38' r='13'/%3E%3Cpath d='M25 38c3-8 15-8 18 0M29 43c4 4 9 4 13 0'/%3E%3Cpath d='M82 22l4 9 10 1-8 7 3 10-9-5-9 5 3-10-8-7 10-1z'/%3E%3Cpath d='M142 32c8-10 22-5 22 6 0 10-11 17-22 25-11-8-22-15-22-25 0-11 14-16 22-6z'/%3E%3Crect x='205' y='20' width='34' height='25' rx='5'/%3E%3Ccircle cx='222' cy='32' r='7'/%3E%3Ccircle cx='232' cy='25' r='2'/%3E%3Cpath d='M275 25l6 10 11 2-8 8 2 11-11-5-10 5 2-11-8-8 11-2z'/%3E%3Cpath d='M31 105c7-8 20-8 27 0l-4 17H35z'/%3E%3Cpath d='M100 91c8 0 14 6 14 14s-6 14-14 14-14-6-14-14 6-14 14-14zM100 97v8l6 5'/%3E%3Cpath d='M153 89l8 8-8 8-8-8zM161 105l8 8-8 8-8-8z'/%3E%3Ccircle cx='238' cy='103' r='18'/%3E%3Cpath d='M229 99c2-4 5-4 7 0M240 99c2-4 5-4 7 0M231 110c5 5 11 5 16 0'/%3E%3Cpath d='M284 88v34M267 105h34'/%3E%3Cpath d='M37 171c0-7 6-12 13-12 7 0 13 5 13 12v15H37z'/%3E%3Cpath d='M48 159v-8M55 159v-8'/%3E%3Cpath d='M91 153l18 18M109 153l-18 18'/%3E%3Cpath d='M148 151l12 12-12 12-12-12z'/%3E%3Cpath d='M196 151c5 8 13 8 18 0 5 8 13 8 18 0'/%3E%3Ccircle cx='275' cy='170' r='15'/%3E%3Cpath d='M265 166h20M275 156v28'/%3E%3Cpath d='M28 237c10-11 29-4 25 11-3 11-16 18-25 24-9-6-22-13-25-24-4-15 15-22 25-11z'/%3E%3Cpath d='M95 228l10 10-10 10-10-10z'/%3E%3Cpath d='M146 222c10 0 18 8 18 18s-8 18-18 18-18-8-18-18 8-18 18-18zM137 240c6 5 12 5 18 0'/%3E%3Cpath d='M205 222l7 14 15 2-11 10 3 15-14-7-14 7 3-15-11-10 15-2z'/%3E%3Cpath d='M278 218l20 12-20 12-20-12z'/%3E%3Cpath d='M275 224v12'/%3E%3Ccircle cx='275' cy='241' r='2'/%3E%3Cpath d='M57 286c8-6 18-6 26 0M61 293c6 4 12 4 18 0'/%3E%3Crect x='112' y='278' width='30' height='24' rx='4'/%3E%3Cpath d='M119 278l4-6h9l4 6'/%3E%3Ccircle cx='127' cy='290' r='6'/%3E%3Cpath d='M178 276l7 12 14 2-10 10 2 14-13-7-13 7 2-14-10-10 14-2z'/%3E%3Cpath d='M247 279c7-7 18-7 25 0M250 286c6 5 13 5 19 0'/%3E%3C/g%3E%3C/svg%3E");
+
+  background-repeat: repeat;
+  background-size: 320px 320px;
+  background-position: center top;
+}
+
+.chat-whatsapp-wallpaper::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+
+  background:
+    linear-gradient(
+      rgba(239, 234, 226, 0.08),
+      rgba(239, 234, 226, 0.08)
+    );
+}
+/* Interactive elements */
+button,
+a,
+[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+select,
+summary {
+  cursor: pointer;
+}
+
+/* Disabled controls should not show a hand cursor */
+button:disabled,
+input:disabled,
+select:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+
+
+/* PhotoOS premium plan card scrollbar */
+
+.photoos-plan-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(148 163 184) transparent;
+  scrollbar-gutter: stable;
+  scroll-behavior: smooth;
+  overscroll-behavior: contain;
+}
+
+.photoos-plan-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.photoos-plan-scroll::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 9999px;
+}
+
+.photoos-plan-scroll::-webkit-scrollbar-thumb {
+  background: rgb(148 163 184);
+  border-radius: 9999px;
+  min-height: 22px;
+}
+
+.photoos-plan-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgb(100 116 139);
+}
+
+@media (max-width: 1279px) {
+  .photoos-plan-scroll::-webkit-scrollbar {
+    width: 4px;
+  }
+}
+
+@media (max-width: 1023px) {
+  .photoos-plan-scroll {
+    scrollbar-width: none;
+  }
+
+  .photoos-plan-scroll::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ============================================================
+   LEGAL AGREEMENT SCROLL EXPERIENCE
+   ============================================================ */
+
+.legal-agreement-scroll {
+  scrollbar-width: auto;
+  scrollbar-color: #0a3f61 #e8eef3;
+}
+
+.legal-agreement-scroll::-webkit-scrollbar {
+  width: 12px;
+}
+
+.legal-agreement-scroll::-webkit-scrollbar-track {
+  margin: 10px 6px;
+  border-radius: 9999px;
+  background: #e8eef3;
+}
+
+.legal-agreement-scroll::-webkit-scrollbar-thumb {
+  border: 3px solid #e8eef3;
+  border-radius: 9999px;
+  background: #0a3f61;
+}
+
+.legal-agreement-scroll::-webkit-scrollbar-thumb:hover {
+  background: #083653;
 }

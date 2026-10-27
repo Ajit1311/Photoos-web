@@ -1,0 +1,1489 @@
+"use client";
+
+import {
+  ReactNode,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+
+import {
+  BadgeIndianRupee,
+  Activity,
+  BarChart3,
+  Bell,
+  Boxes,
+  Building2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  CircleDollarSign,
+  CreditCard,
+  FileText,
+  Globe2,
+  Headphones,
+  LayoutDashboard,
+  LogOut,
+  Mail,
+  Menu,
+  MessageSquare,
+  MoreHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Search,
+  Settings,
+  ShieldCheck,
+  Store,
+  UserCog,
+  Users,
+  X,
+  Zap,
+  BadgeCheck,
+  Clock3,
+  Eye,
+  MapPin,
+  Megaphone,
+  Star,
+  XCircle,
+  ImageIcon,
+} from "lucide-react";
+
+import {
+  getPlatformAdminSession,
+  logoutPlatformAdmin,
+} from "@/lib/api/platform-admin-auth";
+
+import {
+  getPlatformAdminNotificationCount,
+  listPlatformAdminNotifications,
+  markAllPlatformAdminNotificationsRead,
+  markPlatformAdminNotificationRead,
+  type PlatformAdminNotification,
+} from "@/lib/api/platform-admin-notifications";
+
+type AdminShellProps = {
+  children: ReactNode;
+};
+
+type NavItem = {
+  label: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: string;
+  children?: NavItem[];
+};
+
+type NavSection = {
+  label: string;
+  items: NavItem[];
+};
+
+const navSections: NavSection[] = [
+  {
+    label: "Overview",
+    items: [
+      {
+        label: "Dashboard",
+        href: "/admin",
+        icon: LayoutDashboard,
+      },
+    ],
+  },
+  {
+    label: "Platform",
+    items: [
+      {
+        label: "All Users",
+        href: "/admin/users",
+        icon: Users,
+      },
+      {
+        label: "Studios",
+        href: "/admin/studios",
+        icon: Building2,
+      },
+      {
+        label: "Active Subscriptions",
+        href: "/admin/subscriptions/active",
+        icon: Zap,
+      },
+      {
+        label: "Free Trials",
+        href: "/admin/subscriptions/trials",
+        icon: Activity,
+      },
+      {
+        label: "Expired",
+        href: "/admin/subscriptions/expired",
+        icon: FileText,
+      },
+      {
+        label: "Cancelled",
+        href: "/admin/subscriptions/cancelled",
+        icon: X,
+      },
+      {
+        label: "User Activity",
+        href: "/admin/users/activity",
+        icon: Activity,
+      },
+    ],
+  },
+  {
+    label: "Billing & Revenue",
+    items: [
+      {
+        label: "Payments",
+        href: "/admin/payments",
+        icon: CreditCard,
+      },
+      {
+        label: "Subscriptions",
+        href: "/admin/subscriptions",
+        icon: CircleDollarSign,
+      },
+      {
+        label: "Renewals",
+        href: "/admin/renewals",
+        icon: ChevronRight,
+      },
+      {
+        label: "Failed Payments",
+        href: "/admin/payments/failed",
+        icon: MoreHorizontal,
+      },
+      {
+        label: "Refunds",
+        href: "/admin/payments/refunds",
+        icon: CreditCard,
+      },
+      {
+        label: "Accounting",
+        href: "/admin/accounting",
+        icon: BarChart3,
+        children: [
+          {
+            label: "Accounting Dashboard",
+            href: "/admin/accounting",
+            icon: LayoutDashboard,
+          },
+          {
+            label: "Sales / Revenue",
+            href: "/admin/accounting/sales",
+            icon: BarChart3,
+          },
+          {
+            label: "Purchase / Expenses",
+            href: "/admin/accounting/expenses",
+            icon: CreditCard,
+          },
+          {
+            label: "Income Ledger",
+            href: "/admin/accounting/income-ledger",
+            icon: FileText,
+          },
+          {
+            label: "Expense Ledger",
+            href: "/admin/accounting/expense-ledger",
+            icon: FileText,
+          },
+          {
+            label: "Invoices",
+            href: "/admin/accounting/invoices",
+            icon: FileText,
+          },
+          {
+            label: "Receivables",
+            href: "/admin/accounting/receivables",
+            icon: CircleDollarSign,
+          },
+          {
+            label: "Payables",
+            href: "/admin/accounting/payables",
+            icon: CircleDollarSign,
+          },
+          {
+            label: "Reconciliation",
+            href: "/admin/accounting/reconciliation",
+            icon: Activity,
+          },
+          {
+            label: "Credit Notes",
+            href: "/admin/accounting/credit-notes",
+            icon: FileText,
+          },
+          {
+            label: "Debit Notes",
+            href: "/admin/accounting/debit-notes",
+            icon: FileText,
+          },
+          {
+            label: "Tax / GST",
+            href: "/admin/accounting/tax-gst",
+            icon: Globe2,
+          },
+          {
+            label: "TDS",
+            href: "/admin/accounting/tds",
+            icon: ShieldCheck,
+          },
+          {
+            label: "Financial Reports",
+            href: "/admin/accounting/reports",
+            icon: BarChart3,
+          },
+          {
+            label: "CA / ITR Export",
+            href: "/admin/accounting/ca-itr-export",
+            icon: FileText,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    label: "Software",
+    items: [
+      {
+        label: "Software Overview",
+        href: "/admin/software",
+        icon: Boxes,
+      },
+      {
+        label: "Features",
+        href: "/admin/software/features",
+        icon: Zap,
+      },
+      {
+        label: "Plans",
+        href: "/admin/software/plans",
+        icon: FileText,
+      },
+      {
+        label: "Plan Pricing",
+        href: "/admin/software/plan-pricing",
+        icon: BadgeIndianRupee,
+      },
+      {
+        label: "Usage",
+        href: "/admin/software/usage",
+        icon: BarChart3,
+      },
+      {
+        label: "System Health",
+        href: "/admin/software/system-health",
+        icon: Activity,
+      },
+    ],
+  },
+  {
+    label: "Marketplace",
+    items: [
+      {
+        label: "Marketplace Dashboard",
+        href: "/admin/marketplace",
+        icon: Store,
+      },
+      {
+        label: "All Listings",
+        href: "/admin/marketplace/listings",
+        icon: Building2,
+      },
+      {
+        label: "Active Listings",
+        href: "/admin/marketplace/active",
+        icon: Eye,
+      },
+      {
+        label: "Pending Approval",
+        href: "/admin/marketplace/pending",
+        icon: Clock3,
+      },
+      {
+        label: "Featured Listings",
+        href: "/admin/marketplace/featured",
+        icon: Star,
+      },
+      {
+        label: "Paid Listings",
+        href: "/admin/marketplace/paid",
+        icon: CircleDollarSign,
+      },
+      {
+        label: "Free / Trial Listings",
+        href: "/admin/marketplace/free",
+        icon: BadgeCheck,
+      },
+      {
+        label: "Expired Listings",
+        href: "/admin/marketplace/expired",
+        icon: XCircle,
+      },
+      {
+        label: "Categories",
+        href: "/admin/marketplace/categories",
+        icon: FileText,
+      },
+      {
+        label: "Locations",
+        href: "/admin/marketplace/locations",
+        icon: MapPin,
+      },
+      {
+        label: "Leads / Enquiries",
+        href: "/admin/marketplace/leads",
+        icon: Users,
+      },
+      {
+        label: "Reviews",
+        href: "/admin/marketplace/reviews",
+        icon: Star,
+      },
+      {
+        label: "Packages",
+        href: "/admin/marketplace/packages",
+        icon: Boxes,
+      },
+      {
+        label: "Portfolio",
+        href: "/admin/marketplace/portfolio",
+        icon: ImageIcon,
+      },
+      {
+        label: "Featured / Promotions",
+        href: "/admin/marketplace/promotions",
+        icon: Megaphone,
+      },
+      {
+        label: "Marketplace Analytics",
+        href: "/admin/marketplace/analytics",
+        icon: BarChart3,
+      },
+    ],
+  },
+  {
+    label: "Marketing",
+    items: [
+      {
+        label: "Marketing Dashboard",
+        href: "/admin/marketing",
+        icon: BarChart3,
+      },
+      {
+        label: "Leads",
+        href: "/admin/marketing/leads",
+        icon: Users,
+      },
+      {
+        label: "Signups",
+        href: "/admin/marketing/signups",
+        icon: UserCog,
+      },
+      {
+        label: "Trial Conversion",
+        href: "/admin/marketing/trial-conversion",
+        icon: Zap,
+      },
+      {
+        label: "Campaigns",
+        href: "/admin/marketing/campaigns",
+        icon: Mail,
+      },
+      {
+        label: "Growth Analytics",
+        href: "/admin/marketing/growth",
+        icon: BarChart3,
+      },
+    ],
+  },
+  {
+    label: "Support",
+    items: [
+      {
+        label: "Support Dashboard",
+        href: "/admin/support",
+        icon: Headphones,
+      },
+      {
+        label: "Tickets",
+        href: "/admin/support-tickets",
+        icon: FileText,
+      },
+      {
+        label: "Subscription Cancellations",
+        href: "/admin/support/cancellations",
+        icon: X,
+      },
+      {
+        label: "Customer Issues",
+        href: "/admin/support/issues",
+        icon: MessageSquare,
+      },
+    ],
+  },
+  {
+    label: "Communication",
+    items: [
+      {
+        label: "Internal Chat",
+        href: "/admin/chat",
+        icon: MessageSquare,
+      },
+      {
+        label: "Announcements",
+        href: "/admin/announcements",
+        icon: Mail,
+      },
+      {
+        label: "Notifications",
+        href: "/admin/notifications",
+        icon: Bell,
+      },
+    ],
+  },
+  {
+    label: "Administration",
+    items: [
+      {
+        label: "Admin Employees",
+        href: "/admin/employees",
+        icon: UserCog,
+      },
+      {
+        label: "Roles & Permissions",
+        href: "/admin/roles",
+        icon: ShieldCheck,
+      },
+      {
+        label: "Access Control",
+        href: "/admin/access-control",
+        icon: ShieldCheck,
+      },
+      {
+        label: "Audit Logs",
+        href: "/admin/audit-logs",
+        icon: FileText,
+      },
+      {
+        label: "Security Logs",
+        href: "/admin/security-logs",
+        icon: ShieldCheck,
+      },
+    ],
+  },
+  {
+    label: "Settings",
+    items: [
+      {
+        label: "General",
+        href: "/admin/settings",
+        icon: Settings,
+      },
+      {
+        label: "Company",
+        href: "/admin/settings/company",
+        icon: Building2,
+      },
+      {
+        label: "Branding",
+        href: "/admin/settings/branding",
+        icon: Globe2,
+      },
+      {
+        label: "Email",
+        href: "/admin/settings/email",
+        icon: Mail,
+      },
+      {
+        label: "Notifications",
+        href: "/admin/settings/notifications",
+        icon: Bell,
+      },
+      {
+        label: "Payments",
+        href: "/admin/settings/payments",
+        icon: CreditCard,
+      },
+      {
+        label: "Security",
+        href: "/admin/settings/security",
+        icon: ShieldCheck,
+      },
+      {
+        label: "Integrations",
+        href: "/admin/settings/integrations",
+        icon: Boxes,
+      },
+      {
+        label: "System",
+        href: "/admin/settings/system",
+        icon: Settings,
+      },
+    ],
+  },
+];
+
+function isActivePath(
+  pathname: string,
+  href: string,
+) {
+  if (href === "/admin") {
+    return pathname === "/admin";
+  }
+
+  return (
+    pathname === href ||
+    pathname.startsWith(`${href}/`)
+  );
+}
+
+export default function AdminShell({
+  children,
+}: AdminShellProps) {
+  const pathname = usePathname();
+
+  useEffect(() => {
+    setOpenSections((current) => {
+      const next = { ...current };
+
+      navSections.forEach((section) => {
+        if (
+          section.items.some(
+            (item) =>
+              pathname === item.href ||
+              pathname.startsWith(item.href + "/")
+          )
+        ) {
+          next[section.label] = true;
+        }
+      });
+
+      return next;
+    });
+  }, [pathname]);
+  const router = useRouter();
+
+  const [collapsed, setCollapsed] =
+    useState(false);
+
+  const [mobileOpen, setMobileOpen] =
+    useState(false);
+
+  const [accountingOpen, setAccountingOpen] =
+    useState(false);
+
+  const [profileOpen, setProfileOpen] =
+    useState(false);
+
+  const [search, setSearch] =
+    useState("");
+
+  const [openSections, setOpenSections] =
+    useState<Record<string, boolean>>(() => {
+      const initial: Record<string, boolean> = {};
+
+      navSections.forEach((section) => {
+        initial[section.label] =
+          section.items.some((item) =>
+            isActivePath(
+              window.location.pathname,
+              item.href,
+            ),
+          );
+      });
+
+      return initial;
+    });
+
+  const [adminUserId, setAdminUserId] =
+    useState("PX-ADMIN-000001");
+
+  const [notificationOpen, setNotificationOpen] =
+    useState(false);
+
+  const [notifications, setNotifications] =
+    useState<PlatformAdminNotification[]>([]);
+
+  const [notificationUnreadCount, setNotificationUnreadCount] =
+    useState(0);
+
+  const [notificationLoading, setNotificationLoading] =
+    useState(false);
+
+  const [notificationMarkingAll, setNotificationMarkingAll] =
+    useState(false);
+
+  useEffect(() => {
+    const saved =
+      window.localStorage.getItem(
+        "photoos_admin_sidebar_collapsed",
+      );
+
+    if (saved === "true") {
+      setCollapsed(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      "photoos_admin_sidebar_collapsed",
+      String(collapsed),
+    );
+  }, [collapsed]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSession() {
+      try {
+        const session =
+          await getPlatformAdminSession();
+
+        if (!cancelled && session?.user_id) {
+          setAdminUserId(session.user_id);
+        }
+      } catch {
+        // Guard owns authorization.
+      }
+    }
+
+    void loadSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const searchResults = useMemo(() => {
+    const term =
+      search.trim().toLowerCase();
+
+    if (!term) {
+      return [];
+    }
+
+    return navSections
+      .flatMap((section) => section.items)
+      .filter((item) =>
+        item.label
+          .toLowerCase()
+          .includes(term),
+      )
+      .slice(0, 7);
+  }, [search]);
+
+  const loadNotifications = async () => {
+    try {
+      setNotificationLoading(true);
+
+      const [items, count] = await Promise.all([
+        listPlatformAdminNotifications(false),
+        getPlatformAdminNotificationCount(),
+      ]);
+
+      setNotifications(items);
+      setNotificationUnreadCount(count);
+    } catch {
+      // Notification failures must not break the AdminShell.
+    } finally {
+      setNotificationLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadNotifications();
+
+    const interval = window.setInterval(() => {
+      void loadNotifications();
+    }, 60000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  async function handleNotificationRead(
+    notification: PlatformAdminNotification,
+  ) {
+    if (notification.read_at) {
+      return;
+    }
+
+    try {
+      await markPlatformAdminNotificationRead(
+        notification.id,
+      );
+
+      setNotifications((current) =>
+        current.map((item) =>
+          item.id === notification.id
+            ? {
+                ...item,
+                read_at: new Date().toISOString(),
+              }
+            : item,
+        ),
+      );
+
+      setNotificationUnreadCount((current) =>
+        Math.max(0, current - 1),
+      );
+    } catch {
+      // Keep dropdown usable if marking read fails.
+    }
+  }
+
+  async function handleMarkAllNotificationsRead() {
+    if (notificationUnreadCount === 0) {
+      return;
+    }
+
+    try {
+      setNotificationMarkingAll(true);
+
+      await markAllPlatformAdminNotificationsRead();
+
+      const now = new Date().toISOString();
+
+      setNotifications((current) =>
+        current.map((item) =>
+          item.read_at
+            ? item
+            : {
+                ...item,
+                read_at: now,
+              },
+        ),
+      );
+
+      setNotificationUnreadCount(0);
+    } catch {
+      // Keep existing state if request fails.
+    } finally {
+      setNotificationMarkingAll(false);
+    }
+  }
+
+  async function handleLogout() {
+    await logoutPlatformAdmin();
+    router.replace("/admin/login");
+  }
+
+  return (
+    <div className="min-h-screen bg-[#F4F7FA] text-slate-900">
+      {mobileOpen ? (
+        <button
+          aria-label="Close navigation"
+          className="fixed inset-0 z-40 bg-slate-950/45 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      ) : null}
+
+      <aside
+        className={[
+          "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-slate-200 bg-[#071C2B] text-white transition-all duration-200",
+          collapsed
+            ? "w-[76px]"
+            : "w-[272px]",
+          mobileOpen
+            ? "translate-x-0"
+            : "-translate-x-full lg:translate-x-0",
+        ].join(" ")}
+      >
+        <div className="flex h-[76px] shrink-0 items-center border-b border-white/10 px-4">
+          <Link
+            href="/admin"
+            className="flex min-w-0 flex-1 items-center gap-3"
+            onClick={() =>
+              setMobileOpen(false)
+            }
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#0A3F61] shadow-lg">
+              <span className="text-lg font-black">
+                P
+              </span>
+            </div>
+
+            {!collapsed ? (
+              <div className="min-w-0">
+                <div className="truncate text-sm font-bold tracking-wide">
+                  PhotoOS
+                </div>
+
+                <div className="truncate text-[10px] uppercase tracking-[0.18em] text-slate-400">
+                  Platform Admin
+                </div>
+              </div>
+            ) : null}
+          </Link>
+
+          <button
+            type="button"
+            onClick={() =>
+              setCollapsed((value) => !value)
+            }
+            className="hidden rounded-lg p-2 text-slate-400 hover:bg-white/10 hover:text-white lg:block"
+            aria-label={
+              collapsed
+                ? "Expand sidebar"
+                : "Collapse sidebar"
+            }
+          >
+            {collapsed ? (
+              <PanelLeftOpen className="h-4 w-4" />
+            ) : (
+              <PanelLeftClose className="h-4 w-4" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              setMobileOpen(false)
+            }
+            className="rounded-lg p-2 text-slate-400 hover:bg-white/10 hover:text-white lg:hidden"
+            aria-label="Close sidebar"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-3 py-4">
+          {/* Dashboard */}
+          <div className="mb-4">
+            <Link
+              href="/admin"
+              onClick={() =>
+                setMobileOpen(false)
+              }
+              title={
+                collapsed
+                  ? "Dashboard"
+                  : undefined
+              }
+              className={[
+                "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition",
+                pathname === "/admin"
+                  ? "bg-white text-[#0A3F61] shadow-sm"
+                  : "text-slate-300 hover:bg-white/10 hover:text-white",
+                collapsed
+                  ? "justify-center"
+                  : "",
+              ].join(" ")}
+            >
+              <LayoutDashboard
+                className={[
+                  "h-[17px] w-[17px] shrink-0",
+                  pathname === "/admin"
+                    ? "text-[#0A3F61]"
+                    : "text-slate-400 group-hover:text-white",
+                ].join(" ")}
+              />
+
+              {!collapsed ? (
+                <span className="flex-1">
+                  Dashboard
+                </span>
+              ) : null}
+            </Link>
+          </div>
+
+          {/* Main navigation groups */}
+          {navSections
+            .filter(
+              (section) =>
+                section.label !== "Overview",
+            )
+            .map((section) => {
+              const isOpen =
+                openSections[
+                  section.label
+                ] ?? false;
+
+              const hasActiveChild =
+                section.items.some((item) =>
+                  isActivePath(
+                    pathname,
+                    item.href,
+                  ),
+                );
+
+              const toggleSection = () => {
+                setOpenSections(
+                  (current) => ({
+                    ...current,
+                    [section.label]:
+                      !(
+                        current[
+                          section.label
+                        ] ?? false
+                      ),
+                  }),
+                );
+              };
+
+              return (
+                <div
+                  key={section.label}
+                  className="mb-2"
+                >
+                  {/* Main menu */}
+                  <button
+                    type="button"
+                    onClick={toggleSection}
+                    title={
+                      collapsed
+                        ? section.label
+                        : undefined
+                    }
+                    className={[
+                      "group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition",
+                      hasActiveChild
+                        ? "bg-white/10 text-white"
+                        : "text-slate-300 hover:bg-white/10 hover:text-white",
+                      collapsed
+                        ? "justify-center"
+                        : "",
+                    ].join(" ")}
+                  >
+                    <div
+                      className={[
+                        "flex h-[17px] w-[17px] shrink-0 items-center justify-center",
+                        hasActiveChild
+                          ? "text-white"
+                          : "text-slate-400 group-hover:text-white",
+                      ].join(" ")}
+                    >
+                      {section.items[0] ? (
+                        (() => {
+                          const Icon =
+                            section.items[0]
+                              .icon;
+
+                          return (
+                            <Icon className="h-[17px] w-[17px]" />
+                          );
+                        })()
+                      ) : null}
+                    </div>
+
+                    {!collapsed ? (
+                      <>
+                        <span className="min-w-0 flex-1 truncate text-[11px] font-bold uppercase tracking-[0.12em]">
+                          {section.label}
+                        </span>
+
+                        <ChevronDown
+                          className={[
+                            "h-4 w-4 shrink-0 text-slate-500 transition-transform duration-200",
+                            isOpen
+                              ? "rotate-180 text-white"
+                              : "",
+                          ].join(" ")}
+                        />
+                      </>
+                    ) : null}
+                  </button>
+
+                  {/* Submenu */}
+                  {!collapsed && isOpen ? (
+                    <div className="relative ml-4 mt-1 border-l border-white/10 pl-3">
+                      {section.items.map(
+                        (item) => {
+                          const active =
+                            isActivePath(
+                              pathname,
+                              item.href,
+                            );
+
+                          return (
+                          <div key={item.href}>
+                            <Link
+                              href={item.href}
+                              onClick={() => setMobileOpen(false)}
+                              className={[
+                                "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] transition",
+                                active
+                                  ? "bg-white text-[#0A3F61] font-semibold shadow-sm"
+                                  : "text-slate-400 hover:bg-white/10 hover:text-white",
+                              ].join(" ")}
+                            >
+                              <span
+                                className={[
+                                  "h-1.5 w-1.5 shrink-0 rounded-full",
+                                  active
+                                    ? "bg-[#0A3F61]"
+                                    : "bg-slate-600 group-hover:bg-slate-300",
+                                ].join(" ")}
+                              />
+
+                              <span className="min-w-0 flex-1 truncate">
+                                {item.label}
+                              </span>
+
+                              {item.badge ? (
+                                <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                                  {item.badge}
+                                </span>
+                              ) : null}
+
+                              {item.children?.length ? (
+                                <button
+                                  type="button"
+                                  aria-label={
+                                    item.label === "Accounting"
+                                      ? accountingOpen
+                                        ? "Collapse Accounting"
+                                        : "Expand Accounting"
+                                      : `Toggle ${item.label}`
+                                  }
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+
+                                    if (item.label === "Accounting") {
+                                      setAccountingOpen((value) => !value);
+                                    }
+                                  }}
+                                  className="rounded p-1 text-slate-500 transition hover:bg-white/10 hover:text-white"
+                                >
+                                  <ChevronDown
+                                    className={[
+                                      "h-3.5 w-3.5 transition-transform duration-200",
+                                      item.label === "Accounting" &&
+                                      accountingOpen
+                                        ? "rotate-180"
+                                        : "",
+                                    ].join(" ")}
+                                  />
+                                </button>
+                              ) : null}
+                            </Link>
+
+                            {item.children?.length &&
+                            (item.label !== "Accounting" ||
+                              accountingOpen) ? (
+                              <div className="ml-5 mt-1 border-l border-white/10 pl-3">
+                                {item.children.map((child) => {
+                                  const childActive = isActivePath(
+                                    pathname,
+                                    child.href,
+                                  );
+
+                                  return (
+                                    <Link
+                                      key={child.href}
+                                      href={child.href}
+                                      onClick={() => setMobileOpen(false)}
+                                      className={[
+                                        "group flex items-center gap-2 rounded-lg px-3 py-1.5 text-[12px] transition",
+                                        childActive
+                                          ? "bg-white/10 font-semibold text-white"
+                                          : "text-slate-500 hover:bg-white/5 hover:text-slate-200",
+                                      ].join(" ")}
+                                    >
+                                      <span
+                                        className={[
+                                          "h-1 w-1 shrink-0 rounded-full",
+                                          childActive
+                                            ? "bg-white"
+                                            : "bg-slate-600 group-hover:bg-slate-300",
+                                        ].join(" ")}
+                                      />
+
+                                      <span className="min-w-0 flex-1 truncate">
+                                        {child.label}
+                                      </span>
+                                    </Link>
+                                  );
+                                })}
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+        </div>
+
+        <div className="border-t border-white/10 p-3">
+          {!collapsed ? (
+            <div className="mb-2 rounded-xl bg-white/5 px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wider text-slate-500">
+                Environment
+              </div>
+
+              <div className="mt-1 flex items-center gap-2 text-xs text-slate-300">
+                <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                Local Platform
+              </div>
+            </div>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={() => void handleLogout()}
+            title={
+              collapsed
+                ? "Sign out"
+                : undefined
+            }
+            className={[
+              "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-400 transition hover:bg-red-500/10 hover:text-red-300",
+              collapsed
+                ? "justify-center"
+                : "",
+            ].join(" ")}
+          >
+            <LogOut className="h-[17px] w-[17px]" />
+
+            {!collapsed ? (
+              <span>Sign out</span>
+            ) : null}
+          </button>
+        </div>
+      </aside>
+
+      <div
+        className={[
+          "min-h-screen transition-[padding] duration-200",
+          collapsed
+            ? "lg:pl-[76px]"
+            : "lg:pl-[272px]",
+        ].join(" ")}
+      >
+        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
+          <div className="flex h-[76px] items-center gap-3 px-4 sm:px-6 lg:px-8">
+            <button
+              type="button"
+              onClick={() =>
+                setMobileOpen(true)
+              }
+              className="rounded-xl border border-slate-200 p-2.5 text-slate-600 hover:bg-slate-50 lg:hidden"
+              aria-label="Open navigation"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+
+            <div className="relative hidden max-w-xl flex-1 md:block">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+
+              <input
+                value={search}
+                onChange={(event) =>
+                  setSearch(
+                    event.target.value,
+                  )
+                }
+                placeholder="Search users, studios, payments, tickets..."
+                className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm outline-none transition focus:border-[#0A3F61] focus:bg-white focus:ring-4 focus:ring-[#0A3F61]/5"
+              />
+
+              {searchResults.length > 0 ? (
+                <div className="absolute left-0 right-0 top-14 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                  {searchResults.map(
+                    (item) => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() =>
+                          setSearch("")
+                        }
+                        className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm hover:bg-slate-50"
+                      >
+                        <item.icon className="h-4 w-4 text-slate-400" />
+                        {item.label}
+                      </Link>
+                    ),
+                  )}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="ml-auto flex items-center gap-1.5">
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !notificationOpen;
+                    setNotificationOpen(next);
+
+                    if (next) {
+                      void loadNotifications();
+                    }
+                  }}
+                  className="relative rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                  title="Notifications"
+                  aria-label="Notifications"
+                  aria-expanded={notificationOpen}
+                >
+                  <Bell className="h-[19px] w-[19px]" />
+
+                  {notificationUnreadCount > 0 ? (
+                    <span className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-red-500 px-1 text-center text-[10px] font-bold leading-[18px] text-white ring-2 ring-white">
+                      {notificationUnreadCount > 99
+                        ? "99+"
+                        : notificationUnreadCount}
+                    </span>
+                  ) : null}
+                </button>
+
+                {notificationOpen ? (
+                  <div className="absolute right-0 top-12 z-50 w-[360px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                    <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-semibold text-slate-900">
+                            Notifications
+                          </h3>
+
+                          {notificationUnreadCount > 0 ? (
+                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-600">
+                              {notificationUnreadCount} unread
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <p className="mt-0.5 text-[11px] text-slate-400">
+                          Platform Admin alerts
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void handleMarkAllNotificationsRead()
+                        }
+                        disabled={
+                          notificationMarkingAll ||
+                          notificationUnreadCount === 0
+                        }
+                        className="text-[11px] font-medium text-blue-600 hover:text-blue-700 disabled:cursor-not-allowed disabled:text-slate-300"
+                      >
+                        {notificationMarkingAll
+                          ? "Marking..."
+                          : "Mark all read"}
+                      </button>
+                    </div>
+
+                    <div className="max-h-[420px] overflow-y-auto">
+                      {notificationLoading ? (
+                        <div className="px-4 py-10 text-center text-xs text-slate-400">
+                          Loading notifications...
+                        </div>
+                      ) : notifications.length === 0 ? (
+                        <div className="px-4 py-10 text-center">
+                          <Bell className="mx-auto h-7 w-7 text-slate-300" />
+                          <p className="mt-2 text-sm font-medium text-slate-600">
+                            No notifications
+                          </p>
+                          <p className="mt-1 text-xs text-slate-400">
+                            You are all caught up.
+                          </p>
+                        </div>
+                      ) : (
+                        notifications.map((notification) => {
+                          const unread = !notification.read_at;
+
+                          return (
+                            <div
+                              key={notification.id}
+                              onClick={() =>
+                                void handleNotificationRead(
+                                  notification,
+                                )
+                              }
+                              className={[
+                                "cursor-pointer border-b border-slate-100 px-4 py-3 transition hover:bg-slate-50",
+                                unread
+                                  ? "bg-blue-50/50"
+                                  : "bg-white",
+                              ].join(" ")}
+                            >
+                              <div className="flex gap-3">
+                                <div
+                                  className={[
+                                    "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                                    unread
+                                      ? "bg-blue-100 text-blue-600"
+                                      : "bg-slate-100 text-slate-400",
+                                  ].join(" ")}
+                                >
+                                  <Bell className="h-4 w-4" />
+                                </div>
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <p
+                                      className={[
+                                        "text-xs",
+                                        unread
+                                          ? "font-semibold text-slate-900"
+                                          : "font-medium text-slate-700",
+                                      ].join(" ")}
+                                    >
+                                      {notification.title}
+                                    </p>
+
+                                    {unread ? (
+                                      <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-blue-600" />
+                                    ) : null}
+                                  </div>
+
+                                  <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-slate-500">
+                                    {notification.body}
+                                  </p>
+
+                                  <p className="mt-1 text-[10px] text-slate-400">
+                                    {new Date(
+                                      notification.created_at,
+                                    ).toLocaleString("en-IN", {
+                                      dateStyle: "medium",
+                                      timeStyle: "short",
+                                    })}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    <div className="border-t border-slate-100 bg-slate-50 px-4 py-2.5 text-center">
+                      <Link
+                        href="/admin/notifications"
+                        onClick={() =>
+                          setNotificationOpen(false)
+                        }
+                        className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+                      >
+                        View all notifications
+                      </Link>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
+              <Link
+                href="/admin/chat"
+                className="rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                title="Internal chat"
+              >
+                <MessageSquare className="h-[19px] w-[19px]" />
+              </Link>
+
+              <Link
+                href="/admin/settings"
+                className="hidden rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 sm:block"
+                title="Settings"
+              >
+                <Settings className="h-[19px] w-[19px]" />
+              </Link>
+
+              <div className="relative ml-1">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setProfileOpen(
+                      (value) => !value,
+                    )
+                  }
+                  className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2 py-1.5 hover:bg-slate-50"
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0A3F61] text-xs font-bold text-white">
+                    SA
+                  </div>
+
+                  <div className="hidden text-left xl:block">
+                    <div className="text-xs font-semibold text-slate-900">
+                      Super Admin
+                    </div>
+                    <div className="text-[10px] text-slate-400">
+                      {adminUserId}
+                    </div>
+                  </div>
+
+                  <ChevronDown className="hidden h-4 w-4 text-slate-400 xl:block" />
+                </button>
+
+                {profileOpen ? (
+                  <div className="absolute right-0 top-12 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                    <div className="border-b border-slate-100 px-3 py-3">
+                      <div className="text-sm font-semibold">
+                        Super Admin
+                      </div>
+                      <div className="mt-1 text-xs text-slate-400">
+                        {adminUserId}
+                      </div>
+                    </div>
+
+                    <Link
+                      href="/admin/profile"
+                      onClick={() =>
+                        setProfileOpen(false)
+                      }
+                      className="mt-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm hover:bg-slate-50"
+                    >
+                      <UserCog className="h-4 w-4" />
+                      My Profile
+                    </Link>
+
+                    <Link
+                      href="/admin/security-logs"
+                      onClick={() =>
+                        setProfileOpen(false)
+                      }
+                      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm hover:bg-slate-50"
+                    >
+                      <ShieldCheck className="h-4 w-4" />
+                      Security
+                    </Link>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void handleLogout()
+                      }
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-red-600 hover:bg-red-50"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Sign out
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-slate-100 px-4 py-2.5 md:hidden">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+
+              <input
+                value={search}
+                onChange={(event) =>
+                  setSearch(
+                    event.target.value,
+                  )
+                }
+                placeholder="Search admin platform..."
+                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none focus:border-[#0A3F61]"
+              />
+            </div>
+          </div>
+        </header>
+
+        <main className="min-h-[calc(100vh-76px)]">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}

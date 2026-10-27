@@ -1,0 +1,470 @@
+import {
+  NextResponse,
+} from "next/server";
+
+import {
+  createClient,
+} from "@supabase/supabase-js";
+
+
+type ProfileRow = {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  full_name: string | null;
+  phone: string | null;
+};
+
+
+function getServerSupabase() {
+
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  const supabaseServiceRoleKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+
+  if (
+    !supabaseUrl ||
+    !supabaseServiceRoleKey
+  ) {
+
+    throw new Error(
+      "Supabase server environment variables are missing.",
+    );
+
+  }
+
+
+  return createClient(
+    supabaseUrl,
+    supabaseServiceRoleKey,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    },
+  );
+
+}
+
+
+function getRequestAccessToken(
+  request: Request,
+) {
+
+  const authorization =
+    request.headers.get(
+      "authorization",
+    );
+
+
+  if (
+    !authorization
+  ) {
+    return null;
+  }
+
+
+  const [
+    scheme,
+    token,
+  ] =
+    authorization.split(
+      " ",
+    );
+
+
+  if (
+    scheme !== "Bearer" ||
+    !token
+  ) {
+    return null;
+  }
+
+
+  return token;
+
+}
+
+
+export async function GET(
+  request: Request,
+  context: {
+    params: Promise<{
+      leadId: string;
+    }>;
+  },
+) {
+
+  try {
+
+    const {
+      leadId,
+    } =
+      await context.params;
+
+
+    const accessToken =
+      getRequestAccessToken(
+        request,
+      );
+
+
+    if (
+      !accessToken
+    ) {
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Unauthorized.",
+        },
+        {
+          status: 401,
+        },
+      );
+
+    }
+
+
+    const supabase =
+      getServerSupabase();
+
+
+    const {
+      data: authData,
+      error: authError,
+    } =
+      await supabase.auth.getUser(
+        accessToken,
+      );
+
+
+    if (
+      authError ||
+      !authData.user
+    ) {
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Unauthorized.",
+        },
+        {
+          status: 401,
+        },
+      );
+
+    }
+
+
+    const userId =
+      authData.user.id;
+
+
+    const {
+      data: membership,
+      error: membershipError,
+    } =
+      await supabase
+        .from(
+          "studio_members",
+        )
+        .select(
+          "studio_id",
+        )
+        .eq(
+          "profile_id",
+          userId,
+        )
+        .eq(
+          "status",
+          "active",
+        )
+        .limit(
+          1,
+        )
+        .maybeSingle();
+
+
+    if (
+      membershipError
+    ) {
+      throw membershipError;
+    }
+
+
+    if (
+      !membership?.studio_id
+    ) {
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Active studio membership not found.",
+        },
+        {
+          status: 403,
+        },
+      );
+
+    }
+
+
+    const {
+      data: vendor,
+      error: vendorError,
+    } =
+      await supabase
+        .from(
+          "marketplace_vendors",
+        )
+        .select(
+          "id",
+        )
+        .eq(
+          "studio_id",
+          membership.studio_id,
+        )
+        .limit(
+          1,
+        )
+        .maybeSingle();
+
+
+    if (
+      vendorError
+    ) {
+      throw vendorError;
+    }
+
+
+    if (
+      !vendor?.id
+    ) {
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Marketplace vendor not found.",
+        },
+        {
+          status: 404,
+        },
+      );
+
+    }
+
+
+    const {
+      data: lead,
+      error: leadError,
+    } =
+      await supabase
+        .from(
+          "marketplace_booking_requests",
+        )
+        .select(
+          `
+            id,
+            order_id,
+            requested_date,
+            requested_start_time,
+            requested_end_time,
+            customer_message,
+            vendor_response,
+            status,
+            metadata,
+            created_at,
+            updated_at,
+
+            marketplace_orders!inner (
+              id,
+              customer_id,
+              vendor_id,
+              order_number,
+              order_type,
+              status,
+              subtotal,
+              tax_amount,
+              discount_amount,
+              total_amount,
+              currency,
+              customer_notes,
+              vendor_notes,
+              metadata,
+              created_at,
+              updated_at,
+
+              profiles (
+                id,
+                first_name,
+                last_name,
+                full_name,
+                phone
+              )
+            )
+          `,
+        )
+        .eq(
+          "id",
+          leadId,
+        )
+        .eq(
+          "marketplace_orders.vendor_id",
+          vendor.id,
+        )
+        .maybeSingle();
+
+
+    if (
+      leadError
+    ) {
+      throw leadError;
+    }
+
+
+    if (
+      !lead
+    ) {
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Lead not found.",
+        },
+        {
+          status: 404,
+        },
+      );
+
+    }
+
+
+    const order =
+      Array.isArray(
+        lead.marketplace_orders,
+      )
+        ? (
+            lead.marketplace_orders[0] ??
+            null
+          )
+        : lead.marketplace_orders;
+
+
+    const rawProfile =
+      order?.profiles ??
+      null;
+
+
+    const profile =
+      (
+        Array.isArray(
+          rawProfile,
+        )
+          ? (
+              rawProfile[0] ??
+              null
+            )
+          : rawProfile
+      ) as ProfileRow | null;
+
+
+    const customer =
+      profile
+        ? {
+            id:
+              profile.id,
+
+            full_name:
+              profile.full_name,
+
+            first_name:
+              profile.first_name,
+
+            last_name:
+              profile.last_name,
+
+            email:
+              null,
+
+            phone:
+              profile.phone,
+          }
+        : null;
+
+
+    return NextResponse.json(
+      {
+        id:
+          lead.id,
+
+        status:
+          lead.status,
+
+        created_at:
+          lead.created_at,
+
+        order_id:
+          lead.order_id,
+
+        order_number:
+          order?.order_number ??
+          "Unknown order",
+
+        order_status:
+          order?.status ??
+          "unknown",
+
+        total_amount:
+          order?.total_amount ??
+          0,
+
+        currency:
+          order?.currency ??
+          "INR",
+
+        requested_date:
+          lead.requested_date,
+
+        requested_start_time:
+          lead.requested_start_time,
+
+        requested_end_time:
+          lead.requested_end_time,
+
+        customer_message:
+          lead.customer_message,
+
+        customer,
+      },
+    );
+
+  } catch (
+    error
+  ) {
+
+    console.error(
+      "[marketplace-lead-detail] GET ERROR",
+      error,
+    );
+
+
+    return NextResponse.json(
+      {
+        success: false,
+
+        error:
+          "Unable to load marketplace lead.",
+      },
+      {
+        status: 500,
+      },
+    );
+
+  }
+
+}

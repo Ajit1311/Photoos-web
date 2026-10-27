@@ -1,0 +1,40 @@
+import {
+  supabase,
+} from "@/lib/supabase/client";
+
+
+export async function markNotificationRead(
+  notificationId: string,
+): Promise<
+  number
+> {
+
+  const {
+    data,
+    error,
+  } =
+    await supabase.rpc(
+      "bulk_mark_notifications_read",
+      {
+        p_notification_ids:
+          [
+            notificationId,
+          ],
+      },
+    );
+
+
+  if (error) {
+
+    throw error;
+
+  }
+
+
+  return (
+    typeof data === "number"
+      ? data
+      : 0
+  );
+
+}

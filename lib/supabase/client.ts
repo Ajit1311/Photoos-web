@@ -1,18 +1,62 @@
-import { createClient } from "@supabase/supabase-js";
+import {
+  createClient,
+  type SupabaseClient,
+} from "@supabase/supabase-js";
 
 import {
   publishableKey,
   supabaseUrl,
 } from "./config";
 
-export const supabase = createClient(
-  supabaseUrl as string,
-  publishableKey as string,
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
+let client: SupabaseClient | null = null;
+
+function createSupabaseClient(): SupabaseClient {
+
+  return createClient(
+    supabaseUrl,
+    publishableKey,
+    {
+
+      auth: {
+
+        persistSession: true,
+
+        autoRefreshToken: true,
+
+        detectSessionInUrl: true,
+
+        flowType: "pkce",
+
+      },
+
+      global: {
+
+        headers: {
+
+          "x-client-info":
+            "photoos-web",
+
+        },
+
+      },
+
     },
-  },
-);
+  );
+
+}
+
+export function getSupabaseClient(): SupabaseClient {
+
+  if (!client) {
+
+    client =
+      createSupabaseClient();
+
+  }
+
+  return client;
+
+}
+
+export const supabase =
+  getSupabaseClient();

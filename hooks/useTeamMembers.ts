@@ -1,111 +1,95 @@
 "use client";
 
 import {
-  useCallback,
-  useState,
-} from "react";
+  useAppQuery,
+} from "@/hooks/useAppQuery";
 
-import { useBootstrapContext } from "@/context/BootstrapContext";
+import {
+  useStudioId,
+} from "@/hooks/useStudioId";
 
-import { teamMemberRepository } from "@/lib/repositories/team-member.repository";
+import {
+  QUERY_KEYS,
+} from "@/hooks/query-keys";
+
+import {
+  teamMemberRepository,
+} from "@/lib/repositories/team-member.repository";
 
 import type {
-  TeamMember,
-} from "@/types/team-member";
+  TeamMemberListResult,
+} from "@/lib/services/team-member.service";
 
-export function useTeamMembers() {
+type UseTeamMembersOptions = {
+  page?: number;
+  limit?: number;
+  search?: string;
+};
+
+export function useTeamMembers(
+  options: UseTeamMembersOptions = {},
+) {
 
   const {
-    data: bootstrap,
-  } = useBootstrapContext();
+    studioId,
+  } = useStudioId();
 
-  const [
-    members,
-    setMembers,
-  ] = useState<TeamMember[]>([]);
+  const page =
+    options.page ?? 1;
 
-  const [
-    loading,
-    setLoading,
-  ] = useState(false);
+  const limit =
+    options.limit ?? 25;
 
-  const [
-    error,
-    setError,
-  ] = useState<string | null>(
-    null,
-  );
+  const search =
+    options.search ?? "";
 
-  const load =
-    useCallback(
-      async (
-        search = "",
-      ) => {
+  const query =
+    useAppQuery<TeamMemberListResult>({
 
-        if (!bootstrap) {
-          return;
-        }
-
-        setLoading(true);
-
-        setError(null);
-
-        try {
-
-          const studioId =
-            bootstrap.workspace.membership.studioId;
-
-          const result =
-            await teamMemberRepository.getAll(
-              studioId,
-              1,
-              25,
-              search,
-            );
-
-          setMembers(
-            result.members,
-          );
-
-        } catch (err) {
-
-          console.error(err);
-
-          if (err instanceof Error) {
-
-            setError(
-              err.message,
-            );
-
-          } else {
-
-            setError(
-              "Unable to load team members.",
-            );
-
-          }
-
-        } finally {
-
-          setLoading(false);
-
-        }
-
-      },
-      [
-        bootstrap,
+      queryKey: [
+        ...QUERY_KEYS.teamMembers,
+        studioId,
+        page,
+        limit,
+        search,
       ],
-    );
+
+      enabled:
+        Boolean(studioId),
+
+      queryFn:
+        () =>
+          teamMemberRepository.getAll(
+            studioId!,
+            page,
+            limit,
+            search,
+          ),
+
+    });
 
   return {
 
-    members,
+    data:
+      query.data ?? null,
 
-    loading,
+    members:
+      query.data?.members ?? [],
 
-    error,
+    pagination:
+      query.data?.pagination ?? null,
 
-    load,
+    loading:
+      query.isPending,
+
+    refreshing:
+      query.isFetching,
+
+    error:
+      query.error ?? null,
+
+    reload:
+      query.refetch,
 
   };
 

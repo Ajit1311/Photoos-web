@@ -1,144 +1,375 @@
 "use client";
 
 import { useState } from "react";
+
 import PhotoCard from "./PhotoCard";
 import FaceSearchModal from "./FaceSearchModal";
-import { toggleGalleryPhotoFavorite } from "@/lib/api/functions";
 import CustomToast from "@/components/ui/custom-toast";
 
-const initialPhotos = Array.from({ length: 48 }, (_, index) => ({
-  id: `IMG_${String(index + 1).padStart(4, "0")}`,
-  image: `https://picsum.photos/600/600?random=${index + 1}`,
-  rating: 5,
-  favorite: index % 7 === 0,
-  selected: index % 11 === 0,
-  faces: (index % 6) + 1,
-  label: (
-    ["Blue", "Green", "Yellow", "Purple", "Red"] as const
-  )[index % 5],
-}));
+import {
+  toggleGalleryPhotoFavorite,
+} from "@/lib/api/functions";
 
-export default function PhotoGrid() {
-  const [photos, setPhotos] = useState(initialPhotos);
-  const [filteredPhotos, setFilteredPhotos] = useState(initialPhotos);
-  const [isAiFiltered, setIsAiFiltered] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" } | null>(null);
+import type {
+  GalleryPhoto,
+} from "@/types/events/gallery";
 
-  const handleToggleFavorite = async (assetId: string) => {
-    if (isProcessing) return;
-    setIsProcessing(true);
+interface PhotoGridProps {
+  photos: GalleryPhoto[];
 
-    const result = await toggleGalleryPhotoFavorite(assetId, "demo-gallery-id");
+  selectedIds: string[];
 
-    if (result.success) {
-      if (result.message.includes("limit")) {
-        setToast({ message: "Limit reached! You can select a maximum of 200 photos.", type: "warning" });
-      } else {
-        const updateState = (prev: typeof photos) =>
-          prev.map((photo) =>
-            photo.id === assetId ? { ...photo, favorite: !photo.favorite } : photo
-          );
+  onSelectionChange: (
+    ids: string[],
+  ) => void;
+}
 
-        setPhotos(updateState);
-        setFilteredPhotos(updateState);
+export default function PhotoGrid({
+  photos,
+  selectedIds,
+  onSelectionChange,
+}: PhotoGridProps) {
+  const [
+    isAiFiltered,
+    setIsAiFiltered,
+  ] = useState(false);
 
-        const currentPhoto = photos.find((p) => p.id === assetId);
-        setToast({
-          message: currentPhoto?.favorite ? "Selection removed! 🤍" : "Photo selected successfully! ❤️",
-          type: "success",
-        });
-      }
-    } else {
-      setToast({ message: "Something went wrong. Please try again.", type: "error" });
+  const [
+    filteredPhotos,
+    setFilteredPhotos,
+  ] = useState<GalleryPhoto[]>(photos);
+
+  const [
+    isModalOpen,
+    setIsModalOpen,
+  ] = useState(false);
+
+  const [
+    isProcessing,
+    setIsProcessing,
+  ] = useState(false);
+
+  const [
+    toast,
+    setToast,
+  ] = useState<{
+    message: string;
+    type: "success" | "error" | "warning";
+  } | null>(null);
+
+  const handleToggleFavorite = async (
+    assetId: string,
+  ) => {
+    if (isProcessing) {
+      return;
     }
 
-    setIsProcessing(false);
+    setIsProcessing(true);
+
+    try {
+      const result =
+        await toggleGalleryPhotoFavorite(
+          assetId,
+          "demo-gallery-id",
+        );
+
+      if (!result.success) {
+        setToast({
+          message:
+            result.message ||
+            "Something went wrong. Please try again.",
+          type: "error",
+        });
+
+        return;
+      }
+
+      if (
+        result.message
+          .toLowerCase()
+          .includes("limit")
+      ) {
+        setToast({
+          message:
+            "Limit reached! You can select a maximum of 200 photos.",
+          type: "warning",
+        });
+
+        return;
+      }
+
+      const currentlySelected =
+        selectedIds.includes(assetId);
+
+      const nextSelectedIds =
+        currentlySelected
+          ? selectedIds.filter(
+              (id) => id !== assetId,
+            )
+          : [
+              ...selectedIds,
+              assetId,
+            ];
+
+      onSelectionChange(
+        nextSelectedIds,
+      );
+
+      setToast({
+        message: currentlySelected
+          ? "Selection removed."
+          : "Photo selected successfully.",
+        type: "success",
+      });
+    } catch (error) {
+      console.error(
+        "PHOTO SELECTION ERROR:",
+        error,
+      );
+
+      setToast({
+        message:
+          error instanceof Error
+            ? error.message
+            : "Something went wrong. Please try again.",
+        type: "error",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  const handleFaceMatched = (faceProfileId: string) => {
-    const matched = photos.filter((p) => p.faces > 2);
-    setFilteredPhotos(matched);
+  const handleFaceMatched = (
+    _faceProfileId: string,
+  ) => {
+    const matched =
+      photos.filter(
+        (photo) =>
+          photo.aiProcessed,
+      );
+
+    setFilteredPhotos(
+      matched,
+    );
+
     setIsAiFiltered(true);
-    setToast({ message: `AI found ${matched.length} matching photos! ✨`, type: "success" });
+
+    setToast({
+      message:
+        `AI found ${matched.length} matching photos.`,
+      type: "success",
+    });
   };
 
   const resetAiFilter = () => {
-    setFilteredPhotos(photos);
+    setFilteredPhotos(
+      photos,
+    );
+
     setIsAiFiltered(false);
-    setToast({ message: "Gallery filter reset successfully.", type: "success" });
+
+    setToast({
+      message:
+        "Gallery filter reset successfully.",
+      type: "success",
+    });
   };
+
+  if (filteredPhotos.length === 0) {
+    return (
+      <section className="relative rounded-3xl border border-slate-200 bg-white shadow-sm">
+
+        {toast && (
+          <CustomToast
+            message={toast.message}
+            type={toast.type}
+            onClose={() =>
+              setToast(null)
+            }
+          />
+        )}
+
+        <div className="border-b border-slate-100 px-6 py-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900">
+                Photo Gallery
+              </h2>
+
+              <p className="mt-2 text-slate-500">
+                Select photos for albums, AI and delivery.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                setIsModalOpen(true)
+              }
+              className="rounded-2xl bg-[#0A3F61] px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-[#0A3F61]/95"
+            >
+              Find My Photos (AI)
+            </button>
+
+          </div>
+        </div>
+
+        <FaceSearchModal
+          isOpen={isModalOpen}
+          onClose={() =>
+            setIsModalOpen(false)
+          }
+          galleryId=""
+          studioId=""
+          onFaceMatched={
+            handleFaceMatched
+          }
+        />
+
+        <div className="px-6 py-16 text-center text-slate-400">
+          No matching photos found.
+        </div>
+
+      </section>
+    );
+  }
 
   return (
     <section className="relative rounded-3xl border border-slate-200 bg-white shadow-sm">
+
       {toast && (
-        <CustomToast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
+        <CustomToast
+          message={toast.message}
+          type={toast.type}
+          onClose={() =>
+            setToast(null)
+          }
+        />
       )}
 
       <FaceSearchModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        galleryId="demo-gallery-id"
-        studioId="demo-studio-id"
-        onFaceMatched={handleFaceMatched}
+        onClose={() =>
+          setIsModalOpen(false)
+        }
+        galleryId=""
+        studioId=""
+        onFaceMatched={
+          handleFaceMatched
+        }
       />
 
       <div className="border-b border-slate-100 px-6 py-5">
-        <div className="flex items-center justify-between">
+
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+
           <div>
-            <h2 className="text-2xl font-bold text-slate-900">Photo Gallery</h2>
-            <p className="mt-2 text-slate-500">Select photos for albums, AI and delivery.</p>
+            <h2 className="text-2xl font-bold text-slate-900">
+              Photo Gallery
+            </h2>
+
+            <p className="mt-2 text-slate-500">
+              Select photos for albums, AI and delivery.
+            </p>
           </div>
 
           <div className="flex items-center gap-4">
+
             {isAiFiltered ? (
               <button
-                onClick={resetAiFilter}
-                className="px-4 py-2.5 rounded-2xl bg-red-50 border border-red-200 text-sm font-semibold text-red-600 hover:bg-red-100 transition-all"
+                type="button"
+                onClick={
+                  resetAiFilter
+                }
+                className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-100"
               >
-                Clear AI Filter 🔄
+                Clear AI Filter
               </button>
             ) : (
               <button
-                onClick={() => setIsModalOpen(true)}
-                className="px-5 py-2.5 rounded-2xl bg-[#0A3F61] text-sm font-semibold text-white hover:bg-[#0A3F61]/95 shadow-md transition-all flex items-center gap-2"
+                type="button"
+                onClick={() =>
+                  setIsModalOpen(true)
+                }
+                className="flex items-center gap-2 rounded-2xl bg-[#0A3F61] px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-[#0A3F61]/95"
               >
-                🔍 Find My Photos (AI)
+                Find My Photos (AI)
               </button>
             )}
 
             <div className="rounded-2xl bg-[#0A3F61]/10 px-5 py-2 text-center">
-              <p className="text-[10px] uppercase tracking-wide text-[#0A3F61] font-medium">Photos</p>
-              <h3 className="text-lg font-bold text-[#0A3F61]">{filteredPhotos.length}</h3>
+
+              <p className="text-[10px] font-medium uppercase tracking-wide text-[#0A3F61]">
+                Photos
+              </p>
+
+              <h3 className="text-lg font-bold text-[#0A3F61]">
+                {filteredPhotos.length}
+              </h3>
+
             </div>
+
           </div>
         </div>
+
       </div>
 
       <div className="max-h-[900px] overflow-y-auto p-6">
-        {filteredPhotos.length === 0 ? (
-          <div className="text-center py-12 text-slate-400 font-medium">
-            No matching photos found. 📸
-          </div>
-        ) : (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-2 2xl:grid-cols-3">
-            {filteredPhotos.map((photo) => (
+
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-2 2xl:grid-cols-3">
+
+          {filteredPhotos.map(
+            (photo) => (
               <PhotoCard
                 key={photo.id}
-                id={photo.id}
-                image={photo.image}
-                rating={photo.rating}
-                favorite={photo.favorite}
-                selected={photo.selected}
-                faces={photo.faces}
-                label={photo.label}
-                onToggleFavorite={handleToggleFavorite}
+                id={photo.fileName}
+                image={
+                  photo.thumbnailUrl ||
+                  photo.originalUrl
+                }
+                rating={
+                  photo.rating
+                }
+                favorite={
+                  photo.isFavorite
+                }
+                selected={
+                  selectedIds.includes(
+                    photo.id,
+                  )
+                }
+                faces={
+                  photo.aiProcessed
+                    ? 1
+                    : 0
+                }
+                label={
+                  photo.colorLabel ===
+                  "Red"
+                    ? "Red"
+                    : photo.colorLabel ===
+                        "Blue"
+                      ? "Blue"
+                      : photo.colorLabel ===
+                          "Green"
+                        ? "Green"
+                        : photo.colorLabel ===
+                            "Yellow"
+                          ? "Yellow"
+                          : "Purple"
+                }
+                onToggleFavorite={
+                  handleToggleFavorite
+                }
               />
-            ))}
-          </div>
-        )}
+            ),
+          )}
+
+        </div>
+
       </div>
+
     </section>
   );
 }

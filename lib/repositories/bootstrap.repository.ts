@@ -1,17 +1,54 @@
-import {
-  getBootstrap,
-} from "@/lib/api/bootstrap";
+import { requireAccessToken } from "@/lib/auth/session";
+import { supabase } from "@/lib/supabase/client";
 
 import type {
   BootstrapResponse,
 } from "@/types/bootstrap/bootstrap";
 
+const FUNCTION_NAME =
+  "bootstrap";
+
 class BootstrapRepository {
 
   async load(): Promise<BootstrapResponse> {
-    return getBootstrap();
-  }
 
+    const accessToken =
+      await requireAccessToken();
+
+    const {
+      data,
+      error,
+    } =
+      await supabase.functions.invoke(
+        FUNCTION_NAME,
+        {
+          method: "POST",
+          headers: {
+            Authorization:
+              `Bearer ${accessToken}`,
+          },
+        },
+      );
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data) {
+      throw new Error(
+        "Bootstrap returned an empty response.",
+      );
+    }
+
+    if (data.success !== true) {
+      throw new Error(
+        data.error?.message ??
+          "Bootstrap failed.",
+      );
+    }
+
+    return data as BootstrapResponse;
+  }
 }
 
 export const bootstrapRepository =

@@ -1,0 +1,694 @@
+"use client";
+
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  useParams,
+} from "next/navigation";
+
+import Link from "next/link";
+
+import {
+  supabase,
+} from "@/lib/supabase/client";
+
+import {
+  ArrowLeft,
+  CalendarDays,
+  CircleDollarSign,
+  Clock3,
+  Mail,
+  Phone,
+  UserRound,
+  ArrowUpRight,
+  CheckCircle2,
+  ClipboardCheck,
+  MessageCircle,
+  Sparkles,
+  Tag,
+  UsersRound,
+} from "lucide-react";
+
+
+type LeadDetails = {
+  id: string;
+
+  status: string;
+
+  created_at: string;
+
+  order_id: string;
+
+  order_number: string;
+
+  order_type: string | null;
+
+  order_status: string;
+
+  total_amount: number;
+
+  currency: string;
+
+  requested_date: string | null;
+
+  requested_start_time: string | null;
+
+  requested_end_time: string | null;
+
+  customer_message: string | null;
+
+  customer: {
+    id: string;
+
+    full_name: string | null;
+
+    first_name: string | null;
+
+    last_name: string | null;
+
+    email: string | null;
+
+    phone: string | null;
+  } | null;
+};
+
+
+function formatDate(
+  value: string | null,
+) {
+
+  if (
+    !value
+  ) {
+    return "Not specified";
+  }
+
+  return new Intl.DateTimeFormat(
+    "en-IN",
+    {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    },
+  ).format(
+    new Date(
+      value,
+    ),
+  );
+
+}
+
+
+export default function MarketplaceLeadDetailsPage() {
+
+  const params =
+    useParams<
+      {
+        leadId: string;
+      }
+    >();
+
+
+  const leadId =
+    params.leadId;
+
+  const [
+    lead,
+    setLead,
+  ] =
+    useState<
+      LeadDetails | null
+    >(
+      null,
+    );
+
+
+  const [
+    loading,
+    setLoading,
+  ] =
+    useState(
+      true,
+    );
+
+
+  useEffect(
+    () => {
+
+      const loadLead =
+        async () => {
+
+          try {
+
+            const {
+              data: sessionData,
+              error: sessionError,
+            } =
+              await supabase.auth.getSession();
+
+
+            if (
+              sessionError
+            ) {
+              throw sessionError;
+            }
+
+
+            const accessToken =
+              sessionData.session?.access_token;
+
+
+            if (
+              !accessToken
+            ) {
+              throw new Error(
+                "You must be signed in to load lead details.",
+              );
+            }
+
+
+            const response =
+              await fetch(
+                `/api/marketplace/leads/${leadId}`,
+                {
+                  headers: {
+                    Authorization:
+                      `Bearer ${accessToken}`,
+                  },
+                },
+              );
+
+
+            if (
+              !response.ok
+            ) {
+              throw new Error(
+                "Unable to load lead details.",
+              );
+            }
+
+
+            const data =
+              await response.json();
+
+
+            setLead(
+              data,
+            );
+
+          } catch (error) {
+
+            console.error(
+              error,
+            );
+
+          } finally {
+
+            setLoading(
+              false,
+            );
+
+          }
+
+        };
+
+
+      void loadLead();
+
+    },
+    [
+      leadId,
+    ],
+  );
+
+
+  if (
+    loading
+  ) {
+
+    return (
+
+      <div className="rounded-[28px] border border-slate-200 bg-white px-6 py-16 text-center text-sm text-slate-500">
+
+        Loading lead details...
+
+      </div>
+
+    );
+
+  }
+
+
+  if (
+    !lead
+  ) {
+
+    return (
+
+      <div className="rounded-[28px] border border-slate-200 bg-white px-6 py-16 text-center">
+
+        <p className="text-sm font-medium text-slate-900">
+
+          Lead not found.
+
+        </p>
+
+
+        <Link
+          href="/dashboard/marketplace/leads"
+          className="mt-5 inline-flex cursor-pointer text-sm font-semibold text-[#0A3F61]"
+        >
+
+          Back to Marketplace Leads
+
+        </Link>
+
+      </div>
+
+    );
+
+  }
+
+
+  const customerName =
+    lead.customer?.full_name ||
+    [
+      lead.customer?.first_name,
+      lead.customer?.last_name,
+    ]
+      .filter(
+        Boolean,
+      )
+      .join(
+        " ",
+      ) ||
+    "Marketplace Customer";
+
+
+
+  const serviceType =
+    lead.order_type ||
+    "Photography Service";
+
+
+  const leadStatusLabel =
+    lead.status
+      .replaceAll("_", " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+
+  const bookingTime =
+    lead.requested_start_time &&
+    lead.requested_end_time
+      ? `${lead.requested_start_time.slice(0, 5)} – ${lead.requested_end_time.slice(0, 5)}`
+      : "Time to be confirmed";
+
+
+  const createClientParams =
+    new URLSearchParams(
+      {
+
+        source:
+          "marketplace",
+
+        marketplaceLeadId:
+          lead.id,
+
+        marketplaceOrderId:
+          lead.order_id,
+
+        customerName,
+
+        email:
+          lead.customer?.email ??
+          "",
+
+        phone:
+          lead.customer?.phone ??
+          "",
+
+      },
+    );
+
+
+  return (
+
+    <div className="mx-auto max-w-6xl space-y-8">
+
+      <Link
+        href="/dashboard/marketplace/leads"
+        className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-600 transition hover:text-slate-950"
+      >
+
+        <ArrowLeft
+          size={17}
+        />
+
+        Back to Marketplace Leads
+
+      </Link>
+
+
+      <section className="rounded-[32px] border border-slate-200 bg-white p-7 shadow-[0_8px_30px_rgb(15,23,42,0.04)]">
+
+        <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-start">
+
+          <div>
+
+            <div className="flex items-center gap-3">
+
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50 text-violet-600">
+
+                <UserRound
+                  size={22}
+                />
+
+              </div>
+
+
+              <div>
+
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+
+                  Marketplace Lead
+
+                </p>
+
+
+                <h1 className="mt-1 text-2xl font-bold text-slate-950">
+
+                  {
+                    customerName
+                  }
+
+                </h1>
+
+
+                <p className="mt-1 text-sm text-slate-500">
+
+                  Order {
+                    lead.order_number
+                  }
+
+                </p>
+
+              </div>
+
+            </div>
+
+          </div>
+
+
+          <span className="w-fit rounded-full bg-amber-50 px-4 py-2 text-sm font-semibold capitalize text-amber-700">
+
+            {
+              lead.status
+            }
+
+          </span>
+
+        </div>
+
+
+        <div className="mt-8 grid gap-5 md:grid-cols-3">
+
+          <div className="rounded-2xl bg-slate-50 p-5">
+
+            <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+
+              <CalendarDays
+                size={15}
+              />
+
+              Requested Date
+
+            </div>
+
+
+            <p className="mt-3 font-semibold text-slate-950">
+
+              {
+                formatDate(
+                  lead.requested_date,
+                )
+              }
+
+            </p>
+
+          </div>
+
+
+          <div className="rounded-2xl bg-slate-50 p-5">
+
+            <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+
+              <Clock3
+                size={15}
+              />
+
+              Requested Time
+
+            </div>
+
+
+            <p className="mt-3 font-semibold text-slate-950">
+
+              {
+                lead.requested_start_time
+                  ? lead.requested_start_time.slice(
+                      0,
+                      5,
+                    )
+                  : "Not specified"
+              }
+
+              {
+                lead.requested_end_time &&
+                ` – ${lead.requested_end_time.slice(0, 5)}`
+              }
+
+            </p>
+
+          </div>
+
+
+          <div className="rounded-2xl bg-slate-50 p-5">
+
+            <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+
+              <CircleDollarSign
+                size={15}
+              />
+
+              Order Value
+
+            </div>
+
+
+            <p className="mt-3 font-semibold text-slate-950">
+
+              {
+                new Intl.NumberFormat(
+                  "en-IN",
+                  {
+                    style:
+                      "currency",
+
+                    currency:
+                      lead.currency ||
+                      "INR",
+                  },
+                ).format(
+                  Number(
+                    lead.total_amount ??
+                    0,
+                  ),
+                )
+              }
+
+            </p>
+
+          </div>
+
+        </div>
+
+      </section>
+
+
+      <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+
+        <section className="rounded-[28px] border border-slate-200 bg-white p-7">
+
+          <h2 className="text-lg font-semibold text-slate-950">
+
+            Customer Details
+
+          </h2>
+
+
+          <div className="mt-6 space-y-5">
+
+            <div className="flex items-center gap-3">
+
+              <UserRound
+                size={18}
+                className="text-slate-400"
+              />
+
+
+              <div>
+
+                <p className="text-xs text-slate-500">
+
+                  Name
+
+                </p>
+
+
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+
+                  {
+                    customerName
+                  }
+
+                </p>
+
+              </div>
+
+            </div>
+
+
+            <div className="flex items-center gap-3">
+
+              <Mail
+                size={18}
+                className="text-slate-400"
+              />
+
+
+              <div>
+
+                <p className="text-xs text-slate-500">
+
+                  Email
+
+                </p>
+
+
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+
+                  {
+                    lead.customer?.email ||
+                    "Not available"
+                  }
+
+                </p>
+
+              </div>
+
+            </div>
+
+
+            <div className="flex items-center gap-3">
+
+              <Phone
+                size={18}
+                className="text-slate-400"
+              />
+
+
+              <div>
+
+                <p className="text-xs text-slate-500">
+
+                  Phone
+
+                </p>
+
+
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+
+                  {
+                    lead.customer?.phone ||
+                    "Not available"
+                  }
+
+                </p>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </section>
+
+
+        <section className="rounded-[28px] bg-[#0A3F61] p-7 text-white">
+
+          <p className="text-sm font-semibold text-white/70">
+
+            Convert Lead
+
+          </p>
+
+
+          <h2 className="mt-2 text-xl font-bold">
+
+            Create a studio client
+
+          </h2>
+
+
+          <p className="mt-3 text-sm leading-6 text-white/70">
+
+            Customer information from this marketplace lead will be automatically added to the client creation form.
+
+          </p>
+
+
+          <Link
+            href={
+              `/dashboard/clients/create?${createClientParams.toString()}`
+            }
+            className="mt-7 inline-flex h-12 cursor-pointer items-center justify-center rounded-xl bg-white px-5 text-sm font-bold text-[#0A3F61] transition hover:bg-slate-100"
+          >
+
+            Create Client
+
+          </Link>
+
+        </section>
+
+      </div>
+
+
+      <section className="rounded-[28px] border border-slate-200 bg-white p-7">
+
+        <h2 className="text-lg font-semibold text-slate-950">
+
+          Customer Message
+
+        </h2>
+
+
+        <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-slate-600">
+
+          {
+            lead.customer_message ||
+            "No message provided by the customer."
+          }
+
+        </p>
+
+      </section>
+
+    </div>
+
+  );
+
+}

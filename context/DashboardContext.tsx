@@ -2,12 +2,14 @@
 
 import {
   createContext,
-  ReactNode,
+  type ReactNode,
   useContext,
   useMemo,
 } from "react";
 
-import { useDashboard } from "@/hooks/useDashboard";
+import {
+  useDashboard,
+} from "@/hooks/useDashboard";
 
 import type {
   DashboardSummaryResponse,
@@ -16,6 +18,7 @@ import type {
 type DashboardContextValue = {
   data: DashboardSummaryResponse | null;
   loading: boolean;
+  refreshing: boolean;
   error: Error | null;
   reload: () => Promise<void>;
 };
@@ -25,28 +28,43 @@ const DashboardContext =
     null,
   );
 
-type Props = {
+type DashboardProviderProps = {
   children: ReactNode;
 };
 
 export function DashboardProvider({
   children,
-}: Props) {
+}: DashboardProviderProps) {
 
   const dashboard =
     useDashboard();
 
   const value =
-    useMemo(
+    useMemo<DashboardContextValue>(
       () => ({
-        data: dashboard.data,
-        loading: dashboard.loading,
-        error: dashboard.error,
-        reload: dashboard.reload,
+
+        data:
+          dashboard.data,
+
+        loading:
+          dashboard.loading,
+
+        refreshing:
+          dashboard.refreshing,
+
+        error:
+          dashboard.error,
+
+        reload:
+          async () => {
+            await dashboard.reload();
+          },
+
       }),
       [
         dashboard.data,
         dashboard.loading,
+        dashboard.refreshing,
         dashboard.error,
         dashboard.reload,
       ],

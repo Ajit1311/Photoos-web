@@ -1,0 +1,422 @@
+"use client";
+
+import {
+  ArrowLeft,
+  BriefcaseBusiness,
+  Globe,
+  Link2,
+  Mail,
+  MapPin,
+  Phone,
+  Plus,
+  Save,
+  UserRound,
+} from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { upsertFreelancerProfile } from "@/lib/api/marketplace/freelancers";
+import { getFirebaseCurrentUser } from "@/lib/auth/firebase-auth.service";
+
+export default function FreelancerProfileCreatePage() {
+  const router = useRouter();
+
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [experience, setExperience] = useState("");
+  const [location, setLocation] = useState("");
+  const [city, setCity] = useState("");
+  const [district, setDistrict] = useState("");
+  const [state, setState] = useState("");
+
+  const [instagram, setInstagram] = useState("");
+  const [facebook, setFacebook] = useState("");
+  const [youtube, setYoutube] = useState("");
+  const [website, setWebsite] = useState("");
+
+  const [services, setServices] = useState<string[]>([]);
+  const [service, setService] = useState("");
+
+  const [portfolio, setPortfolio] = useState<string[]>([]);
+  const [portfolioUrl, setPortfolioUrl] = useState("");
+
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const addService = () => {
+    const value = service.trim();
+
+    if (!value) return;
+
+    setServices((current) =>
+      current.includes(value) ? current : [...current, value],
+    );
+    setService("");
+  };
+
+  const addPortfolio = () => {
+    const value = portfolioUrl.trim();
+
+    if (!value) return;
+
+    setPortfolio((current) =>
+      current.includes(value) ? current : [...current, value],
+    );
+    setPortfolioUrl("");
+  };
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    setError("");
+
+    const firebaseUser = getFirebaseCurrentUser();
+
+    if (!firebaseUser) {
+      const next = encodeURIComponent("/freelancer/profile/create");
+      router.push(`/login?next=${next}`);
+      return;
+    }
+
+    if (!fullName.trim()) {
+      setError("Please enter your full name.");
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const parsedExperience = experience.trim()
+        ? Number.parseInt(experience.replace(/\D/g, ""), 10)
+        : null;
+
+      if (
+        parsedExperience !== null &&
+        Number.isNaN(parsedExperience)
+      ) {
+        throw new Error("Please enter a valid experience value.");
+      }
+
+      await upsertFreelancerProfile({
+        display_name: fullName.trim(),
+        phone: phone.trim() || null,
+        email: email.trim() || firebaseUser.email || null,
+        experience_years: parsedExperience,
+        skills: services,
+        location: location.trim() || null,
+        city: city.trim() || null,
+        state: state.trim() || null,
+        country: "India",
+        portfolio_urls: portfolio,
+        instagram_url: instagram.trim() || null,
+        facebook_url: facebook.trim() || null,
+        youtube_url: youtube.trim() || null,
+        website_url: website.trim() || null,
+      });
+
+      router.push("/dashboard/marketplace/freelancers");
+    } catch (submissionError) {
+      setError(
+        submissionError instanceof Error
+          ? submissionError.message
+          : "Unable to create freelancer profile.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1050px]">
+        <Link
+          href="/dashboard/marketplace/freelancers"
+          className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-900"
+        >
+          <ArrowLeft size={16} />
+          Back
+        </Link>
+
+        <div className="mt-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#0A3F61] text-white">
+              <BriefcaseBusiness size={23} />
+            </div>
+
+            <div>
+              <h1 className="text-2xl font-bold text-slate-950 sm:text-3xl">
+                Create Freelancer Profile
+              </h1>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Create your professional profile to receive
+                photography and creative work opportunities.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <form onSubmit={submit} className="mt-8 space-y-6">
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-950">
+              Basic Information
+            </h2>
+
+            <div className="mt-5 grid gap-5 md:grid-cols-2">
+              <Field
+                label="Full Name"
+                icon={<UserRound size={16} />}
+                placeholder="Your full name"
+                required
+                value={fullName}
+                onChange={setFullName}
+              />
+
+              <Field
+                label="Phone Number"
+                icon={<Phone size={16} />}
+                placeholder="Your phone number"
+                required
+                value={phone}
+                onChange={setPhone}
+              />
+
+              <Field
+                label="Email"
+                icon={<Mail size={16} />}
+                placeholder="Login email"
+                type="email"
+                required
+                value={email}
+                onChange={setEmail}
+              />
+
+              <Field
+                label="Experience"
+                icon={<BriefcaseBusiness size={16} />}
+                placeholder="e.g. 5 years"
+                value={experience}
+                onChange={setExperience}
+              />
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-950">
+              Location
+            </h2>
+
+            <div className="mt-5 grid gap-5 md:grid-cols-2">
+              <Field
+                label="Location"
+                icon={<MapPin size={16} />}
+                placeholder="Area / locality"
+                value={location}
+                onChange={setLocation}
+              />
+
+              <Field
+                label="City"
+                placeholder="City"
+                value={city}
+                onChange={setCity}
+              />
+
+              <Field
+                label="District"
+                placeholder="District"
+                value={district}
+                onChange={setDistrict}
+              />
+
+              <Field
+                label="State"
+                placeholder="State"
+                value={state}
+                onChange={setState}
+              />
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-950">
+              Services You Provide
+            </h2>
+
+            <div className="mt-5 flex gap-3">
+              <input
+                value={service}
+                onChange={(event) => setService(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    addService();
+                  }
+                }}
+                placeholder="Wedding Photography, Drone, Editing..."
+                className="h-11 flex-1 rounded-xl border border-slate-200 px-4 text-sm outline-none focus:border-[#0A3F61]"
+              />
+
+              <button
+                type="button"
+                onClick={addService}
+                className="inline-flex h-11 items-center gap-2 rounded-xl bg-slate-950 px-4 text-sm font-semibold text-white"
+              >
+                <Plus size={16} />
+                Add
+              </button>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              {services.map((item) => (
+                <span
+                  key={item}
+                  className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-[#0A3F61]"
+                >
+                  {item}
+                </span>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-950">
+              Portfolio
+            </h2>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Add portfolio links where studios can see your work.
+            </p>
+
+            <div className="mt-5 flex gap-3">
+              <input
+                value={portfolioUrl}
+                onChange={(event) => setPortfolioUrl(event.target.value)}
+                placeholder="https://your-portfolio.com"
+                className="h-11 flex-1 rounded-xl border border-slate-200 px-4 text-sm outline-none focus:border-[#0A3F61]"
+              />
+
+              <button
+                type="button"
+                onClick={addPortfolio}
+                className="inline-flex h-11 items-center gap-2 rounded-xl bg-slate-950 px-4 text-sm font-semibold text-white"
+              >
+                <Plus size={16} />
+                Add
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              {portfolio.map((item) => (
+                <div
+                  key={item}
+                  className="flex items-center gap-2 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600"
+                >
+                  <Globe size={15} />
+                  {item}
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-950">
+              Social Media
+            </h2>
+
+            <div className="mt-5 grid gap-5 md:grid-cols-2">
+              <Field
+                label="Instagram"
+                icon={<Link2 size={16} />}
+                placeholder="Instagram profile URL"
+                value={instagram}
+                onChange={setInstagram}
+              />
+
+              <Field
+                label="Facebook"
+                icon={<Link2 size={16} />}
+                placeholder="Facebook profile URL"
+                value={facebook}
+                onChange={setFacebook}
+              />
+
+              <Field
+                label="YouTube"
+                icon={<Link2 size={16} />}
+                placeholder="YouTube channel URL"
+                value={youtube}
+                onChange={setYoutube}
+              />
+
+              <Field
+                label="Website"
+                icon={<Globe size={16} />}
+                placeholder="Website / portfolio URL"
+                value={website}
+                onChange={setWebsite}
+              />
+            </div>
+          </section>
+
+          {error ? (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-700">
+              {error}
+            </div>
+          ) : null}
+
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-800">
+            Your profile will be saved securely through the PhotoOS
+            freelancer marketplace.
+          </div>
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#0A3F61] px-5 py-3.5 text-sm font-bold text-white shadow-sm hover:bg-[#08344f] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Save size={17} />
+            {submitting ? "Saving Freelancer Profile..." : "Submit Freelancer Profile"}
+          </button>
+        </form>
+      </div>
+    </main>
+  );
+}
+
+function Field({
+  label,
+  placeholder,
+  icon,
+  type = "text",
+  required = false,
+  value,
+  onChange,
+}: {
+  label: string;
+  placeholder: string;
+  icon?: React.ReactNode;
+  type?: string;
+  required?: boolean;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
+        {icon}
+        {label}
+      </span>
+
+      <input
+        required={required}
+        type={type}
+        placeholder={placeholder}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-[#0A3F61] focus:ring-2 focus:ring-[#0A3F61]/10"
+      />
+    </label>
+  );
+}

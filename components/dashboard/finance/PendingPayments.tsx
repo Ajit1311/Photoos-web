@@ -1,156 +1,265 @@
+"use client";
+
 import {
+  ArrowUpRight,
   CreditCard,
-  ChevronRight,
-  AlertTriangle,
+  ReceiptIndianRupee,
 } from "lucide-react";
 
-const payments = [
-  {
-    client: "Rahul Patil",
-    event: "Rahul & Priya Wedding",
-    amount: "₹45,000",
-    due: "Today",
-    priority: "High",
-  },
-  {
-    client: "ABC Industries",
-    event: "Corporate Shoot",
-    amount: "₹18,000",
-    due: "Tomorrow",
-    priority: "Medium",
-  },
-  {
-    client: "Sneha Kulkarni",
-    event: "Birthday Event",
-    amount: "₹12,500",
-    due: "2 Days",
-    priority: "Low",
-  },
-  {
-    client: "Patil Family",
-    event: "Family Photoshoot",
-    amount: "₹30,000",
-    due: "3 Days",
-    priority: "Medium",
-  },
-];
+import {
+  useDashboardContext,
+} from "@/context/DashboardContext";
 
-function badge(priority: string) {
-  switch (priority) {
-    case "High":
-      return "bg-red-100 text-red-600";
 
-    case "Medium":
-      return "bg-orange-100 text-orange-600";
+function formatCurrency(
+  amount: number,
+) {
 
-    default:
-      return "bg-green-100 text-green-600";
-  }
+  return new Intl.NumberFormat(
+    "en-IN",
+    {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    },
+  ).format(
+    amount,
+  );
+
 }
 
-export default function PendingPayments() {
-  return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
 
-      <div className="mb-6 flex items-center justify-between">
+function formatDueDate(
+  value: string | null,
+) {
+
+  if (
+    !value
+  ) {
+    return "No due date";
+  }
+
+  return new Intl.DateTimeFormat(
+    "en-IN",
+    {
+      day: "numeric",
+      month: "short",
+    },
+  ).format(
+    new Date(value),
+  );
+
+}
+
+
+export default function PendingPayments() {
+
+  const dashboard =
+    useDashboardContext();
+
+
+  const pendingPayments =
+    dashboard.data?.metrics
+      .pendingPaymentsData ??
+    {
+      items: [],
+      total_due: 0,
+      total_clients: 0,
+    };
+
+
+  return (
+
+    <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_8px_30px_rgb(15,23,42,0.04)]">
+
+      <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
 
         <div>
 
-          <h2 className="text-2xl font-bold text-slate-900">
-            Pending Payments
-          </h2>
+          <div className="flex items-center gap-2">
 
-          <p className="mt-2 text-slate-500">
-            Outstanding client payments requiring attention.
-          </p>
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
 
-        </div>
-
-        <button className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm transition hover:bg-slate-50">
-
-          View All
-
-          <ChevronRight size={16} />
-
-        </button>
-
-      </div>
-
-      <div className="space-y-4">
-
-        {payments.map((payment) => (
-
-          <div
-            key={`${payment.client}-${payment.event}`}
-            className="rounded-2xl border border-slate-200 p-5 transition-all duration-200 hover:border-[#0A3F61]/20 hover:shadow-md"
-          >
-
-            <div className="flex items-start justify-between">
-
-              <div>
-
-                <h3 className="font-semibold text-slate-900">
-                  {payment.client}
-                </h3>
-
-                <p className="mt-2 text-sm text-slate-500">
-                  {payment.event}
-                </p>
-
-              </div>
-
-              <span
-                className={`rounded-full px-3 py-2 text-xs font-semibold ${badge(
-                  payment.priority
-                )}`}
-              >
-                {payment.priority}
-              </span>
+              <ReceiptIndianRupee
+                size={18}
+              />
 
             </div>
 
-            <div className="mt-5 flex items-center justify-between rounded-2xl bg-slate-50 p-4">
+            <div>
 
-              <div className="flex items-center gap-3">
+              <h2 className="font-semibold text-slate-900">
 
-                <div className="rounded-xl bg-[#0A3F61]/10 p-3 text-[#0A3F61]">
+                Pending Payments
 
-                  <CreditCard size={18} />
+              </h2>
 
-                </div>
+              <p className="mt-0.5 text-xs text-slate-500">
 
-                <div>
+                {pendingPayments.total_clients} clients with outstanding balances
 
-                  <p className="text-sm text-slate-500">
-                    Amount Due
-                  </p>
-
-                  <h4 className="font-bold text-slate-900">
-                    {payment.amount}
-                  </h4>
-
-                </div>
-
-              </div>
-
-              <div className="flex items-center gap-2 text-orange-600">
-
-                <AlertTriangle size={18} />
-
-                <span className="font-medium">
-                  {payment.due}
-                </span>
-
-              </div>
+              </p>
 
             </div>
 
           </div>
 
-        ))}
+        </div>
+
+
+        <div className="text-right">
+
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+
+            Total Due
+
+          </p>
+
+          <p className="mt-1 text-xl font-bold text-slate-900">
+
+            {formatCurrency(
+              Number(
+                pendingPayments.total_due,
+              ),
+            )}
+
+          </p>
+
+        </div>
+
+      </div>
+
+
+      <div className="divide-y divide-slate-100">
+
+        {
+          pendingPayments.items.length === 0 ? (
+
+            <div className="px-6 py-12 text-center">
+
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+
+                <CreditCard
+                  size={20}
+                />
+
+              </div>
+
+              <p className="mt-4 text-sm font-medium text-slate-900">
+
+                No pending payments
+
+              </p>
+
+              <p className="mt-1 text-xs text-slate-500">
+
+                All tracked payments are up to date.
+
+              </p>
+
+            </div>
+
+          ) : (
+
+            pendingPayments.items.map(
+              (
+                payment,
+              ) => (
+
+                <div
+                  key={
+                    payment.id
+                  }
+                  className="group flex items-center justify-between gap-4 px-6 py-4 transition hover:bg-slate-50"
+                >
+
+                  <div className="min-w-0">
+
+                    <p className="truncate text-sm font-semibold text-slate-900">
+
+                      {
+                        payment.client_name
+                      }
+
+                    </p>
+
+
+                    <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+
+                      {
+                        payment.invoice_number && (
+
+                          <span>
+
+                            Invoice #
+                            {
+                              payment.invoice_number
+                            }
+
+                          </span>
+
+                        )
+                      }
+
+
+                      <span className="h-1 w-1 rounded-full bg-slate-300" />
+
+
+                      <span>
+
+                        Due
+                        {" "}
+                        {
+                          formatDueDate(
+                            payment.due_date,
+                          )
+                        }
+
+                      </span>
+
+                    </div>
+
+                  </div>
+
+
+                  <div className="flex items-center gap-3">
+
+                    <div className="text-right">
+
+                      <p className="text-sm font-bold text-slate-900">
+
+                        {
+                          formatCurrency(
+                            Number(
+                              payment.amount_due,
+                            ),
+                          )
+                        }
+
+                      </p>
+
+                    </div>
+
+
+                    <ArrowUpRight
+                      size={16}
+                      className="text-slate-300 transition group-hover:text-slate-700"
+                    />
+
+                  </div>
+
+                </div>
+
+              ),
+            )
+
+          )
+        }
 
       </div>
 
     </section>
+
   );
+
 }

@@ -7,36 +7,25 @@ import {
 
 export function useDebounce<T>(
   value: T,
-  delay = 400,
+  delay = 500,
 ) {
-
-  const [debouncedValue, setDebouncedValue] =
-    useState(value);
+  const [
+    debouncedValue,
+    setDebouncedValue,
+  ] = useState(value);
 
   useEffect(() => {
-
-    const timer =
-      window.setTimeout(() => {
-
-        setDebouncedValue(
-          value,
-        );
-
-      }, delay);
+    const timer = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
 
     return () => {
-
-      window.clearTimeout(
-        timer,
-      );
-
+      clearTimeout(timer);
     };
-
   }, [
     value,
     delay,
   ]);
 
   return debouncedValue;
-
 }

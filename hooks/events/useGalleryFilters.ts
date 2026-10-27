@@ -1,80 +1,164 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import {
+  useMemo,
+  useState,
+} from "react";
 
-import type { UploadItem } from "@/types/events/upload";
+import type {
+  GalleryPhoto,
+} from "@/types/events/gallery";
 
 export type GalleryFilter =
   | "all"
-  | "queued"
-  | "uploading"
-  | "processing"
-  | "completed"
-  | "failed"
-  | "cancelled";
+  | "favorites"
+  | "selected"
+  | "hidden"
+  | "rejected"
+  | "ai";
 
 export type GallerySort =
   | "name"
   | "size"
-  | "status";
+  | "date";
 
 export function useGalleryFilters(
-  items: UploadItem[],
+  items: GalleryPhoto[],
 ) {
-  const [search, setSearch] =
-    useState("");
+  const [
+    search,
+    setSearch,
+  ] = useState("");
 
-  const [filter, setFilter] =
-    useState<GalleryFilter>("all");
+  const [
+    filter,
+    setFilter,
+  ] =
+    useState<GalleryFilter>(
+      "all",
+    );
 
-  const [sort, setSort] =
-    useState<GallerySort>("name");
+  const [
+    sort,
+    setSort,
+  ] =
+    useState<GallerySort>(
+      "name",
+    );
 
   const filteredItems =
     useMemo(() => {
-      let result = items.slice();
+      let result =
+        items.slice();
 
-      if (filter !== "all") {
-        result = result.filter(
-          (item) =>
-            item.status === filter,
-        );
+      // -----------------------------------------------------------------------
+      // Filter
+      // -----------------------------------------------------------------------
+
+      switch (filter) {
+        case "favorites":
+          result =
+            result.filter(
+              (item) =>
+                item.isFavorite,
+            );
+          break;
+
+        case "selected":
+          result =
+            result.filter(
+              (item) =>
+                item.isSelected,
+            );
+          break;
+
+        case "hidden":
+          result =
+            result.filter(
+              (item) =>
+                item.visibility ===
+                "hidden",
+            );
+          break;
+
+        case "rejected":
+          result =
+            result.filter(
+              (item) =>
+                item.visibility ===
+                "rejected",
+            );
+          break;
+
+        case "ai":
+          result =
+            result.filter(
+              (item) =>
+                item.aiProcessed,
+            );
+          break;
+
+        case "all":
+        default:
+          break;
       }
+
+      // -----------------------------------------------------------------------
+      // Search
+      // -----------------------------------------------------------------------
 
       if (search.trim()) {
         const value =
-          search.toLowerCase();
+          search
+            .trim()
+            .toLowerCase();
 
-        result = result.filter(
-          (item) =>
-            (item.file?.name ?? "")
-              .toLowerCase()
-              .includes(value),
-        );
+        result =
+          result.filter(
+            (item) =>
+              item.fileName
+                .toLowerCase()
+                .includes(value) ||
+              (
+                item.aiCategory ??
+                ""
+              )
+                .toLowerCase()
+                .includes(value),
+          );
       }
+
+      // -----------------------------------------------------------------------
+      // Sort
+      // -----------------------------------------------------------------------
 
       switch (sort) {
         case "name":
-          result.sort((a, b) =>
-            a.file.name.localeCompare(
-              b.file.name,
-            ),
+          result.sort(
+            (a, b) =>
+              a.fileName.localeCompare(
+                b.fileName,
+              ),
           );
           break;
 
         case "size":
           result.sort(
             (a, b) =>
-              a.file.size -
-              b.file.size,
+              a.fileSize -
+              b.fileSize,
           );
           break;
 
-        case "status":
-          result.sort((a, b) =>
-            a.status.localeCompare(
-              b.status,
-            ),
+        case "date":
+          result.sort(
+            (a, b) =>
+              new Date(
+                b.uploadedAt,
+              ).getTime() -
+              new Date(
+                a.uploadedAt,
+              ).getTime(),
           );
           break;
       }
@@ -88,9 +172,11 @@ export function useGalleryFilters(
     ]);
 
   return {
-    items: filteredItems,
+    items:
+      filteredItems,
 
-    total: items.length,
+    total:
+      items.length,
 
     filteredCount:
       filteredItems.length,

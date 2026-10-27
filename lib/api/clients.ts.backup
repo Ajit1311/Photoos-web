@@ -1,0 +1,262 @@
+import { supabase } from "@/lib/supabase/client";
+import { getAccessToken } from "@/lib/auth/session";
+
+import type {
+  ClientDto,
+  ClientListResponse,
+  CreateClientRequest,
+  UpdateClientRequest,
+} from "@/types/api/client";
+
+const LIST_FUNCTION = "client-list-worker";
+const GET_FUNCTION = "client-get-worker";
+const CREATE_FUNCTION = "client-create-worker";
+const UPDATE_FUNCTION = "client-update-worker";
+
+async function getHeaders(
+  studioId: string,
+): Promise<Record<string, string>> {
+  const accessToken = await getAccessToken();
+
+  if (!accessToken) {
+    throw new Error("User is not authenticated.");
+  }
+
+  return {
+    Authorization: `Bearer ${accessToken}`,
+    "x-studio-id": studioId,
+    "Content-Type": "application/json",
+  };
+}
+
+function normalizeListResponse(
+  data: unknown,
+  page: number,
+  limit: number,
+): ClientListResponse {
+  if (
+    data &&
+    typeof data === "object" &&
+    "clients" in data &&
+    "pagination" in data
+  ) {
+    return data as ClientListResponse;
+  }
+
+  if (Array.isArray(data)) {
+    return {
+      clients: data as ClientDto[],
+      pagination: {
+        page,
+        limit,
+        total: data.length,
+        totalPages: data.length > 0
+          ? Math.ceil(data.length / limit)
+          : 1,
+      },
+    };
+  }
+
+  if (
+    data &&
+    typeof data === "object" &&
+    "data" in data &&
+    Array.isArray(
+      (data as { data?: unknown }).data,
+    )
+  ) {
+    const rows =
+      (data as { data: ClientDto[] }).data;
+
+    return {
+      clients: rows,
+      pagination: {
+        page,
+        limit,
+        total: rows.length,
+        totalPages: rows.length > 0
+          ? Math.ceil(rows.length / limit)
+          : 1,
+      },
+    };
+  }
+
+  throw new Error(
+    "Invalid client list response from backend.",
+  );
+}
+
+export async function getClients(
+  studioId: string,
+  page = 1,
+  limit = 25,
+  search = "",
+): Promise<ClientListResponse> {
+  const offset =
+    (page - 1) * limit;
+
+  const { data, error } =
+    await supabase.functions.invoke(
+      LIST_FUNCTION,
+      {
+        method: "POST",
+        headers:
+          await getHeaders(studioId),
+        body: {
+          search:
+            search.trim() || null,
+
+          limit,
+
+          offset,
+
+          status: null,
+        },
+      },
+    );
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error(
+      "Clients returned an empty response.",
+    );
+  }
+
+  if (data.success !== true) {
+    throw new Error(
+      data.error?.message ??
+        "Failed to load clients.",
+    );
+  }
+
+  return normalizeListResponse(
+    data.data,
+    page,
+    limit,
+  );
+}
+
+export async function getClient(
+  studioId: string,
+  clientId: string,
+): Promise<ClientDto> {
+  const { data, error } =
+    await supabase.functions.invoke(
+      GET_FUNCTION,
+      {
+        method: "POST",
+        headers:
+          await getHeaders(studioId),
+        body: {
+          client_id: clientId,
+        },
+      },
+    );
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error(
+      "Client returned an empty response.",
+    );
+  }
+
+  if (data.success !== true) {
+    throw new Error(
+      data.error?.message ??
+        "Failed to load client.",
+    );
+  }
+
+  const result =
+    data.data;
+
+  if (
+    result &&
+    typeof result === "object" &&
+    "client" in result
+  ) {
+    return result.client as ClientDto;
+  }
+
+  return result as ClientDto;
+}
+
+export async function createClient(
+  studioId: string,
+  payload: CreateClientRequest,
+): Promise<ClientDto> {
+  const { data, error } =
+    await supabase.functions.invoke(
+      CREATE_FUNCTION,
+      {
+        method: "POST",
+        headers:
+          await getHeaders(studioId),
+        body: payload,
+      },
+    );
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error(
+      "Client returned an empty response.",
+    );
+  }
+
+  if (data.success !== true) {
+    throw new Error(
+      data.error?.message ??
+        "Failed to create client.",
+    );
+  }
+
+  return data.data as ClientDto;
+}
+
+export async function updateClient(
+  studioId: string,
+  clientId: string,
+  payload: UpdateClientRequest,
+): Promise<ClientDto> {
+  const { data, error } =
+    await supabase.functions.invoke(
+      UPDATE_FUNCTION,
+      {
+        method: "POST",
+        headers:
+          await getHeaders(studioId),
+        body: {
+          client_id: clientId,
+          ...payload,
+        },
+      },
+    );
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error(
+      "Client returned an empty response.",
+    );
+  }
+
+  if (data.success !== true) {
+    throw new Error(
+      data.error?.message ??
+        "Failed to update client.",
+    );
+  }
+
+  return data.data as ClientDto;
+}

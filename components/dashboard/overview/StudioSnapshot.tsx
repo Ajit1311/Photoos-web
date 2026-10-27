@@ -1,34 +1,75 @@
+"use client";
+
 import {
-  CalendarDays,
+  FolderOpen,
   Image,
-  Users,
   Sparkles,
+  Users,
 } from "lucide-react";
 
-const stats = [
-  {
-    title: "Total Events",
-    value: "248",
-    icon: CalendarDays,
-  },
-  {
-    title: "Active Galleries",
-    value: "42",
-    icon: Image,
-  },
-  {
-    title: "Active Clients",
-    value: "186",
-    icon: Users,
-  },
-  {
-    title: "AI Jobs",
-    value: "18",
-    icon: Sparkles,
-  },
-];
+import {
+  useDashboardContext,
+} from "@/context/DashboardContext";
+
 
 export default function StudioSnapshot() {
+
+  const dashboard =
+    useDashboardContext();
+
+
+  const metrics =
+    dashboard.data?.metrics ??
+    null;
+
+
+  const stats = [
+    {
+      title: "Active Projects",
+
+      value:
+        metrics?.activeProjects ??
+        0,
+
+      icon:
+        FolderOpen,
+    },
+
+    {
+      title: "Active Galleries",
+
+      value:
+        metrics?.activeAlbums ??
+        0,
+
+      icon:
+        Image,
+    },
+
+    {
+      title: "Pending Payments",
+
+      value:
+        metrics?.pendingPayments ??
+        0,
+
+      icon:
+        Users,
+    },
+
+    {
+      title: "AI Jobs",
+
+      value:
+        metrics?.pendingProcessingJobs ??
+        0,
+
+      icon:
+        Sparkles,
+    },
+  ];
+
+
   return (
     <section className="rounded-3xl border border-slate-200 bg-white shadow-sm">
 
@@ -44,49 +85,65 @@ export default function StudioSnapshot() {
 
       </div>
 
+
       <div className="grid grid-cols-2 gap-4 p-6">
 
-        {stats.map((item) => {
+        {
+          stats.map(
+            (
+              item,
+            ) => {
 
-          const Icon = item.icon;
+              const Icon =
+                item.icon;
 
-          return (
 
-            <button
-              key={item.title}
-              className="rounded-2xl border border-slate-200 p-4 text-left transition-all duration-200 hover:border-[#0A3F61] hover:bg-[#0A3F61]/5"
-            >
+              return (
 
-              <div className="mb-4 flex items-center justify-between">
+                <div
+                  key={
+                    item.title
+                  }
+                  className="rounded-2xl border border-slate-200 p-4 transition-all duration-200 hover:border-[#0A3F61] hover:bg-[#0A3F61]/5"
+                >
 
-                <div className="rounded-xl bg-[#0A3F61]/10 p-3 text-[#0A3F61]">
+                  <div className="mb-4 flex items-center justify-between">
 
-                  <Icon size={18} />
+                    <div className="rounded-xl bg-[#0A3F61]/10 p-3 text-[#0A3F61]">
+
+                      <Icon
+                        size={18}
+                      />
+
+                    </div>
+
+
+                    <span className="text-2xl font-bold text-slate-900">
+
+                      {item.value}
+
+                    </span>
+
+                  </div>
+
+
+                  <p className="text-sm font-medium text-slate-600">
+
+                    {item.title}
+
+                  </p>
 
                 </div>
 
-                <span className="text-2xl font-bold text-slate-900">
+              );
 
-                  {item.value}
-
-                </span>
-
-              </div>
-
-              <p className="text-sm font-medium text-slate-600">
-
-                {item.title}
-
-              </p>
-
-            </button>
-
-          );
-
-        })}
+            },
+          )
+        }
 
       </div>
 
     </section>
   );
+
 }

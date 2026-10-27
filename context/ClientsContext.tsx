@@ -23,7 +23,7 @@ type ClientsProviderProps = {
   search?: string;
 };
 
-type ClientsContextValue = {
+interface ClientsContextValue {
   data: ClientListResponse | null;
 
   clients: ClientListResponse["clients"];
@@ -57,44 +57,45 @@ export function ClientsProvider({
     });
 
   const value =
-    useMemo(
-      () => ({
+  useMemo(
+    () => ({
 
-        data:
-          clients.data,
-
-        clients:
-          clients.clients,
-
-        pagination:
-          clients.pagination,
-
-        loading:
-          clients.loading,
-
-        error:
-          clients.error,
-
-        reload:
-          clients.reload,
-
-      }),
-      [
-
+      data:
         clients.data,
 
+      clients:
         clients.clients,
 
+      pagination:
         clients.pagination,
 
+      loading:
         clients.loading,
 
+      error:
         clients.error,
 
-        clients.reload,
+      reload: async () => {
+        await clients.reload();
+      },
 
-      ],
-    );
+    }),
+    [
+
+      clients.data,
+
+      clients.clients,
+
+      clients.pagination,
+
+      clients.loading,
+
+      clients.error,
+
+      clients.reload,
+
+    ],
+  );
 
   return (
 

@@ -1,0 +1,38 @@
+"use client";
+
+import { usePathname } from "next/navigation";
+
+const titles: Record<string, string> = {
+  "/dashboard": "Dashboard",
+  "/dashboard/events": "Events",
+  "/dashboard/events/create": "Create Event",
+  "/dashboard/clients": "Clients",
+  "/dashboard/galleries": "Galleries",
+  "/dashboard/albums": "Albums",
+  "/dashboard/assets": "Assets",
+  "/dashboard/ai": "AI Processing",
+  "/dashboard/payments": "Payments",
+  "/dashboard/team": "Team",
+  "/dashboard/reports": "Reports",
+  "/dashboard/settings": "Settings",
+};
+
+export default function PageHeader() {
+  const pathname = usePathname();
+
+  const title = titles[pathname] ?? "Dashboard";
+
+  return (
+    <div>
+
+      <h1 className="text-3xl font-bold text-foreground">
+        {title}
+      </h1>
+
+      <p className="mt-1 text-sm text-muted-foreground">
+        Welcome back to PhotoOS.
+      </p>
+
+    </div>
+  );
+}

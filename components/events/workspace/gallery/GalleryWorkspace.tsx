@@ -1,23 +1,68 @@
 "use client";
 
 import {
+  useCallback,
+  useEffect,
   useMemo,
+  useRef,
+  useState,
   type MouseEvent,
 } from "react";
+
 import { useParams } from "next/navigation";
 
-import GalleryHeader from "./GalleryHeader";
-import { GalleryGrid } from "./GalleryGrid";
-import UploadQueue from "./upload/UploadQueue";
+import {
+  CheckCircle2,
+  Loader2,
+  Minimize2,
+  UploadCloud,
+  X,
+} from "lucide-react";
 
-import { useGallery } from "@/hooks/events/useGallery";
-import { useGallerySelection } from "@/hooks/events/useGallerySelection";
-import { useUploadManager } from "@/hooks/events/useUploadManager";
+import {
+  useBootstrapContext,
+} from "@/context/BootstrapContext";
+
+import {
+  useWorkspace,
+} from "@/hooks/events/useWorkspace";
+
+import {
+  useGallery,
+} from "@/hooks/events/useGallery";
+
+import {
+  useGallerySelection,
+} from "@/hooks/events/useGallerySelection";
+
+import {
+  useUploadManager,
+} from "@/hooks/events/useUploadManager";
+
+import {
+  useGalleryFilters,
+} from "@/hooks/events/useGalleryFilters";
+
+import GalleryHeader from "./GalleryHeader";
+
+import { GalleryGrid } from "./GalleryGrid";
+
 import GalleryToolbar from "./toolbar/GalleryToolbar";
-import { useGalleryFilters } from "@/hooks/events/useGalleryFilters";
+
 import GalleryBulkActions from "./toolbar/GalleryBulkActions";
 
+import GalleryPreview from "./GalleryPreview";
+
+import UploadQueue from "./upload/UploadQueue";
+
+import GalleryQRCodeModal from "./GalleryQRCodeModal";
+
+
 export default function GalleryWorkspace() {
+  // ==========================================================================
+  // EVENT ID
+  // ==========================================================================
+
   const params = useParams();
 
   const eventId = useMemo(() => {
@@ -30,117 +75,916 @@ export default function GalleryWorkspace() {
     return (value as string) ?? "";
   }, [params]);
 
+
+  // ==========================================================================
+  // BOOTSTRAP
+  // ==========================================================================
+
   const {
+    data: bootstrap,
+    loading: bootstrapLoading,
+  } = useBootstrapContext();
+
+  const studioId =
+    bootstrap?.workspace?.membership?.studioId ?? "";
+
+
+  // ==========================================================================
+  // EVENT WORKSPACE
+  // ==========================================================================
+
+  const {
+    workspace,
+    loading: workspaceLoading,
+  } = useWorkspace(eventId);
+
+  const projectId =
+    workspace?.event?.projectId ?? "";
+
+
+  // ==========================================================================
+  // GALLERY
+  // ==========================================================================
+
+  const gallery = useGallery(eventId);
+
+  const {
+    loading: galleryLoading,
+    error: galleryError,
     photos,
-    loading,
-  } = useGallery(eventId);
+    allPhotos,
+    refresh,
+  } = gallery;
 
-  const uploadManager = useUploadManager();
 
-  const filters = useGalleryFilters(uploadManager.items);
+  // ==========================================================================
+  // GALLERY FILTERS
+  // ==========================================================================
 
-  const selection = useGallerySelection();
+  const filters =
+    useGalleryFilters(photos);
 
-  const orderedIds = useMemo(
-    () => filters.items.map((item) => item.id),
-    [filters.items],
+
+  // ==========================================================================
+  // GALLERY SELECTION
+  // ==========================================================================
+
+  const selection =
+    useGallerySelection();
+
+  const orderedIds =
+    useMemo(
+      () =>
+        filters.items.map(
+          (item) => item.id,
+        ),
+      [filters.items],
+    );
+
+
+  // ==========================================================================
+  // UPLOAD MANAGER
+  // ==========================================================================
+
+  const {
+    items: uploadItems,
+    isUploading,
+    overallProgress,
+    addFiles,
+    remove,
+    clearCompleted,
+    upload,
+    retry,
+    cancel,
+  } = useUploadManager();
+
+
+  // ==========================================================================
+  // UPLOAD UI STATE
+  // ==========================================================================
+
+  const [
+    uploadPanelOpen,
+    setUploadPanelOpen,
+  ] = useState(false);
+
+  const [
+    uploadPanelMinimized,
+    setUploadPanelMinimized,
+  ] = useState(false);
+
+  const previousUploadingRef =
+    useRef(false);
+
+
+  // ==========================================================================
+  // QR STATE
+  // ==========================================================================
+
+  const [
+    isQRModalOpen,
+    setIsQRModalOpen,
+  ] = useState(false);
+
+  const handleGenerateQR =
+    useCallback(() => {
+      setIsQRModalOpen(true);
+    }, []);
+
+  const handleCloseQR =
+    useCallback(() => {
+      setIsQRModalOpen(false);
+    }, []);
+
+
+  // ==========================================================================
+  // FILE SELECTION
+  // ==========================================================================
+
+  const handleFilesSelected =
+    useCallback(
+      (files: File[]) => {
+        if (!files.length) {
+          return;
+        }
+
+        addFiles(files);
+
+        setUploadPanelOpen(true);
+        setUploadPanelMinimized(false);
+      },
+      [addFiles],
+    );
+
+
+  // ==========================================================================
+  // AUTO START UPLOAD
+  // ==========================================================================
+//
+// Files are added to the upload manager first.
+// Once React commits the new queue state, start the upload automatically.
+// ==========================================================================
+
+useEffect(() => {
+  if (
+    !studioId ||
+    !eventId ||
+    !projectId
+  ) {
+    return;
+  }
+
+  if (isUploading) {
+    return;
+  }
+
+  const hasQueuedItems =
+    uploadItems.some(
+      (item) =>
+        item.status === "queued",
+    );
+
+  if (!hasQueuedItems) {
+    return;
+  }
+
+  void upload(
+    studioId,
+    eventId,
+    projectId,
   );
+}, [
+  studioId,
+  eventId,
+  projectId,
+  uploadItems,
+  isUploading,
+  upload,
+]);
 
-  const handleSelect = (
-    id: string,
-    _index: number,
-    event: MouseEvent<HTMLButtonElement>,
-  ) => {
-    selection.select(id, {
-      multi: event.metaKey || event.ctrlKey,
-      range: event.shiftKey,
-      orderedIds,
-    });
-  };
+  // ==========================================================================
+  // AUTO REFRESH AFTER UPLOAD COMPLETES
+  //
+  // When upload transitions from uploading -> not uploading and at least one
+  // queue item completed, refresh the gallery from backend.
+  // ==========================================================================
+
+  useEffect(() => {
+    const wasUploading =
+      previousUploadingRef.current;
+
+    if (
+      wasUploading &&
+      !isUploading
+    ) {
+      const hasCompleted =
+        uploadItems.some(
+          (item) =>
+            item.status ===
+            "completed",
+        );
+
+      if (hasCompleted) {
+        void refresh();
+      }
+    }
+
+    previousUploadingRef.current =
+      isUploading;
+  }, [
+    isUploading,
+    uploadItems,
+    refresh,
+  ]);
+
+
+  // ==========================================================================
+  // AUTO OPEN UPLOAD PANEL
+  // ==========================================================================
+
+  
+
+
+  // ==========================================================================
+  // PHOTO SELECTION
+  //
+  // Supports:
+  // - normal click
+  // - Cmd/Ctrl + click
+  // - Shift + click
+  // ==========================================================================
+
+  const handleSelect =
+    useCallback(
+      (
+        id: string,
+        _index: number,
+        event: MouseEvent<HTMLButtonElement>,
+      ) => {
+        selection.select(
+          id,
+          {
+            multi:
+              event.metaKey ||
+              event.ctrlKey,
+
+            range:
+              event.shiftKey,
+
+            orderedIds,
+          },
+        );
+      },
+      [
+        selection,
+        orderedIds,
+      ],
+    );
+
+
+  // ==========================================================================
+  // PREVIEW
+  // ==========================================================================
+
+  const previewPhoto = useMemo(() => {
+  const selectedId =
+    selection.selectedIds[
+      selection.selectedIds.length - 1
+    ];
+
+  if (!selectedId) {
+    return null;
+  }
 
   return (
-    <div className="flex h-full flex-col">
+    filters.items.find(
+      (item) => item.id === selectedId,
+    ) ?? null
+  );
+}, [
+  filters.items,
+  selection.selectedIds,
+]);
+
+  const effectivePreviewIndex =
+    previewPhoto
+      ? filters.items.findIndex(
+          (item) =>
+            item.id ===
+            previewPhoto.id,
+        )
+      : -1;
+
+
+  const handlePrevious =
+    useCallback(() => {
+      if (
+        effectivePreviewIndex <= 0
+      ) {
+        return;
+      }
+
+      const previous =
+        filters.items[
+          effectivePreviewIndex - 1
+        ];
+
+      if (previous) {
+        selection.select(
+          previous.id,
+        );
+      }
+    }, [
+      effectivePreviewIndex,
+      filters.items,
+      selection,
+    ]);
+
+
+  const handleNext =
+    useCallback(() => {
+      if (
+        effectivePreviewIndex < 0 ||
+        effectivePreviewIndex >=
+          filters.items.length - 1
+      ) {
+        return;
+      }
+
+      const next =
+        filters.items[
+          effectivePreviewIndex + 1
+        ];
+
+      if (next) {
+        selection.select(
+          next.id,
+        );
+      }
+    }, [
+      effectivePreviewIndex,
+      filters.items,
+      selection,
+    ]);
+
+
+  // ==========================================================================
+  // BULK ACTIONS
+  // ==========================================================================
+
+  const failedCount =
+    useMemo(
+      () =>
+        uploadItems.filter(
+          (item) =>
+            selection.selectedIds.includes(
+              item.id,
+            ) &&
+            item.status ===
+              "failed",
+        ).length,
+      [
+        uploadItems,
+        selection.selectedIds,
+      ],
+    );
+
+
+  const handleBulkDownload =
+    useCallback(() => {
+      window.alert(
+        "Bulk download will be enabled after Storage download APIs are completed.",
+      );
+    }, []);
+
+
+  const handleBulkRetry =
+    useCallback(() => {
+      selection.selectedIds.forEach(
+        (id) => {
+          retry(id);
+        },
+      );
+
+      selection.clearSelection();
+    }, [
+      selection,
+      retry,
+    ]);
+
+
+  const handleBulkRemove =
+    useCallback(() => {
+      if (
+        selection.count === 0
+      ) {
+        return;
+      }
+
+      const confirmed =
+        window.confirm(
+          `Remove ${selection.count} selected upload(s)?`,
+        );
+
+      if (!confirmed) {
+        return;
+      }
+
+      selection.selectedIds.forEach(
+        (id) => {
+          remove(id);
+        },
+      );
+
+      selection.clearSelection();
+    }, [
+      selection,
+      remove,
+    ]);
+
+
+  // ==========================================================================
+  // LOADING
+  // ==========================================================================
+
+  if (
+    bootstrapLoading ||
+    workspaceLoading ||
+    galleryLoading
+  ) {
+    return (
+      <div className="flex min-h-[500px] items-center justify-center">
+        <div className="text-center">
+          <Loader2
+            className="mx-auto h-8 w-8 animate-spin text-[#0A3F61]"
+          />
+
+          <p className="mt-3 text-sm text-slate-500">
+            Loading gallery...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+
+  // ==========================================================================
+  // ERROR
+  // ==========================================================================
+
+  if (galleryError) {
+    return (
+      <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-700">
+        <h3 className="font-semibold">
+          Unable to load gallery
+        </h3>
+
+        <p className="mt-1 text-sm">
+          {galleryError}
+        </p>
+
+        <button
+          type="button"
+          onClick={() => {
+            void refresh();
+          }}
+          className="mt-4 rounded-xl bg-[#0A3F61] px-4 py-2 text-sm font-medium text-white"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+
+  // ==========================================================================
+  // RENDER
+  // ==========================================================================
+
+  return (
+    <div className="relative flex min-h-0 flex-1 flex-col">
+
+      {/* ================================================================== */}
+      {/* GALLERY HEADER */}
+      {/* ================================================================== */}
+
       <GalleryHeader
-        totalPhotos={photos.length}
-        onFilesSelected={uploadManager.addFiles}
+        totalPhotos={
+          allPhotos.length
+        }
+        onFilesSelected={
+          handleFilesSelected
+        }
+        onGenerateQR={
+          handleGenerateQR
+        }
       />
-      <GalleryToolbar
-        total={filters.total}
-        filteredCount={filters.filteredCount}
-        search={filters.search}
-        filter={filters.filter}
-        sort={filters.sort}
-        onSearch={filters.setSearch}
-        onFilter={filters.setFilter}
-        onSort={filters.setSort}
-      />
-      <GalleryBulkActions
-        selectedCount={selection.count}
-        totalCount={filters.filteredCount}
-        failedCount={
-          uploadManager.items.filter(
-            (item) =>
-              selection.selectedIds.includes(item.id) &&
-              item.status === "failed",
-          ).length
-        }
-        onSelectAll={() =>
-          selection.selectAll(orderedIds)
-        }
-        onInvertSelection={() =>
-          selection.invertSelection(orderedIds)
-        }
-        onClearSelection={
-          selection.clearSelection
-        }
-        onDownload={() => {
-          alert(
-            "Bulk download will be enabled after Storage download APIs are completed.",
-          );
-        }}
-        onRetry={() => {
-          selection.selectedIds.forEach((id) => {
-            uploadManager.retry(id);
-          });
 
-          selection.clearSelection();
-        }}
-        onRemove={() => {
-          const confirmed = window.confirm(
-            `Remove ${selection.count} selected upload(s)?`,
-          );
 
-          if (!confirmed) {
-            return;
+      {/* ================================================================== */}
+      {/* GALLERY TOOLBAR */}
+      {/* ================================================================== */}
+
+      <div className="mt-4">
+        <GalleryToolbar
+          total={
+            filters.total
           }
 
-          selection.selectedIds.forEach((id) => {
-            uploadManager.remove(id);
-          });
+          filteredCount={
+            filters.filteredCount
+          }
 
-          selection.clearSelection();
-        }}
-      />
-      <div className="flex-1 overflow-auto">
-        <GalleryGrid
-  items={filters.items}
-  selectedIds={selection.selectedIds}
-  keyboard={{
-    activeIndex: 0,
-  }}
-  onSelect={handleSelect}
-/>
+          search={
+            filters.search
+          }
+
+          onSearch={
+            filters.setSearch
+          }
+
+          filter={
+            filters.filter
+          }
+
+          onFilter={
+            filters.setFilter
+          }
+
+          sort={
+            filters.sort
+          }
+
+          onSort={
+            filters.setSort
+          }
+        />
       </div>
 
-      <UploadQueue
-        items={uploadManager.items}
-        isUploading={uploadManager.isUploading}
-        overallProgress={uploadManager.overallProgress}
-        onRemove={uploadManager.remove}
-        onRetry={uploadManager.retry}
-        onCancel={uploadManager.cancel}
-        onClearCompleted={uploadManager.clearCompleted}
-      />
+
+      {/* ================================================================== */}
+      {/* BULK ACTIONS */}
+      {/* ================================================================== */}
+
+      <div className="mt-4">
+        <GalleryBulkActions
+          selectedCount={
+            selection.count
+          }
+
+          totalCount={
+            filters.filteredCount
+          }
+
+          failedCount={
+            failedCount
+          }
+
+          onSelectAll={() => {
+            selection.selectAll(
+              orderedIds,
+            );
+          }}
+
+          onInvertSelection={() => {
+            selection.invertSelection(
+              orderedIds,
+            );
+          }}
+
+          onClearSelection={
+            selection.clearSelection
+          }
+
+          onDownload={
+            handleBulkDownload
+          }
+
+          onRetry={
+            handleBulkRetry
+          }
+
+          onRemove={
+            handleBulkRemove
+          }
+        />
+      </div>
+
+
+      {/* ================================================================== */}
+      {/* MAIN GALLERY */}
+      {/* ================================================================== */}
+
+      <div className="mt-4 min-h-0 flex-1 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+
+        <div className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px]">
+
+          {/* ============================================================ */}
+          {/* PHOTO GRID */}
+          {/* ============================================================ */}
+
+          <div className="min-h-0 overflow-auto border-r border-slate-200">
+
+            <GalleryGrid
+              items={
+                filters.items
+              }
+
+              selectedIds={
+                selection.selectedIds
+              }
+
+              keyboard={{
+                activeIndex:
+                  effectivePreviewIndex,
+              }}
+
+              onSelect={
+                handleSelect
+              }
+            />
+
+          </div>
+
+
+          {/* ============================================================ */}
+          {/* PHOTO PREVIEW */}
+          {/* ============================================================ */}
+
+          <div className="min-h-0 overflow-auto bg-slate-50 p-4 lg:p-5">
+
+            <GalleryPreview
+              key={
+                previewPhoto?.id ??
+                "empty"
+              }
+
+              photo={
+                previewPhoto
+              }
+
+              currentIndex={
+                effectivePreviewIndex
+              }
+
+              total={
+                filters.items.length
+              }
+
+              onPrevious={
+                handlePrevious
+              }
+
+              onNext={
+                handleNext
+              }
+            />
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+      {/* ================================================================== */}
+      {/* UPLOAD MODAL */}
+      {/* ================================================================== */}
+
+      {uploadPanelOpen &&
+        !uploadPanelMinimized &&
+        uploadItems.length >
+          0 && (
+
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-md">
+
+          <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-white/30 bg-white shadow-2xl">
+
+            {/* ---------------------------------------------------------- */}
+            {/* MODAL HEADER */}
+            {/* ---------------------------------------------------------- */}
+
+            <div className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
+
+              <div className="flex items-center gap-3">
+
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0A3F61]/10">
+
+                  {isUploading ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-[#0A3F61]" />
+                  ) : (
+                    <UploadCloud className="h-5 w-5 text-[#0A3F61]" />
+                  )}
+
+                </div>
+
+                <div>
+
+                  <h2 className="text-lg font-bold text-slate-900">
+                    {isUploading
+                      ? "Uploading Photos"
+                      : "Upload Photos"}
+                  </h2>
+
+                  <p className="text-sm text-slate-500">
+                    {
+                      uploadItems.length
+                    }{" "}
+                    file
+                    {uploadItems.length ===
+                    1
+                      ? ""
+                      : "s"}{" "}
+                    in queue
+                  </p>
+
+                </div>
+
+              </div>
+
+
+              <div className="flex items-center gap-2">
+
+                {/* Hide */}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUploadPanelMinimized(
+                      true,
+                    );
+                  }}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                  title="Hide upload panel"
+                  aria-label="Hide upload panel"
+                >
+                  <Minimize2 className="h-4 w-4" />
+                </button>
+
+
+                {/* Close */}
+
+                {!isUploading && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUploadPanelOpen(
+                        false,
+                      );
+                    }}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                    title="Close upload panel"
+                    aria-label="Close upload panel"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                )}
+
+              </div>
+
+            </div>
+
+
+            {/* ---------------------------------------------------------- */}
+            {/* QUEUE */}
+            {/* ---------------------------------------------------------- */}
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+
+              <UploadQueue
+                items={uploadItems}
+                isUploading={isUploading}
+                overallProgress={overallProgress}
+                onRemove={remove}
+                onRetry={retry}
+                onCancel={cancel}
+                onClearCompleted={clearCompleted}
+              />
+
+            </div>
+
+          </div>
+
+        </div>
+      )}
+
+
+      {/* ================================================================== */}
+      {/* MINIMIZED UPLOAD BAR */}
+      {/* ================================================================== */}
+
+      {uploadPanelOpen &&
+        uploadPanelMinimized &&
+        uploadItems.length >
+          0 && (
+
+        <div className="fixed bottom-6 right-6 z-[110] w-[360px] max-w-[calc(100vw-2rem)]">
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl">
+
+            <div className="flex items-center gap-3">
+
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#0A3F61]/10">
+
+                {isUploading ? (
+                  <Loader2 className="h-5 w-5 animate-spin text-[#0A3F61]" />
+                ) : (
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                )}
+
+              </div>
+
+
+              <div className="min-w-0 flex-1">
+
+                <p className="truncate text-sm font-semibold text-slate-900">
+                  {isUploading
+                    ? "Uploading photos..."
+                    : "Upload complete"}
+                </p>
+
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200">
+
+                  <div
+                    className="h-full rounded-full bg-[#0A3F61] transition-all duration-300"
+                    style={{
+                      width: `${overallProgress}%`,
+                    }}
+                  />
+
+                </div>
+
+              </div>
+
+
+              <span className="text-xs font-semibold text-slate-600">
+                {
+                  overallProgress
+                }%
+              </span>
+
+
+              <button
+                type="button"
+                onClick={() => {
+                  setUploadPanelMinimized(
+                    false,
+                  );
+                }}
+                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-900"
+                title="Show upload panel"
+                aria-label="Show upload panel"
+              >
+                <UploadCloud className="h-4 w-4" />
+              </button>
+
+            </div>
+
+
+            {!isUploading && (
+              <button
+                type="button"
+                onClick={() => {
+                  clearCompleted();
+
+                  setUploadPanelOpen(
+                    false,
+                  );
+
+                  setUploadPanelMinimized(
+                    false,
+                  );
+                }}
+                className="mt-3 w-full rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+              >
+                Done
+              </button>
+            )}
+
+          </div>
+
+        </div>
+      )}
+
+
+      {/* ================================================================== */}
+      {/* QR MODAL */}
+      {/* ================================================================== */}
+
+      {isQRModalOpen &&
+        eventId && (
+
+        <GalleryQRCodeModal
+          eventId={
+            eventId
+          }
+          onClose={
+            handleCloseQR
+          }
+        />
+
+      )}
+
     </div>
   );
 }

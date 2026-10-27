@@ -11,36 +11,39 @@ export default function Breadcrumb() {
     .split("/")
     .filter(Boolean);
 
-  return (
-    <div className="flex items-center gap-2 text-sm text-slate-500">
+  if (segments.length === 0) {
+    return null;
+  }
 
+  return (
+    <nav aria-label="Breadcrumbs" className="flex items-center gap-1.5 text-xs text-muted-foreground">
       <Link
         href="/dashboard"
-        className="hover:text-[#0A3F61]"
+        className="transition-colors hover:text-foreground"
       >
         Dashboard
       </Link>
 
-      {/* इथे index काढून फक्त segment ठेवला आहे */}
-      {segments.slice(1).map((segment) => (
-
-        <div
-          key={segment} // segment स्वतः unique key म्हणून काम करेल
-          className="flex items-center gap-2"
-        >
-
-          <ChevronRight size={14} />
-
-          <span className="capitalize">
-
-            {segment.replace(/-/g, " ")}
-
-          </span>
-
-        </div>
-
-      ))}
-
-    </div>
+      {segments.slice(1).map((segment, index) => {
+        const isLast = index === segments.slice(1).length - 1;
+        return (
+          <div
+            key={`${segment}-${index}`}
+            className="flex items-center gap-1.5"
+          >
+            <ChevronRight size={12} className="text-muted-foreground/50 shrink-0" />
+            <span
+              className={`capitalize ${
+                isLast
+                  ? "font-medium text-foreground"
+                  : "transition-colors hover:text-foreground"
+              }`}
+            >
+              {segment.replace(/-/g, " ")}
+            </span>
+          </div>
+        );
+      })}
+    </nav>
   );
 }

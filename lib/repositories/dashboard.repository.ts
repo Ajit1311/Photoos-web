@@ -9,7 +9,12 @@ import type {
 class DashboardRepository {
 
   async load(): Promise<DashboardSummaryResponse> {
-    return getDashboardSummary();
+
+    const response =
+      await getDashboardSummary();
+
+    return response;
+
   }
 
 }

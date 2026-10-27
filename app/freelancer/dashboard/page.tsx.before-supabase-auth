@@ -1,0 +1,498 @@
+"use client";
+
+import {
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  LogOut,
+  MapPin,
+  RefreshCw,
+  UserRound,
+  XCircle,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+
+import {
+  acceptFreelancerHiring,
+  getFreelancerHiringRequests,
+  rejectFreelancerHiring,
+  type FreelancerHiringRequest,
+} from "@/lib/api/marketplace/freelancers";
+
+import {
+  getCurrentUser,
+  signOut,
+} from "@/lib/auth/auth.service";
+import { supabase } from "@/lib/supabase/client";
+
+type LoadState = "loading" | "ready" | "error";
+
+function formatDate(value: string): string {
+  if (!value) return "—";
+
+  const date = new Date(`${value}T00:00:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function formatTime(value: string | null): string {
+  if (!value) return "—";
+
+  const parts = value.split(":");
+  const hour = Number(parts[0]);
+  const minute = Number(parts[1] ?? 0);
+
+  if (Number.isNaN(hour)) return value;
+
+  const date = new Date();
+  date.setHours(hour, minute, 0, 0);
+
+  return date.toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatMoney(
+  amount: number | null,
+  currency: string,
+): string {
+  if (amount === null || amount === undefined) {
+    return "—";
+  }
+
+  return `${currency || "INR"} ${Number(amount).toLocaleString("en-IN")}`;
+}
+
+function statusClasses(status: string): string {
+  switch (status) {
+    case "requested":
+      return "bg-amber-50 text-amber-700 border-amber-200";
+    case "confirmed":
+      return "bg-emerald-50 text-emerald-700 border-emerald-200";
+    case "rejected":
+      return "bg-red-50 text-red-700 border-red-200";
+    case "cancelled":
+      return "bg-slate-100 text-slate-600 border-slate-200";
+    case "completed":
+      return "bg-blue-50 text-blue-700 border-blue-200";
+    default:
+      return "bg-slate-100 text-slate-600 border-slate-200";
+  }
+}
+
+function statusLabel(status: string): string {
+  switch (status) {
+    case "requested":
+      return "New Request";
+    case "confirmed":
+      return "Confirmed";
+    case "rejected":
+      return "Rejected";
+    case "cancelled":
+      return "Cancelled";
+    case "completed":
+      return "Completed";
+    default:
+      return status;
+  }
+}
+
+export default function FreelancerDashboardPage() {
+  const router = useRouter();
+
+  const [requests, setRequests] = useState<FreelancerHiringRequest[]>([]);
+  const [loadState, setLoadState] = useState<LoadState>("loading");
+  const [error, setError] = useState("");
+  const [processingId, setProcessingId] = useState<string | null>(null);
+
+  const [currentUser, setCurrentUser] = useState<Awaited<ReturnType<typeof getCurrentUser>>>(null);
+
+  async function loadRequests() {
+    setError("");
+    setLoadState("loading");
+
+    try {
+      const data = await getFreelancerHiringRequests();
+      setRequests(Array.isArray(data) ? data : []);
+      setLoadState("ready");
+    } catch (loadError) {
+      console.error("FREELANCER REQUESTS LOAD ERROR:", loadError);
+
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Unable to load booking requests.",
+      );
+
+      setLoadState("error");
+    }
+  }
+
+  useEffect(() => {
+    let mounted = true;
+
+    const initializeAuth = async () => {
+      const user = await getCurrentUser();
+
+      if (!mounted) return;
+
+      if (!user) {
+        router.replace("/freelancer/login");
+        return;
+      }
+
+      setCurrentUser(user);
+      void loadRequests();
+    };
+
+    void initializeAuth();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
+
+      if (!session?.user) {
+        router.replace("/freelancer/login");
+        return;
+      }
+
+      setCurrentUser(session.user);
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [router]);
+
+  async function handleAccept(hiringId: string) {
+    setError("");
+    setProcessingId(hiringId);
+
+    try {
+      await acceptFreelancerHiring(hiringId);
+
+      setRequests((current) =>
+        current.map((request) =>
+          request.hiring_id === hiringId
+            ? { ...request, status: "confirmed" }
+            : request,
+        ),
+      );
+    } catch (acceptError) {
+      console.error("FREELANCER ACCEPT ERROR:", acceptError);
+
+      setError(
+        acceptError instanceof Error
+          ? acceptError.message
+          : "Unable to accept this booking request.",
+      );
+    } finally {
+      setProcessingId(null);
+    }
+  }
+
+  async function handleReject(hiringId: string) {
+    setError("");
+    setProcessingId(hiringId);
+
+    try {
+      await rejectFreelancerHiring(hiringId);
+
+      setRequests((current) =>
+        current.map((request) =>
+          request.hiring_id === hiringId
+            ? { ...request, status: "rejected" }
+            : request,
+        ),
+      );
+    } catch (rejectError) {
+      console.error("FREELANCER REJECT ERROR:", rejectError);
+
+      setError(
+        rejectError instanceof Error
+          ? rejectError.message
+          : "Unable to reject this booking request.",
+      );
+    } finally {
+      setProcessingId(null);
+    }
+  }
+
+  async function handleLogout() {
+    await signOut();
+    router.replace("/freelancer/login");
+  }
+
+  if (loadState === "loading") {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-[#0A3F61]" />
+          <p className="mt-4 text-sm font-medium text-slate-500">
+            Loading freelancer dashboard...
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-slate-50">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#0A3F61] text-lg font-black text-white">
+              P
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                PhotoOS
+              </p>
+              <h1 className="text-lg font-black text-slate-950">
+                Freelancer Portal
+              </h1>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+          >
+            <LogOut size={16} />
+            Logout
+          </button>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <section className="rounded-[28px] bg-[#0A3F61] p-6 text-white shadow-xl shadow-slate-300/30 sm:p-8">
+          <div className="flex flex-col justify-between gap-6 md:flex-row md:items-center">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-medium text-white/70">
+                <UserRound size={16} />
+                Freelancer Account
+              </div>
+
+              <h2 className="mt-2 text-2xl font-black sm:text-3xl">
+                Welcome back{currentUser?.user_metadata?.full_name
+                  ? `, ${firebaseUser.displayName}`
+                  : ""}
+              </h2>
+
+              <p className="mt-2 text-sm text-white/70">
+                Manage your photography and creative work requests from studios.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => void loadRequests()}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-3 text-sm font-bold text-white ring-1 ring-white/20 transition hover:bg-white/15"
+            >
+              <RefreshCw size={16} />
+              Refresh
+            </button>
+          </div>
+        </section>
+
+        {error ? (
+          <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm leading-6 text-red-700">
+            {error}
+          </div>
+        ) : null}
+
+        <section className="mt-8">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-[#0A3F61]">
+                Booking Requests
+              </p>
+              <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
+                Your Work Requests
+              </h2>
+            </div>
+
+            <div className="rounded-full bg-white px-4 py-2 text-sm font-bold text-slate-600 shadow-sm ring-1 ring-slate-200">
+              {requests.length} {requests.length === 1 ? "Request" : "Requests"}
+            </div>
+          </div>
+
+          {requests.length === 0 ? (
+            <div className="mt-6 rounded-[28px] border border-dashed border-slate-300 bg-white p-12 text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                <CalendarDays size={25} />
+              </div>
+
+              <h3 className="mt-5 text-lg font-bold text-slate-950">
+                No booking requests yet
+              </h3>
+
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+                When a studio sends you a work request, the booking details
+                will appear here.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-6 grid gap-5">
+              {requests.map((request) => {
+                const isProcessing =
+                  processingId === request.hiring_id;
+
+                return (
+                  <article
+                    key={request.hiring_id}
+                    className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+                  >
+                    <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <h3 className="text-xl font-black text-slate-950">
+                            {request.studio_name}
+                          </h3>
+
+                          <span
+                            className={`rounded-full border px-3 py-1 text-xs font-bold ${statusClasses(
+                              request.status,
+                            )}`}
+                          >
+                            {statusLabel(request.status)}
+                          </span>
+                        </div>
+
+                        <p className="mt-2 flex items-center gap-2 text-sm text-slate-500">
+                          <MapPin size={15} />
+                          Studio booking request
+                        </p>
+                      </div>
+
+                      {request.status === "requested" ? (
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <button
+                            type="button"
+                            disabled={isProcessing}
+                            onClick={() =>
+                              void handleReject(request.hiring_id)
+                            }
+                            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-5 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                          >
+                            <XCircle size={17} />
+                            Reject
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={isProcessing}
+                            onClick={() =>
+                              void handleAccept(request.hiring_id)
+                            }
+                            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                          >
+                            <CheckCircle2 size={17} />
+                            {isProcessing ? "Processing..." : "Accept"}
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      <div className="rounded-2xl bg-slate-50 p-4">
+                        <p className="text-xs font-semibold text-slate-400">
+                          Booking Date
+                        </p>
+                        <p className="mt-1 font-bold text-slate-900">
+                          {formatDate(request.booking_date)}
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl bg-slate-50 p-4">
+                        <p className="text-xs font-semibold text-slate-400">
+                          Time
+                        </p>
+                        <p className="mt-1 flex items-center gap-1.5 font-bold text-slate-900">
+                          <Clock3 size={15} />
+                          {formatTime(request.start_time)}
+                          {" – "}
+                          {formatTime(request.end_time)}
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl bg-slate-50 p-4">
+                        <p className="text-xs font-semibold text-slate-400">
+                          Duration
+                        </p>
+                        <p className="mt-1 font-bold text-slate-900">
+                          {request.number_of_days}{" "}
+                          {request.number_of_days === 1 ? "Day" : "Days"}
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl bg-slate-50 p-4">
+                        <p className="text-xs font-semibold text-slate-400">
+                          Total Amount
+                        </p>
+                        <p className="mt-1 font-bold text-slate-900">
+                          {formatMoney(
+                            request.total_amount,
+                            request.currency,
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    {request.daily_rate !== null ? (
+                      <div className="mt-4 text-sm text-slate-500">
+                        Daily Rate:{" "}
+                        <span className="font-bold text-slate-800">
+                          {formatMoney(
+                            request.daily_rate,
+                            request.currency,
+                          )}
+                        </span>
+                      </div>
+                    ) : null}
+
+                    {request.studio_note ? (
+                      <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                          Studio Note
+                        </p>
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                          {request.studio_note}
+                        </p>
+                      </div>
+                    ) : null}
+
+                    {request.freelancer_note ? (
+                      <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                          Your Note
+                        </p>
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                          {request.freelancer_note}
+                        </p>
+                      </div>
+                    ) : null}
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </div>
+    </main>
+  );
+}

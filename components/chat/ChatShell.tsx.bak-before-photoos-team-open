@@ -1,0 +1,339 @@
+"use client";
+
+import {
+  MessageCircle,
+  Search,
+} from "lucide-react";
+
+import {
+  useMemo,
+  useState,
+} from "react";
+
+import type {
+  ClientDto,
+} from "@/types/api/client";
+
+import type {
+  ChatConversation,
+} from "@/types/chat";
+
+import {
+  useClients,
+} from "@/hooks/useClients";
+
+import {
+  useChatConversations,
+} from "@/hooks/chat/useChatConversations";
+
+import {
+  startClientChatConversation,
+} from "@/lib/api/chat";
+
+import ChatConversationList from "./ChatConversationList";
+import ChatConversationPanel from "./ChatConversationPanel";
+
+function createLocalConversation(
+  client: ClientDto,
+  conversationId: string,
+): ChatConversation {
+  const now =
+    new Date().toISOString();
+
+  return {
+    id: conversationId,
+    type: "client",
+    title: client.display_name,
+
+    metadata: {
+      client_id: client.id,
+      client_name:
+        client.display_name,
+      source: "chat_start",
+    },
+
+    created_at: now,
+    updated_at: now,
+
+    client_id: client.id,
+    project_id: null,
+    album_id: null,
+    unread_count: 0,
+  };
+}
+
+export default function ChatShell() {
+  const [
+    selectedConversation,
+    setSelectedConversation,
+  ] =
+    useState<ChatConversation | null>(
+      null,
+    );
+
+  const [
+    clientSearch,
+    setClientSearch,
+  ] =
+    useState("");
+
+  const [
+    startingClientId,
+    setStartingClientId,
+  ] =
+    useState<string | null>(
+      null,
+    );
+
+  const [
+    locallyStartedConversations,
+    setLocallyStartedConversations,
+  ] =
+    useState<ChatConversation[]>(
+      [],
+    );
+
+  const {
+    conversations,
+    loading:
+      conversationsLoading,
+    refresh:
+      refreshConversations,
+  } =
+    useChatConversations();
+
+  const {
+    clients,
+    loading:
+      clientsLoading,
+    error:
+      clientsError,
+  } =
+    useClients({
+      page: 1,
+      limit: 100,
+      search: clientSearch,
+      allPages: true,
+    });
+
+  const displayedConversations =
+    useMemo(() => {
+      const merged = [
+        ...locallyStartedConversations,
+        ...conversations,
+      ];
+
+      return Array.from(
+        new Map(
+          merged.map(
+            (conversation) => [
+              conversation.id,
+              conversation,
+            ],
+          ),
+        ).values(),
+      );
+    }, [
+      locallyStartedConversations,
+      conversations,
+    ]);
+
+  async function handleSelectClient(
+    client: ClientDto,
+  ) {
+    const existingConversation =
+      displayedConversations.find(
+        (conversation) =>
+          conversation.type ===
+            "client" &&
+          conversation.client_id ===
+            client.id,
+      );
+
+    /*
+     * Existing chat:
+     * Just switch to it.
+     */
+    if (existingConversation) {
+      setSelectedConversation(
+        existingConversation,
+      );
+
+      return;
+    }
+
+    /*
+     * Prevent multiple conversation
+     * creation requests at the same time.
+     */
+    if (startingClientId) {
+      return;
+    }
+
+    setStartingClientId(
+      client.id,
+    );
+
+    try {
+      const conversationId =
+        await startClientChatConversation(
+          client.id,
+        );
+
+      const newConversation =
+        createLocalConversation(
+          client,
+          conversationId,
+        );
+
+      /*
+       * Add immediately to local state.
+       * This means the user does not have
+       * to wait for refresh.
+       */
+      setLocallyStartedConversations(
+        (current) => [
+          newConversation,
+          ...current.filter(
+            (conversation) =>
+              conversation.id !==
+              newConversation.id,
+          ),
+        ],
+      );
+
+      setSelectedConversation(
+        newConversation,
+      );
+
+      void refreshConversations();
+    } catch (error) {
+      console.error(
+        "START CLIENT CHAT ERROR:",
+        error,
+      );
+
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : "Unable to start client chat.",
+      );
+    } finally {
+      setStartingClientId(
+        null,
+      );
+    }
+  }
+
+  return (
+    <div className="flex h-[calc(100vh-0px)] min-h-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      {/* ================================================================
+          CLIENT SIDEBAR
+         ================================================================ */}
+
+      <aside
+        className={`flex w-full shrink-0 flex-col border-r border-slate-200 bg-white lg:w-[380px] ${
+          selectedConversation
+            ? "hidden lg:flex"
+            : "flex"
+        }`}
+      >
+        <div className="border-b border-slate-200 px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-semibold text-slate-900">
+                Chats
+              </h1>
+
+              <p className="mt-0.5 text-xs text-slate-500">
+                All clients
+              </p>
+            </div>
+
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100">
+              <MessageCircle className="h-5 w-5 text-[#0A3F61]" />
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2.5">
+            <Search className="h-4 w-4 text-slate-400" />
+
+            <input
+              type="search"
+              value={clientSearch}
+              onChange={(event) =>
+                setClientSearch(
+                  event.target.value,
+                )
+              }
+              placeholder="Search clients..."
+              className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
+            />
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {clientsError ? (
+            <div className="p-5 text-sm text-red-600">
+              Unable to load clients.
+            </div>
+          ) : (
+            <ChatConversationList
+              clients={clients}
+              conversations={
+                displayedConversations
+              }
+              selectedConversationId={
+                selectedConversation?.id ??
+                null
+              }
+              loading={
+                clientsLoading ||
+                conversationsLoading
+              }
+              startingClientId={
+                startingClientId
+              }
+              onSelectClient={
+                handleSelectClient
+              }
+            />
+          )}
+        </div>
+      </aside>
+
+      {/* ================================================================
+          CHAT PANEL
+         ================================================================ */}
+
+      {selectedConversation ? (
+        <ChatConversationPanel
+          conversation={
+            selectedConversation
+          }
+          onBack={() =>
+            setSelectedConversation(
+              null,
+            )
+          }
+        />
+      ) : (
+        <section className="hidden flex-1 items-center justify-center bg-[#f8fafc] lg:flex">
+          <div className="text-center">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-slate-100">
+              <MessageCircle className="h-9 w-9 text-[#0A3F61]" />
+            </div>
+
+            <h2 className="mt-5 text-lg font-semibold text-slate-800">
+              Select a client
+            </h2>
+
+            <p className="mt-1 max-w-sm text-sm text-slate-500">
+              Select any client from the left to start or continue chatting.
+            </p>
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}

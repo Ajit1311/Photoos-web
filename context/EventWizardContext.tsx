@@ -29,19 +29,15 @@ type EventWizardContextValue = {
 
   error: string | null;
 
-  setStep: (
-    step: number,
-  ) => void;
+  setStep: (step: number) => void;
 
   nextStep: () => void;
 
   previousStep: () => void;
 
-  setField: <
-    K extends keyof EventWizardData,
-  >(
+  setField: <K extends keyof EventWizardData>(
     key: K,
-    value: EventWizardData[K],
+    value: EventWizardData[K]
   ) => void;
 
   clearError: () => void;
@@ -51,259 +47,219 @@ type EventWizardContextValue = {
   submit: () => Promise<void>;
 };
 
-const EventWizardContext =
-  createContext<EventWizardContextValue | null>(
-    null,
-  );
+const EventWizardContext = createContext<EventWizardContextValue | null>(null);
 
 type Props = {
   children: ReactNode;
+
+  initialProjectId?: string;
 };
 
-export function EventWizardProvider({
-  children,
-}: Props) {
+export function EventWizardProvider({ children, initialProjectId }: Props) {
+  const router = useRouter();
 
-  const router =
-    useRouter();
+  const { data: bootstrap } = useBootstrapContext();
 
-  const {
-    data: bootstrap,
-  } = useBootstrapContext();
+  const [currentStep, setCurrentStep] = useState(1);
 
-  const [
-    currentStep,
-    setCurrentStep,
-  ] = useState(1);
+  const [data, setData] = useState<EventWizardData>({
+    ...defaultEventWizardData,
+    projectId: initialProjectId ?? "",
+  });
 
-  const [
-    data,
-    setData,
-  ] = useState(
-    defaultEventWizardData,
+  const [submitting, setSubmitting] = useState(false);
+
+  const [error, setError] = useState<string | null>(null);
+
+  const setStep = useCallback((step: number) => {
+    setCurrentStep(step);
+  }, []);
+
+  const nextStep = useCallback(() => {
+    setCurrentStep((step) => Math.min(step + 1, 7));
+  }, []);
+
+  const previousStep = useCallback(() => {
+    setCurrentStep((step) => Math.max(step - 1, 1));
+  }, []);
+
+  const setField = useCallback(
+    <K extends keyof EventWizardData>(key: K, value: EventWizardData[K]) => {
+      setData((current) => ({
+        ...current,
+        [key]: value,
+      }));
+    },
+    []
   );
 
-  const [
-    submitting,
-    setSubmitting,
-  ] = useState(false);
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
 
-  const [
-    error,
-    setError,
-  ] = useState<string | null>(
-    null,
-  );
+  const reset = useCallback(() => {
+    setCurrentStep(1);
 
-  const setStep =
-    useCallback(
-      (
-        step: number,
-      ) => {
+    setData({
+      ...defaultEventWizardData,
+      projectId: initialProjectId ?? "",
+    });
 
-        setCurrentStep(step);
+    setError(null);
+  }, [initialProjectId]);
 
-      },
-      [],
-    );
+  const submit = useCallback(async () => {
+    if (submitting) {
+      return Promise.resolve();
+    }
 
-  const nextStep =
-    useCallback(() => {
+    // -----------------------------------------------------------------------------
+    // Validation
+    // -----------------------------------------------------------------------------
 
-      setCurrentStep(
-        (step) =>
-          Math.min(
-            step + 1,
-            7,
-          ),
-      );
+    if (!data.projectId.trim()) {
+      setError("Please select a project.");
+      return;
+    }
 
-    }, []);
+    if (!data.title.trim()) {
+      setError("Please enter an event title.");
+      return;
+    }
 
-  const previousStep =
-    useCallback(() => {
+    if (!data.eventDate) {
+      setError("Please select an event date.");
+      return;
+    }
 
-      setCurrentStep(
-        (step) =>
-          Math.max(
-            step - 1,
-            1,
-          ),
-      );
+    if (!data.eventType.trim()) {
+      setError("Please select an event type.");
+      return;
+    }
 
-    }, []);
+    if (data.clientMode === "existing" && !data.selectedClientId) {
+      setError("Please select an existing client.");
+      return;
+    }
 
-  const setField =
-    useCallback(
-      <
-        K extends keyof EventWizardData,
-      >(
-        key: K,
-        value: EventWizardData[K],
-      ) => {
-
-        setData(
-          (current) => ({
-            ...current,
-            [key]: value,
-          }),
-        );
-
-      },
-      [],
-    );
-
-  const clearError =
-    useCallback(() => {
-
-      setError(null);
-
-    }, []);
-
-  const reset =
-    useCallback(() => {
-
-      setCurrentStep(1);
-
-      setData(
-        defaultEventWizardData,
-      );
-
-      setError(null);
-
-    }, []);
-
-  const submit =
-    useCallback(async () => {
-
-      if (submitting) {
-        return Promise.resolve();
+    if (data.clientMode === "new") {
+      if (!data.clientName.trim()) {
+        setError("Please enter client name.");
+        return;
       }
 
-      if (!bootstrap) {
-        throw new Error(
-          "Bootstrap data not loaded.",
-        );
+      if (!data.clientPhone.trim()) {
+        setError("Please enter client phone number.");
+        return;
       }
+    }
 
-      const studioId =
-        bootstrap.workspace.membership.studioId;
+    if (data.packageAmount < 0) {
+      setError("Package amount cannot be negative.");
+      return;
+    }
 
-      if (!studioId) {
-        throw new Error(
-          "Studio not found.",
-        );
+    if (data.advanceAmount < 0) {
+      setError("Advance amount cannot be negative.");
+      return;
+    }
+
+    if (data.discount < 0) {
+      setError("Discount cannot be negative.");
+      return;
+    }
+
+    if (data.advanceAmount > data.packageAmount) {
+      setError("Advance amount cannot exceed package amount.");
+      return;
+    }
+
+    // -----------------------------------------------------------------------------
+
+    if (!bootstrap) {
+      throw new Error("Bootstrap data not loaded.");
+    }
+
+    const studioId = bootstrap.workspace.membership.studioId;
+
+    if (!studioId) {
+      throw new Error("Studio not found.");
+    }
+
+    setSubmitting(true);
+
+    setError(null);
+
+    try {
+      // 1. Event तयार करा आणि ID मिळवा
+      const event = await eventRepository.create(studioId, data);
+
+      // 2. State reset करा
+      reset();
+
+      // 3. नवीन तयार झालेल्या event च्या details पेजवर रीडायरेक्ट करा
+      if (event?.id) {
+        router.replace(`/dashboard/events/${event.id}`);
+      } else {
+        router.replace("/dashboard/events");
       }
+    } catch (err) {
+      console.error("Failed to create event", err);
 
-      setSubmitting(true);
-
-      setError(null);
-
-      try {
-
-        await eventRepository.create(
-          studioId,
-          data,
-        );
-
-        reset();
-
-        router.replace(
-          "/dashboard/events",
-        );
-
-      } catch (err) {
-
-        console.error(
-          "Failed to create event",
-          err,
-        );
-
-        if (
-          err instanceof Error
-        ) {
-
-          setError(
-            err.message,
-          );
-
-        } else {
-
-          setError(
-            "Unable to create event.",
-          );
-
-        }
-
-      } finally {
-
-        setSubmitting(false);
-
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Unable to create event.");
       }
+    } finally {
+      setSubmitting(false);
+    }
+  }, [bootstrap, data, submitting, reset, router]);
 
-    }, [
-      bootstrap,
+  const value = useMemo(
+    () => ({
+      currentStep,
       data,
       submitting,
+      error,
+      setStep,
+      nextStep,
+      previousStep,
+      setField,
+      clearError,
       reset,
-      router,
-    ]);
-
-  const value =
-    useMemo(
-      () => ({
-        currentStep,
-        data,
-        submitting,
-        error,
-        setStep,
-        nextStep,
-        previousStep,
-        setField,
-        clearError,
-        reset,
-        submit,
-      }),
-      [
-        currentStep,
-        data,
-        submitting,
-        error,
-        setStep,
-        nextStep,
-        previousStep,
-        setField,
-        clearError,
-        reset,
-        submit,
-      ],
-    );
+      submit,
+    }),
+    [
+      currentStep,
+      data,
+      submitting,
+      error,
+      setStep,
+      nextStep,
+      previousStep,
+      setField,
+      clearError,
+      reset,
+      submit,
+    ]
+  );
 
   return (
-    <EventWizardContext.Provider
-      value={value}
-    >
+    <EventWizardContext.Provider value={value}>
       {children}
     </EventWizardContext.Provider>
   );
-
 }
 
 export function useEventWizard() {
-
-  const context =
-    useContext(
-      EventWizardContext,
-    );
+  const context = useContext(EventWizardContext);
 
   if (!context) {
-
     throw new Error(
-      "useEventWizard must be used inside EventWizardProvider.",
+      "useEventWizard must be used inside EventWizardProvider."
     );
-
   }
 
   return context;
-
 }

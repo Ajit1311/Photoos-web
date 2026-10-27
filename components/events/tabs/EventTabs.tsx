@@ -12,9 +12,9 @@ import {
   Settings,
 } from "lucide-react";
 
-import AlbumWorkspace from "@/components/events/albums/AlbumWorkspace";
+import AlbumsPage from "@/components/events/albums/AlbumsPage";
 import DeliveryWorkspace from "@/components/events/delivery/DeliveryWorkspace";
-import GalleryWorkspace from "@/components/events/gallery/GalleryWorkspace";
+import GalleryWorkspace from "@/components/events/workspace/gallery/GalleryWorkspace";
 import EventOverviewWorkspace from "@/components/events/overview/EventOverviewWorkspace";
 
 const tabs = [
@@ -56,7 +56,8 @@ const tabs = [
 ];
 
 export default function EventTabs() {
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] =
+    useState("overview");
 
   return (
     <section className="space-y-6">
@@ -71,7 +72,10 @@ export default function EventTabs() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                type="button"
+                onClick={() =>
+                  setActiveTab(tab.id)
+                }
                 className={`flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-medium transition-all ${
                   activeTab === tab.id
                     ? "bg-[#0A3F61] text-white shadow-md"
@@ -84,23 +88,42 @@ export default function EventTabs() {
               </button>
             );
           })}
+
         </div>
 
       </div>
 
-      {activeTab === "overview" && <EventOverviewWorkspace />}
+      {activeTab === "overview" && (
+        <EventOverviewWorkspace />
+      )}
 
-      {activeTab === "gallery" && <GalleryWorkspace />}
+      {activeTab === "gallery" && (
+        <GalleryWorkspace />
+      )}
 
-      {activeTab === "albums" && <AlbumWorkspace />}
+     {activeTab === "albums" && (
+  <AlbumsPage />
+)}
 
-      {activeTab === "delivery" && <DeliveryWorkspace />}
+      {activeTab === "delivery" && (
+        <DeliveryWorkspace />
+      )}
 
-      {!["overview", "gallery", "albums", "delivery"].includes(activeTab) && (
+      {![
+        "overview",
+        "gallery",
+        "albums",
+        "delivery",
+      ].includes(activeTab) && (
         <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-20 text-center">
 
           <h2 className="text-2xl font-bold text-slate-900">
-            {tabs.find((tab) => tab.id === activeTab)?.label}
+            {
+              tabs.find(
+                (tab) =>
+                  tab.id === activeTab,
+              )?.label
+            }
           </h2>
 
           <p className="mt-3 text-slate-500">

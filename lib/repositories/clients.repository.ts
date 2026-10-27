@@ -10,6 +10,7 @@ import type {
   ClientListResponse,
   CreateClientRequest,
   UpdateClientRequest,
+  ClientDetailsResponse,
 } from "@/types/api/client";
 
 class ClientsRepository {
@@ -21,36 +22,45 @@ class ClientsRepository {
     search = "",
   ): Promise<ClientListResponse> {
 
-    return getClients(
-      studioId,
-      page,
-      limit,
-      search,
-    );
+    const response =
+      await getClients(
+        studioId,
+        page,
+        limit,
+        search,
+      );
+
+    return response;
 
   }
 
   async get(
-    studioId: string,
-    clientId: string,
-  ): Promise<ClientDto> {
+  studioId: string,
+  clientId: string,
+): Promise<ClientDetailsResponse> {
 
-    return getClient(
+  const response =
+    await getClient(
       studioId,
       clientId,
     );
 
-  }
+  return response;
+
+}
 
   async create(
     studioId: string,
     payload: CreateClientRequest,
   ): Promise<ClientDto> {
 
-    return createClient(
-      studioId,
-      payload,
-    );
+    const response =
+      await createClient(
+        studioId,
+        payload,
+      );
+
+    return response;
 
   }
 
@@ -60,11 +70,14 @@ class ClientsRepository {
     payload: UpdateClientRequest,
   ): Promise<ClientDto> {
 
-    return updateClient(
-      studioId,
-      clientId,
-      payload,
-    );
+    const response =
+      await updateClient(
+        studioId,
+        clientId,
+        payload,
+      );
+
+    return response;
 
   }
 

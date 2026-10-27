@@ -53,20 +53,23 @@ export function ProjectsProvider({
     });
 
   const value =
-    useMemo(
-      () => ({
-        data: projects.data,
-        loading: projects.loading,
-        error: projects.error,
-        reload: projects.reload,
-      }),
-      [
-        projects.data,
-        projects.loading,
-        projects.error,
-        projects.reload,
-      ],
-    );
+  useMemo(
+    () => ({
+      data: projects.data,
+      loading: projects.loading,
+      error: projects.error,
+
+      reload: async () => {
+        await projects.reload();
+      },
+    }),
+    [
+      projects.data,
+      projects.loading,
+      projects.error,
+      projects.reload,
+    ],
+  );
 
   return (
 

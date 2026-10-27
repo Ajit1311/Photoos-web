@@ -1,87 +1,214 @@
+"use client";
+
 import {
   CalendarDays,
   Clock3,
   CreditCard,
   Sparkles,
   Image,
-  Camera,
-  Users,
-  Truck,
-  HardDrive,
+  FolderOpen,
+  PackageCheck,
+  Bell,
 } from "lucide-react";
 
-const tasks = [
-  {
-    title: "Rahul & Priya Wedding",
-    subtitle: "Wedding Shoot",
-    time: "09:00 AM",
-    icon: CalendarDays,
-  },
-  {
-    title: "Corporate Payment Pending",
-    subtitle: "₹45,000 Remaining",
-    time: "Today",
-    icon: CreditCard,
-  },
-  {
-    title: "AI Processing Queue",
-    subtitle: "18 Jobs Running",
-    time: "Live",
-    icon: Sparkles,
-  },
-  {
-    title: "Gallery Approval",
-    subtitle: "5 Galleries Waiting",
-    time: "Pending",
-    icon: Image,
-  },
-  {
-    title: "Album Selection",
-    subtitle: "3 Clients Pending",
-    time: "Today",
-    icon: Camera,
-  },
-  {
-    title: "Client Meeting",
-    subtitle: "ABC Industries",
-    time: "02:00 PM",
-    icon: Users,
-  },
-  {
-    title: "Final Delivery",
-    subtitle: "Patil Family Album",
-    time: "05:00 PM",
-    icon: Truck,
-  },
-  {
-    title: "Backup Verification",
-    subtitle: "Cloud Storage Check",
-    time: "06:00 PM",
-    icon: HardDrive,
-  },
-];
+import {
+  useDashboardContext,
+} from "@/context/DashboardContext";
+
 
 export default function TodaysFocus() {
+
+  const dashboard =
+    useDashboardContext();
+
+
+  const metrics =
+    dashboard.data?.metrics ??
+    null;
+
+
+  const tasks = [
+
+    {
+      title: "Today's Events",
+
+      subtitle:
+        metrics
+          ? `${metrics.todayEvents} event${
+              metrics.todayEvents === 1
+                ? ""
+                : "s"
+            } scheduled today`
+          : "Loading today's schedule...",
+
+      time:
+        metrics
+          ? "Today"
+          : "Loading",
+
+      icon:
+        CalendarDays,
+    },
+
+
+    {
+      title: "Pending Payments",
+
+      subtitle:
+        metrics
+          ? `${metrics.pendingPayments} payment${
+              metrics.pendingPayments === 1
+                ? ""
+                : "s"
+            } need attention`
+          : "Loading payment status...",
+
+      time:
+        metrics
+          ? "Pending"
+          : "Loading",
+
+      icon:
+        CreditCard,
+    },
+
+
+    {
+      title: "AI Processing Queue",
+
+      subtitle:
+        metrics
+          ? `${metrics.pendingProcessingJobs} job${
+              metrics.pendingProcessingJobs === 1
+                ? ""
+                : "s"
+            } waiting for processing`
+          : "Loading AI queue...",
+
+      time:
+        metrics
+          ? "Live"
+          : "Loading",
+
+      icon:
+        Sparkles,
+    },
+
+
+    {
+      title: "Pending Deliveries",
+
+      subtitle:
+        metrics
+          ? `${metrics.pendingDeliveries} deliver${
+              metrics.pendingDeliveries === 1
+                ? "y"
+                : "ies"
+            } need attention`
+          : "Loading delivery status...",
+
+      time:
+        metrics
+          ? "Pending"
+          : "Loading",
+
+      icon:
+        PackageCheck,
+    },
+
+
+    {
+      title: "Active Albums",
+
+      subtitle:
+        metrics
+          ? `${metrics.activeAlbums} active album${
+              metrics.activeAlbums === 1
+                ? ""
+                : "s"
+            } in your studio`
+          : "Loading album data...",
+
+      time:
+        metrics
+          ? "Active"
+          : "Loading",
+
+      icon:
+        Image,
+    },
+
+
+    {
+      title: "Active Projects",
+
+      subtitle:
+        metrics
+          ? `${metrics.activeProjects} active project${
+              metrics.activeProjects === 1
+                ? ""
+                : "s"
+            } currently running`
+          : "Loading project data...",
+
+      time:
+        metrics
+          ? "Active"
+          : "Loading",
+
+      icon:
+        FolderOpen,
+    },
+
+
+    {
+      title: "Notifications",
+
+      subtitle:
+        metrics
+          ? `${metrics.unreadNotifications} unread notification${
+              metrics.unreadNotifications === 1
+                ? ""
+                : "s"
+            }`
+          : "Loading notifications...",
+
+      time:
+        metrics
+          ? "Unread"
+          : "Loading",
+
+      icon:
+        Bell,
+    },
+
+  ];
+
+
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+
+    <section className="rounded-2xl border border-border/80 bg-card p-5 shadow-[0_4px_24px_rgba(10,63,97,0.045)] sm:p-6">
 
       <div className="mb-6 flex items-center justify-between">
 
         <div>
 
-          <h2 className="text-2xl font-bold text-slate-900">
+          <h2 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
             Today&apos;s Focus
           </h2>
 
-          <p className="mt-2 text-slate-500">
-            Priority tasks for your studio today.
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Live priorities based on your studio activity.
           </p>
 
         </div>
 
-        <div className="flex items-center gap-2 rounded-2xl bg-[#0A3F61]/10 px-4 py-2 text-[#0A3F61]">
 
-          <Clock3 size={18} />
+        <div className="flex items-center gap-2 rounded-xl border border-primary/10 bg-primary/5 px-3.5 py-2 text-primary">
+
+          <Clock3
+            size={18}
+          />
 
           <span className="font-semibold">
             Live
@@ -91,53 +218,77 @@ export default function TodaysFocus() {
 
       </div>
 
+
       <div className="space-y-4">
 
-        {tasks.map((task) => {
+        {
+          tasks.map(
+            (
+              task,
+            ) => {
 
-          const Icon = task.icon;
+              const Icon =
+                task.icon;
 
-          return (
 
-            <div
-              key={task.title}
-              className="flex items-center justify-between rounded-2xl border border-slate-200 p-5 transition hover:border-[#0A3F61]/20 hover:bg-slate-50"
-            >
+              return (
 
-              <div className="flex items-center gap-4">
+                <div
+                  key={
+                    task.title
+                  }
+                  className="flex items-center justify-between rounded-xl border border-border/70 bg-background/70 p-4 transition-all hover:border-primary/20 hover:bg-muted/60 sm:p-5"
+                >
 
-                <div className="rounded-2xl bg-[#0A3F61]/10 p-3 text-[#0A3F61]">
+                  <div className="flex items-center gap-4">
 
-                  <Icon size={20} />
+                    <div className="rounded-2xl bg-[#0A3F61]/10 p-3 text-[#0A3F61]">
+
+                      <Icon
+                        size={20}
+                      />
+
+                    </div>
+
+
+                    <div>
+
+                      <h3 className="font-semibold text-slate-900">
+
+                        {task.title}
+
+                      </h3>
+
+
+                      <p className="mt-1 text-sm text-slate-500">
+
+                        {task.subtitle}
+
+                      </p>
+
+                    </div>
+
+                  </div>
+
+
+                  <span className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600">
+
+                    {task.time}
+
+                  </span>
 
                 </div>
 
-                <div>
+              );
 
-                  <h3 className="font-semibold text-slate-900">
-                    {task.title}
-                  </h3>
-
-                  <p className="mt-1 text-sm text-slate-500">
-                    {task.subtitle}
-                  </p>
-
-                </div>
-
-              </div>
-
-              <span className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600">
-                {task.time}
-              </span>
-
-            </div>
-
-          );
-
-        })}
+            },
+          )
+        }
 
       </div>
 
     </section>
+
   );
+
 }

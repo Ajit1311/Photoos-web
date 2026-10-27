@@ -1,0 +1,62 @@
+import {
+  getAccessToken,
+} from "@/lib/auth/session";
+
+import type {
+  NotificationBadgeCount,
+} from "@/types/notification/notification";
+
+export async function getNotificationBadgeCount(
+  studioId: string,
+  profileId: string,
+): Promise<NotificationBadgeCount> {
+  const token = await getAccessToken();
+
+  if (!token) {
+    throw new Error("Firebase authentication token is unavailable.");
+  }
+
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/get-notification-badge-count`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        studio_id: studioId,
+        profile_id: profileId,
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    const body = await response.text();
+
+    console.warn(
+      "[Notifications] Badge service unavailable:",
+      response.status,
+      body,
+    );
+
+    return {
+      total: 0,
+      unread: 0,
+    };
+  }
+
+  const data =
+    (await response.json()) as NotificationBadgeCount;
+
+  return {
+    total:
+      typeof data?.total === "number"
+        ? data.total
+        : 0,
+    unread:
+      typeof data?.unread === "number"
+        ? data.unread
+        : 0,
+  };
+}

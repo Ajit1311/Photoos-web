@@ -2,12 +2,14 @@ import {
   getProjects,
   getProject,
   createProject,
+  updateProject,
 } from "@/lib/api/projects";
 
 import type {
+  CreateProjectRequest,
+  UpdateProjectRequest,
   GetProjectsResponse,
   ProjectDto,
-  CreateProjectRequest,
 } from "@/types/api/project";
 
 class ProjectsRepository {
@@ -47,6 +49,20 @@ class ProjectsRepository {
 
     return createProject(
       studioId,
+      payload,
+    );
+
+  }
+
+  async update(
+    studioId: string,
+    projectId: string,
+    payload: UpdateProjectRequest,
+  ): Promise<ProjectDto> {
+
+    return updateProject(
+      studioId,
+      projectId,
       payload,
     );
 

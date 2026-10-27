@@ -1,0 +1,295 @@
+"use client";
+
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import Logo from "@/components/logo/Logo";
+import SidebarGroup from "./SidebarGroup";
+import SidebarItem from "./SidebarItem";
+
+import {
+  sidebar,
+} from "@/constants/sidebar";
+
+import {
+  APP_VERSION,
+} from "@/constants/app";
+
+import {
+  getCurrentMemberComplianceStatus,
+} from "@/lib/api/legal-compliance";
+
+import {
+  resolveUserStudio,
+} from "@/lib/auth/resolve-user-studio";
+
+import {
+  usePlanAccess,
+} from "@/hooks/usePlanAccess";
+
+import type {
+  PlanFeatureKey,
+} from "@/lib/subscription/plan-access";
+
+
+type AdminState =
+  | "loading"
+  | "admin"
+  | "standard";
+
+
+export default function Sidebar() {
+
+  const {
+    loading:
+      planLoading,
+    canAccess,
+  } =
+    usePlanAccess();
+
+
+  const [
+    adminState,
+    setAdminState,
+  ] =
+    useState<AdminState>(
+      "loading",
+    );
+
+
+  useEffect(
+    () => {
+
+      let cancelled =
+        false;
+
+
+      async function resolvePlatformAdmin() {
+
+        try {
+
+          const membership =
+            await resolveUserStudio();
+
+
+          if (!membership) {
+
+            if (!cancelled) {
+
+              setAdminState(
+                "standard",
+              );
+
+            }
+
+            return;
+
+          }
+
+
+          const compliance =
+            await getCurrentMemberComplianceStatus(
+              membership.studioId,
+            );
+
+
+          if (
+            !cancelled
+          ) {
+
+            setAdminState(
+              compliance.is_photoos_admin
+                ? "admin"
+                : "standard",
+            );
+
+          }
+
+        } catch (
+          error
+        ) {
+
+          console.error(
+            "SIDEBAR PLATFORM ADMIN CHECK ERROR:",
+            error,
+          );
+
+
+          if (
+            !cancelled
+          ) {
+
+            setAdminState(
+              "standard",
+            );
+
+          }
+
+        }
+
+      }
+
+
+      resolvePlatformAdmin();
+
+
+      return () => {
+
+        cancelled =
+          true;
+
+      };
+
+    },
+    [],
+  );
+
+
+  return (
+    <aside className="flex h-screen w-72 flex-col border-r border-slate-200 bg-white">
+
+
+      {/* Logo */}
+
+      <div className="border-b border-slate-200 px-6 py-6">
+
+        <Logo />
+
+      </div>
+
+
+      {/* Navigation */}
+
+      <div className="flex-1 overflow-y-auto px-4 py-4">
+
+        {
+          sidebar
+            .filter(
+              (
+                group,
+              ) =>
+                !group.requiresPlatformAdmin ||
+                adminState ===
+                  "admin",
+            )
+            .map(
+              (
+                group,
+              ) => {
+
+                const visibleItems =
+                  group.items.filter(
+                    (
+                      item,
+                    ) => {
+
+                      const hasAdminAccess =
+                        !item.requiresPlatformAdmin ||
+                        adminState ===
+                          "admin";
+
+
+                      if (
+                        !hasAdminAccess
+                      ) {
+                        return false;
+                      }
+
+
+                      if (
+                        planLoading
+                      ) {
+                        return true;
+                      }
+
+
+                      if (
+                        !item.requiredFeature
+                      ) {
+                        return true;
+                      }
+
+
+                      return canAccess(
+                        item.requiredFeature as PlanFeatureKey,
+                      );
+
+                    },
+                  );
+
+
+                if (
+                  visibleItems.length ===
+                  0
+                ) {
+
+                  return null;
+
+                }
+
+
+                return (
+
+                  <SidebarGroup
+                    key={
+                      group.group
+                    }
+                    title={
+                      group.group
+                    }
+                  >
+
+                    {
+                      visibleItems.map(
+                        (
+                          item,
+                        ) => (
+
+                          <SidebarItem
+                            key={
+                              item.href
+                            }
+                            href={
+                              item.href
+                            }
+                            title={
+                              item.title
+                            }
+                            icon={
+                              item.icon
+                            }
+                          />
+
+                        ),
+                      )
+                    }
+
+                  </SidebarGroup>
+
+                );
+
+              },
+            )
+        }
+
+      </div>
+
+
+      {/* Footer */}
+
+      <div className="border-t border-slate-200 p-5">
+
+        <p className="text-center text-xs text-slate-400">
+
+          PhotoOS {APP_VERSION}
+
+        </p>
+
+      </div>
+
+    </aside>
+  );
+
+}

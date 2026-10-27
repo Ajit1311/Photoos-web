@@ -12,14 +12,34 @@ interface Props {
   ) => void;
 }
 
-const FILTERS: GalleryFilter[] = [
-  "all",
-  "queued",
-  "uploading",
-  "processing",
-  "completed",
-  "failed",
-  "cancelled",
+const FILTERS: {
+  value: GalleryFilter;
+  label: string;
+}[] = [
+  {
+    value: "all",
+    label: "All",
+  },
+  {
+    value: "favorites",
+    label: "Favorites",
+  },
+  {
+    value: "selected",
+    label: "Selected",
+  },
+  {
+    value: "hidden",
+    label: "Hidden",
+  },
+  {
+    value: "rejected",
+    label: "Rejected",
+  },
+  {
+    value: "ai",
+    label: "AI Processed",
+  },
 ];
 
 export default function GalleryFilters({
@@ -28,28 +48,33 @@ export default function GalleryFilters({
 }: Props) {
   return (
     <div className="flex flex-wrap gap-2">
-      {FILTERS.map((filter) => (
-        <button
-          key={filter}
-          onClick={() =>
-            onChange(filter)
-          }
-          className={[
-            "rounded-full",
-            "px-4",
-            "py-2",
-            "text-sm",
-            "font-medium",
-            "transition",
+      {FILTERS.map(
+        (filter) => (
+          <button
+            key={filter.value}
+            type="button"
+            onClick={() =>
+              onChange(
+                filter.value,
+              )
+            }
+            className={[
+              "rounded-full",
+              "px-4",
+              "py-2",
+              "text-sm",
+              "font-medium",
+              "transition",
 
-            value === filter
-              ? "bg-[#0A3F61] text-white"
-              : "border border-slate-300 bg-white hover:border-[#0A3F61]",
-          ].join(" ")}
-        >
-          {filter}
-        </button>
-      ))}
+              value === filter.value
+                ? "bg-[#0A3F61] text-white"
+                : "border border-slate-300 bg-white text-slate-700 hover:border-[#0A3F61]",
+            ].join(" ")}
+          >
+            {filter.label}
+          </button>
+        ),
+      )}
     </div>
   );
 }

@@ -2,54 +2,68 @@
 
 import { useQuery } from "@tanstack/react-query";
 
-import { useBootstrapContext } from "@/context/BootstrapContext";
+import {
+  useBootstrapContext,
+} from "@/context/BootstrapContext";
 
-import { eventRepository } from "@/lib/repositories/event.repository";
+import {
+  eventRepository,
+} from "@/lib/repositories/event.repository";
 
-import type { Event } from "@/types/event";
+import type {
+  Event,
+} from "@/types/event";
+
+const EVENT_QUERY_KEY = [
+  "event",
+];
 
 export function useEvent(
   eventId: string,
 ) {
 
   const {
-    data,
+    data: bootstrap,
     loading: bootstrapLoading,
-  } = useBootstrapContext();
+  } =
+    useBootstrapContext();
 
   const studioId =
-    data?.workspace.membership.studioId;
+    bootstrap?.workspace?.membership?.studioId;
 
   const query =
     useQuery<Event, Error>({
+
       queryKey: [
-        "event",
+        ...EVENT_QUERY_KEY,
         studioId,
         eventId,
       ],
 
       enabled:
         !bootstrapLoading &&
-        !!studioId &&
-        !!eventId,
+        Boolean(studioId) &&
+        Boolean(eventId),
 
-      queryFn: () =>
-        eventRepository.getById(
-          studioId!,
-          eventId,
-        ),
+      queryFn:
+        () =>
+          eventRepository.getById(
+            studioId!,
+            eventId,
+          ),
 
       staleTime:
         1000 * 60,
 
       gcTime:
-        1000 *
-        60 *
-        10,
+        1000 * 60 * 10,
 
-      retry: 2,
+      retry:
+        2,
 
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus:
+        false,
+
     });
 
   return {
@@ -61,15 +75,14 @@ export function useEvent(
       bootstrapLoading ||
       query.isPending,
 
+    refreshing:
+      query.isFetching,
+
     error:
       query.error ?? null,
 
     reload:
-      async () => {
-
-        await query.refetch();
-
-      },
+      query.refetch,
 
   };
 

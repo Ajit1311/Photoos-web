@@ -1,9 +1,25 @@
 "use client";
+
+import { useMemo } from "react";
+
 import { useEventWizard } from "@/context/EventWizardContext";
+import { useProjects } from "@/hooks/useProjects";
 
 export default function StepOneBasicDetails() {
   // Component च्या स्टार्टिंगला context डेटा आणि setField मेथड ॲड केली आहे
   const { data, setField } = useEventWizard();
+
+  const {
+    data: projectsResponse,
+    loading: projectsLoading,
+  } = useProjects();
+
+  const projects = useMemo(
+    () => projectsResponse?.projects ?? [],
+    [projectsResponse],
+  );
+
+  const projectLocked = data.projectId.trim().length > 0;
 
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
@@ -16,6 +32,47 @@ export default function StepOneBasicDetails() {
       </p>
 
       <div className="mt-8 grid gap-6 md:grid-cols-2">
+        {/* Project Section */}
+        <div>
+          <label className="mb-2 block text-sm font-medium">
+            Project
+          </label>
+
+          {projectLocked ? (
+            <input
+              value={
+                projects.find(
+                  (project) => project.id === data.projectId,
+                )?.title ?? data.projectId
+              }
+              disabled
+              className="w-full rounded-2xl border border-slate-200 bg-slate-100 p-3"
+            />
+          ) : (
+            <select
+              value={data.projectId}
+              onChange={(event) =>
+                setField("projectId", event.target.value)
+              }
+              disabled={projectsLoading}
+              className="w-full rounded-2xl border border-slate-200 p-3"
+            >
+              <option value="">
+                Select Project
+              </option>
+
+              {projects.map((project) => (
+                <option
+                  key={project.id}
+                  value={project.id}
+                >
+                  {project.title}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+
         {/* Event Name */}
         <div>
           <label className="mb-2 block text-sm font-medium">

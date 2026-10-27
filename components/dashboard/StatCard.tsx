@@ -15,7 +15,7 @@ export default function StatCard({
   icon,
 }: StatCardProps) {
   return (
-    <div className="group relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-[#0A3F61]/20 hover:shadow-xl">
+    <div className="group relative overflow-hidden rounded-2xl border border-border/80 bg-card p-5 shadow-[0_4px_24px_rgba(10,63,97,0.045)] transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-[0_12px_32px_rgba(10,63,97,0.10)] sm:p-6">
 
       {/* Top Accent */}
       <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#0A3F61] via-[#3495A1] to-[#EF8619]" />
@@ -26,18 +26,18 @@ export default function StatCard({
 
         <div className="flex-1">
 
-          <p className="text-sm font-medium text-slate-500">
+          <p className="text-sm font-medium tracking-wide text-muted-foreground">
             {title}
           </p>
 
-          <h2 className="mt-3 text-4xl font-bold tracking-tight text-slate-900">
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
             {value}
           </h2>
 
           <div className="mt-5 flex items-center gap-2">
 
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-green-100">
-              <TrendingUp size={14} className="text-green-600" />
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50 ring-1 ring-emerald-100">
+              <TrendingUp size={14} className="text-emerald-700" />
             </div>
 
             <span className="text-sm font-medium text-green-600">
@@ -50,7 +50,7 @@ export default function StatCard({
 
         {/* Icon */}
 
-        <div className="rounded-2xl bg-gradient-to-br from-[#0A3F61]/10 to-[#3495A1]/10 p-4 text-[#0A3F61] transition-transform duration-300 group-hover:scale-110">
+        <div className="rounded-2xl border border-primary/10 bg-gradient-to-br from-primary/10 via-[#3495A1]/10 to-[#1F70B8]/5 p-3.5 text-primary transition-transform duration-300 group-hover:scale-110">
 
           {icon}
 

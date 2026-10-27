@@ -1,0 +1,491 @@
+"use client";
+
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  Bell,
+  Building2,
+  Crown,
+  Loader2,
+} from "lucide-react";
+
+import {
+  useBootstrapContext,
+} from "@/context/BootstrapContext";
+
+import {
+  useSubscriptionAccess,
+} from "@/context/SubscriptionAccessContext";
+
+import {
+  useNotificationContext,
+} from "@/context/NotificationContext";
+
+import NotificationPanel from "@/components/notifications/NotificationPanel";
+
+import Breadcrumb from "./Breadcrumb";
+import PageHeader from "./PageHeader";
+import GlobalSearch from "./GlobalSearch";
+import UserProfile from "./UserProfile";
+
+
+export default function Header() {
+
+  const bootstrap =
+    useBootstrapContext();
+
+
+  const {
+    data: subscription,
+    loading: subscriptionLoading,
+  } =
+    useSubscriptionAccess();
+
+
+  const {
+    badge: notificationBadge,
+    chatUnread,
+    loading: notificationLoading,
+  } =
+    useNotificationContext();
+
+
+  const totalUnread =
+    notificationBadge.unread +
+    chatUnread;
+
+
+  const studio =
+    bootstrap.data?.workspace.studio ??
+    null;
+
+
+  const [
+    notificationOpen,
+    setNotificationOpen,
+  ] =
+    useState(
+      false,
+    );
+
+
+  const mainPlan =
+    subscription?.main_plan ??
+    null;
+
+
+  const activeAddons =
+    subscription?.active_addons ??
+    [];
+
+
+  const usableAddons =
+    subscription?.has_access === true
+      ? activeAddons.filter(
+          (addon) =>
+            addon.is_active === true &&
+            addon.has_access !== false,
+        )
+      : [];
+
+
+  const hasVerifiedAddon =
+    usableAddons.some(
+      (addon) =>
+        addon.plan === "marketplace_verified" ||
+        addon.plan_name ===
+          "Marketplace Verified Badge",
+    );
+
+
+  const formatSubscriptionDate = (
+    value: string | null | undefined,
+  ) => {
+
+    if (!value) {
+      return "—";
+    }
+
+
+    return new Intl.DateTimeFormat(
+      "en-IN",
+      {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      },
+    ).format(
+      new Date(
+        value,
+      ),
+    );
+
+  };
+
+
+  const organization =
+    bootstrap.data?.workspace.organization ??
+    null;
+
+
+  const studioName =
+    studio?.name ??
+    null;
+
+
+  const organizationName =
+    organization?.display_name ??
+    organization?.legal_name ??
+    null;
+
+
+  return (
+    <header className="border-b border-slate-200 bg-white px-8 py-6">
+
+      <div className="flex items-start justify-between">
+
+        <div className="space-y-4">
+
+          <Breadcrumb />
+
+          <PageHeader />
+
+        </div>
+
+
+        <div className="flex items-center gap-4">
+
+          <GlobalSearch />
+
+
+          <div className="relative">
+
+            <button
+              type="button"
+              onClick={() => {
+
+                setNotificationOpen(
+                  (current) =>
+                    !current,
+                );
+
+              }}
+              className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white transition hover:bg-slate-50"
+            >
+
+            <Bell size={18} />
+
+            {!notificationLoading &&
+              totalUnread > 0 && (
+
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-red-500 px-1 text-[9px] font-bold leading-none text-white">
+
+                  {
+                    totalUnread > 99
+                      ? "99+"
+                      : totalUnread
+                  }
+
+                </span>
+
+              )}
+
+            </button>
+
+
+            <NotificationPanel
+              open={
+                notificationOpen
+              }
+              onClose={() => {
+
+                setNotificationOpen(
+                  false,
+                );
+
+              }}
+            />
+
+          </div>
+
+
+            <button
+              type="button"
+              onClick={() => {
+
+                window.location.href =
+                  "/dashboard/plans";
+
+              }}
+              className={`hidden h-[100px] min-w-[290px] max-w-[320px] items-start gap-3 rounded-2xl border bg-white px-4 py-3 text-left shadow-[0_8px_30px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_38px_rgba(15,23,42,0.10)] lg:flex ${
+                hasVerifiedAddon
+                  ? "border-amber-300 shadow-amber-100/80"
+                  : "border-slate-200 shadow-slate-100/70"
+              }`}
+            >
+
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600">
+
+                {
+                  subscriptionLoading
+                    ? (
+                        <Loader2
+                          size={16}
+                          className="animate-spin"
+                        />
+                      )
+                    : (
+                        <Crown
+                          size={17}
+                        />
+                      )
+                }
+
+              </div>
+
+
+              <div className="min-w-0 flex-1">
+
+                <div className="flex items-center justify-between gap-3">
+
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+
+                    Current Plan
+
+                  </p>
+
+
+                  {hasVerifiedAddon && (
+
+                    <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wide text-amber-700">
+
+                      Verified
+
+                    </span>
+
+                  )}
+
+                </div>
+
+
+                <div
+                  className="
+                    mt-2
+                    max-h-[58px]
+                    space-y-2
+                    overflow-y-scroll
+                    overscroll-contain
+                    scroll-smooth
+                    pr-1
+                    [scrollbar-color:rgb(203_213_225)_transparent]
+                    [scrollbar-width:thin]
+                  "
+                >
+
+                  <div className="rounded-xl border border-slate-100 bg-gradient-to-br from-slate-50/90 to-white px-2.5 py-1.5 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
+
+                    <div className="flex items-start justify-between gap-3">
+
+                      <div className="min-w-0">
+
+                        <p className="truncate text-sm font-bold text-slate-900">
+
+                          {
+                            subscriptionLoading
+                              ? "Loading..."
+                              : mainPlan?.plan_name ??
+                                subscription?.plan_name ??
+                                subscription?.plan ??
+                                "No active plan"
+                          }
+
+                        </p>
+
+
+                        {!subscriptionLoading && (
+
+                          <>
+
+                            <p className="mt-0.5 text-xs text-slate-500">
+
+                              ₹{
+                                mainPlan?.price ??
+                                subscription?.price ??
+                                "—"
+                              }
+                              {" / "}
+                              {
+                                mainPlan?.billing_cycle ??
+                                subscription?.billing_cycle ??
+                                "monthly"
+                              }
+
+                            </p>
+
+
+                            <p className="mt-0.5 text-[9px] text-slate-500">
+
+                              Expires{" "}
+                              {
+                                formatSubscriptionDate(
+                                  mainPlan?.effective_access_end_at ??
+                                  mainPlan?.subscription_end_at ??
+                                  subscription?.effective_access_end_at ??
+                                  subscription?.subscription_end_at,
+                                )
+                              }
+
+                            </p>
+
+                          </>
+
+                        )}
+
+                      </div>
+
+
+                      {!subscriptionLoading && (
+
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
+                            subscription?.has_access === true
+                              ? "bg-green-100 text-green-700"
+                              : "bg-red-100 text-red-700"
+                          }`}
+                        >
+
+                          {
+                            subscription?.has_access === true
+                              ? "Active"
+                              : "Expired"
+                          }
+
+                        </span>
+
+                      )}
+
+                    </div>
+
+                  </div>
+
+
+                  {usableAddons.map(
+                    (addon) => (
+
+                      <div
+                        key={
+                          addon.subscription_id ??
+                          addon.plan ??
+                          addon.plan_name ??
+                          "active-addon"
+                        }
+                        className="rounded-xl border border-amber-200 bg-amber-50/60 px-2.5 py-1.5"
+                      >
+
+                        <div className="flex items-start justify-between gap-3">
+
+                          <div className="flex min-w-0 items-start gap-2">
+
+                            <div
+                              className="
+                                mt-0.5
+                                flex
+                                h-7
+                                w-7
+                                shrink-0
+                                items-center
+                                justify-center
+                                rounded-lg
+                                border
+                                border-slate-700
+                                bg-slate-950
+                                text-sm
+                                shadow-sm
+                              "
+                            >
+
+                              👍
+
+                            </div>
+
+
+                            <div className="min-w-0">
+
+                              <p className="truncate text-xs font-bold text-amber-800">
+
+                              {
+                                addon.plan_name ??
+                                addon.plan ??
+                                "Active Add-on"
+                              }
+
+                            </p>
+
+
+                            <p className="mt-0.5 text-[10px] text-amber-700">
+
+                              {
+                                addon.currency === "INR"
+                                  ? "₹"
+                                  : `${addon.currency ?? ""} `
+                              }
+                              {addon.price ?? "—"}
+                              {" / "}
+                              {addon.billing_cycle ?? "monthly"}
+
+                            </p>
+
+
+                            <p className="mt-0.5 text-[9px] text-amber-700">
+
+                              Expires{" "}
+                              {
+                                formatSubscriptionDate(
+                                  addon.effective_access_end_at ??
+                                  addon.subscription_end_at,
+                                )
+                              }
+
+                              </p>
+
+                            </div>
+
+                          </div>
+
+
+                          <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-700">
+
+                            Active
+
+                          </span>
+
+                        </div>
+
+                      </div>
+
+                    ),
+                  )}
+
+                </div>
+
+              </div>
+
+            </button>
+
+
+
+          <UserProfile />
+
+        </div>
+
+      </div>
+
+    </header>
+  );
+
+}

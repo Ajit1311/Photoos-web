@@ -1,77 +1,159 @@
-import type { Event } from "@/types/event";
-
 import {
   eventService,
-  type EventListResult,
 } from "@/lib/services/event.service";
+
+import type {
+  Event,
+} from "@/types/event";
 
 import type {
   EventWizardData,
 } from "@/types/event-wizard";
 
+export type EventRepositoryListResult =
+  Awaited<
+    ReturnType<
+      typeof eventService.getAll
+    >
+  >;
+
+
 class EventRepository {
+
+
+  // ==========================================================================
+  // GET EVENTS FOR PROJECT
+  // ==========================================================================
 
   async getAll(
     studioId: string,
-    page = 1,
-    limit = 25,
-    search = "",
-  ): Promise<EventListResult> {
+    projectId: string,
+  ): Promise<EventRepositoryListResult> {
+
     return eventService.getAll(
       studioId,
-      page,
-      limit,
-      search,
+      projectId,
     );
+
   }
+
+
+  // ==========================================================================
+  // GET SINGLE EVENT
+  // ==========================================================================
 
   async getById(
     studioId: string,
     eventId: string,
   ): Promise<Event> {
+
     return eventService.getById(
       studioId,
       eventId,
     );
+
   }
 
+
+  // ==========================================================================
+  // CREATE EVENT
+  // ==========================================================================
+
   async create(
+    studioId: string,
+    wizard: EventWizardData,
+  ): Promise<Event> {
+
+    return eventService.create(
+      studioId,
+      wizard,
+    );
+
+  }
+
+
+  // ==========================================================================
+  // CREATE EVENT FROM WIZARD
+  // ==========================================================================
+
+  async createFromWizard(
+    studioId: string,
+    data: EventWizardData,
+  ): Promise<Event> {
+
+    return eventService.createFromWizard(
+      studioId,
+      data,
+    );
+
+  }
+
+
+  // ==========================================================================
+  // UPDATE EVENT
+  // ==========================================================================
+
+  async update(
   studioId: string,
-  wizard: EventWizardData,
+  event: Event,
+  status: string,
 ): Promise<Event> {
 
-  return eventService.create(
+  return eventService.update(
     studioId,
-    wizard,
+    event,
+    status,
   );
 
 }
 
-  async update(
-    event: Event,
-  ): Promise<Event> {
-    return eventService.update(event);
-  }
+
+  // ==========================================================================
+  // PUBLISH EVENT
+  // ==========================================================================
 
   async publish(
     eventId: string,
   ): Promise<Event> {
-    return eventService.publish(eventId);
+
+    return eventService.publish(
+      eventId,
+    );
+
   }
+
+
+  // ==========================================================================
+  // ARCHIVE EVENT
+  // ==========================================================================
 
   async archive(
     eventId: string,
   ): Promise<void> {
-    return eventService.archive(eventId);
+
+    return eventService.archive(
+      eventId,
+    );
+
   }
+
+
+  // ==========================================================================
+  // DELETE EVENT
+  // ==========================================================================
 
   async delete(
     eventId: string,
   ): Promise<void> {
-    return eventService.delete(eventId);
+
+    return eventService.delete(
+      eventId,
+    );
+
   }
 
 }
+
 
 export const eventRepository =
   new EventRepository();
