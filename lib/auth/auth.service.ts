@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
+import { publishableKey } from "@/lib/supabase/config";
 import { getSafeRedirectUrl } from "@/lib/security/safe-redirect";
 
 const AUTH_CALLBACK_PATH =
@@ -154,12 +155,26 @@ export async function signInWithGoogle(
         redirectTo:
           getRedirectUrl(next),
 
+        skipBrowserRedirect: true,
+
       },
 
     });
 
   if (error) {
     throw error;
+  }
+
+  if (data?.url && typeof window !== "undefined") {
+    try {
+      const targetUrl = new URL(data.url);
+      if (!targetUrl.searchParams.has("apikey") && publishableKey) {
+        targetUrl.searchParams.set("apikey", publishableKey);
+      }
+      window.location.href = targetUrl.toString();
+    } catch {
+      window.location.href = data.url;
+    }
   }
 
   return data;
