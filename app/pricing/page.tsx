@@ -405,7 +405,7 @@ export default function PricingPage() {
                             </li>
                             <li className="flex items-center gap-2.5 text-slate-400">
                               <PauseCircle className="h-4 w-4 shrink-0 text-slate-400" />
-                              <span>New uploads paused (0 new events)</span>
+                              <span>No new storage provided &bull; Uploads paused (0 new events)</span>
                             </li>
                           </>
                         ) : isAddon ? (

@@ -68,7 +68,7 @@ const formatFeatureName = (value: string) => {
     .replace(/\b\w/g, (character) => character.toUpperCase());
 };
 
-const formatLimitValue = (key: string, value: unknown): string => {
+const formatLimitValue = (key: string, value: unknown, isVault = false): string => {
   if (value === -1 || value === "-1") {
     return "Unlimited";
   }
@@ -84,6 +84,9 @@ const formatLimitValue = (key: string, value: unknown): string => {
   }
 
   if (key === "events_per_month" && !Number.isNaN(numericValue)) {
+    if (isVault || numericValue === 0) {
+      return "0 (Uploads Paused)";
+    }
     return `${numericValue.toLocaleString()} Events`;
   }
 
@@ -136,18 +139,27 @@ const getFeatures = (features: unknown): string[] => {
   return [];
 };
 
-const getLimits = (limits: unknown): Array<{ label: string; value: string }> => {
+const getLimits = (limits: unknown, isVault = false): Array<{ label: string; value: string }> => {
   if (!limits || typeof limits !== "object" || Array.isArray(limits)) {
     return [];
   }
 
   return Object.entries(limits as Record<string, unknown>)
-    .filter(([, value]) => value !== null && value !== undefined && typeof value !== "boolean")
+    .filter(([key, value]) => {
+      if (value === null || value === undefined || typeof value === "boolean") {
+        return false;
+      }
+      // In Studio Vault: no storage is given or displayed
+      if (isVault && (key === "storage_gb" || key === "upload_paused" || key === "galleries_active")) {
+        return false;
+      }
+      return true;
+    })
     .map(([key, value]) => ({
       label:
         limitLabels[key] ??
         key.replace(/_/g, " ").replace(/\b\w/g, (character) => character.toUpperCase()),
-      value: formatLimitValue(key, value),
+      value: formatLimitValue(key, value, isVault),
     }));
 };
 
@@ -507,10 +519,10 @@ export default function SubscriptionPlansPage() {
         {!loading && !error && visiblePlans.length > 0 && (
           <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {visiblePlans.map((plan) => {
-              const features = getFeatures(plan.features);
-              const limits = getLimits(plan.limits);
-              const addon = isAddonPlan(plan);
               const vault = isVaultPlan(plan);
+              const addon = isAddonPlan(plan);
+              const features = getFeatures(plan.features);
+              const limits = getLimits(plan.limits, vault);
               const isPopular = Boolean(plan.metadata?.popular);
 
               return (
@@ -607,7 +619,7 @@ export default function SubscriptionPlansPage() {
                     {limits.length > 0 && (
                       <div className="mt-6 border-t border-slate-100 pt-6">
                         <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                          {addon ? "Add-on Capacity" : "Studio Limits"}
+                          {addon ? "Add-on Capacity" : vault ? "Retention Architecture" : "Studio Limits"}
                         </h3>
                         <dl className="mt-4 space-y-2.5">
                           {limits.map((limit) => (

@@ -379,7 +379,7 @@ export const PLAN_CONFIGS: Record<string, PlanPresetConfig> = {
       marketplace: false,
     },
     limits: {
-      storage_gb: 100,
+      storage_gb: 0,
       events_per_month: 0,
       users: 1,
       watermark_photos: 0,
@@ -424,7 +424,7 @@ export const PLAN_CONFIGS: Record<string, PlanPresetConfig> = {
       marketplace: false,
     },
     limits: {
-      storage_gb: 100,
+      storage_gb: 0,
       events_per_month: 0,
       users: 1,
       watermark_photos: 0,
