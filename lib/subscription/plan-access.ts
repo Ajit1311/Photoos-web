@@ -67,7 +67,7 @@ export type PlanPresetConfig = {
 };
 
 export const PLAN_CONFIGS: Record<string, PlanPresetConfig> = {
-  // Free 7-Day Trial (Full feature exploration with limited trial usage)
+  // Free 7-Day Trial (Essential studio software exploration with standard trial gates)
   photoos_free_trial_7_day: {
     plan_code: "photoos_free_trial_7_day",
     name: "7-Day Free Trial",
@@ -82,30 +82,111 @@ export const PLAN_CONFIGS: Record<string, PlanPresetConfig> = {
       chat: true,
       qr_sharing: true,
       client_selfie_upload: true,
-      face_matching: true,
+      face_matching: false,
       matched_photo_delivery: true,
-      finance: true,
-      watermark: true,
+      finance: false,
+      watermark: false,
       reports: true,
-      whatsapp: true,
-      analytics: true,
-      automation: true,
-      ai_features: true,
+      whatsapp: false,
+      analytics: false,
+      automation: false,
+      ai_features: false,
       priority_support: false,
-      marketing: true,
-      team: true,
-      marketplace: true,
+      marketing: false,
+      team: false,
+      marketplace: false,
     },
     limits: {
       storage_gb: 5,
       events_per_month: 1,
       users: 1,
-      watermark_photos: 50,
+      watermark_photos: 0,
       photos_per_event: 500,
     },
     metadata: {
       is_trial: true,
       trial_days: 7,
+    },
+  },
+
+  // Free Tier
+  free: {
+    plan_code: "free",
+    name: "Free Plan",
+    price: 0,
+    billing_cycle: "monthly",
+    features: {
+      dashboard: true,
+      crm: true,
+      projects: true,
+      events: true,
+      gallery: true,
+      chat: true,
+      qr_sharing: true,
+      client_selfie_upload: true,
+      face_matching: false,
+      matched_photo_delivery: true,
+      finance: false,
+      watermark: false,
+      reports: true,
+      whatsapp: false,
+      analytics: false,
+      automation: false,
+      ai_features: false,
+      priority_support: false,
+      marketing: false,
+      team: false,
+      marketplace: false,
+    },
+    limits: {
+      storage_gb: 5,
+      events_per_month: 1,
+      users: 1,
+      watermark_photos: 0,
+      photos_per_event: 500,
+    },
+    metadata: {
+      is_free: true,
+    },
+  },
+
+  photoos_free: {
+    plan_code: "photoos_free",
+    name: "Free Plan",
+    price: 0,
+    billing_cycle: "monthly",
+    features: {
+      dashboard: true,
+      crm: true,
+      projects: true,
+      events: true,
+      gallery: true,
+      chat: true,
+      qr_sharing: true,
+      client_selfie_upload: true,
+      face_matching: false,
+      matched_photo_delivery: true,
+      finance: false,
+      watermark: false,
+      reports: true,
+      whatsapp: false,
+      analytics: false,
+      automation: false,
+      ai_features: false,
+      priority_support: false,
+      marketing: false,
+      team: false,
+      marketplace: false,
+    },
+    limits: {
+      storage_gb: 5,
+      events_per_month: 1,
+      users: 1,
+      watermark_photos: 0,
+      photos_per_event: 500,
+    },
+    metadata: {
+      is_free: true,
     },
   },
 
@@ -449,6 +530,9 @@ export function getPlanConfig(planCode: string | null | undefined): PlanPresetCo
   if (PLAN_CONFIGS[normalized]) {
     return PLAN_CONFIGS[normalized];
   }
+  if (normalized.includes("free") || normalized.includes("trial")) {
+    return PLAN_CONFIGS.photoos_free_trial_7_day;
+  }
   if (normalized.includes("vault")) {
     return PLAN_CONFIGS.studio_vault_monthly;
   }
@@ -543,9 +627,9 @@ export function canAccessPlanFeature(
     return false;
   }
 
-  // If features are empty or not strictly mapped, default to granting standard access
+  // If features are empty or not strictly mapped, check against canonical free trial entitlements
   if (!features || Object.keys(features).length === 0) {
-    return true;
+    return hasPlanFeature(PLAN_CONFIGS.photoos_free_trial_7_day.features, feature);
   }
 
   return hasPlanFeature(features, feature);

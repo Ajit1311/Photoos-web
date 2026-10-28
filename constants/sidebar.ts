@@ -14,6 +14,7 @@ import {
   ArrowUpCircle,
   Users,
   UsersRound,
+  XCircle,
 } from "lucide-react";
 
 
@@ -166,6 +167,11 @@ export const sidebar: SidebarGroupConfig[] = [
         title: "Plans & Billing",
         href: "/dashboard/plans",
         icon: CreditCard,
+      },
+      {
+        title: "Cancel Subscription",
+        href: "/dashboard/cancel-subscription",
+        icon: XCircle,
       },
     ],
   },

@@ -85,11 +85,11 @@ export async function getSubscriptionAccessDetails(
       const planConfig = isTrial ? PLAN_CONFIGS.photoos_free_trial_7_day : getPlanConfig(planCode);
 
       const resolvedFeatures = (rawPlan?.features && Object.keys(rawPlan.features).length > 0)
-        ? rawPlan.features
+        ? { ...planConfig.features, ...rawPlan.features }
         : planConfig.features;
 
       const resolvedLimits = (rawPlan?.limits && Object.keys(rawPlan.limits).length > 0)
-        ? rawPlan.limits
+        ? { ...planConfig.limits, ...rawPlan.limits }
         : planConfig.limits;
 
       return {

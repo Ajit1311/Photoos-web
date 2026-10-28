@@ -1371,6 +1371,12 @@ export default function SettingsPage() {
             >
               Cancel Subscription
             </button>
+            <Link
+              href="/dashboard/cancel-subscription"
+              className="text-xs text-slate-500 hover:text-slate-800 hover:underline transition"
+            >
+              Cancellation Options
+            </Link>
           </div>
         </div>
       </section>

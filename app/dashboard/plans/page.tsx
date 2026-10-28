@@ -15,6 +15,7 @@ import {
   useState,
 } from "react";
 
+import Link from "next/link";
 import {
   useRouter,
 } from "next/navigation";
@@ -778,18 +779,7 @@ export default function PlansPage() {
                                 )
                               }
 
-                              {subscription?.subscription_id && (
-                                <button
-                                  type="button"
-                                  onClick={() => setCancelModalOpen(true)}
-                                  className="mt-3 text-xs font-semibold text-red-600 hover:text-red-700 hover:underline transition"
-                                >
-                                  Cancel Subscription
-                                </button>
-                              )}
-
                             </div>
-
 
                             <p
                               className="
@@ -798,10 +788,24 @@ export default function PlansPage() {
                                 text-muted-foreground
                               "
                             >
-
                               Current base subscription
-
                             </p>
+
+                            <div className="mt-3 flex items-center gap-3">
+                              <button
+                                type="button"
+                                onClick={() => setCancelModalOpen(true)}
+                                className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50/70 px-3.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100 hover:text-red-700 transition shadow-sm"
+                              >
+                                Cancel Subscription
+                              </button>
+                              <Link
+                                href="/dashboard/cancel-subscription"
+                                className="text-xs text-slate-500 hover:text-slate-800 hover:underline transition"
+                              >
+                                Cancellation Options
+                              </Link>
+                            </div>
 
                           </div>
 
@@ -928,15 +932,7 @@ export default function PlansPage() {
                                 )
                               }
 
-                              {subscription?.subscription_id && (
-                                <button
-                                  type="button"
-                                  onClick={() => setCancelModalOpen(true)}
-                                  className="mt-3 text-xs font-semibold text-red-600 hover:text-red-700 hover:underline transition"
-                                >
-                                  Cancel Subscription
-                                </button>
-                              )}
+
 
                             </p>
 
@@ -981,15 +977,7 @@ export default function PlansPage() {
                                 )
                               }
 
-                              {subscription?.subscription_id && (
-                                <button
-                                  type="button"
-                                  onClick={() => setCancelModalOpen(true)}
-                                  className="mt-3 text-xs font-semibold text-red-600 hover:text-red-700 hover:underline transition"
-                                >
-                                  Cancel Subscription
-                                </button>
-                              )}
+
 
                             </p>
 
@@ -1133,15 +1121,7 @@ export default function PlansPage() {
                                 )
                               }
 
-                              {subscription?.subscription_id && (
-                                <button
-                                  type="button"
-                                  onClick={() => setCancelModalOpen(true)}
-                                  className="mt-3 text-xs font-semibold text-red-600 hover:text-red-700 hover:underline transition"
-                                >
-                                  Cancel Subscription
-                                </button>
-                              )}
+
 
                             </div>
                           }
@@ -2211,15 +2191,7 @@ export default function PlansPage() {
                                 )
                               }
 
-                              {subscription?.subscription_id && (
-                                <button
-                                  type="button"
-                                  onClick={() => setCancelModalOpen(true)}
-                                  className="mt-3 text-xs font-semibold text-red-600 hover:text-red-700 hover:underline transition"
-                                >
-                                  Cancel Subscription
-                                </button>
-                              )}
+
 
                             </div>
                           )

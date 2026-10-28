@@ -292,7 +292,7 @@ export default function SubscriptionPlansPage() {
         </div>
 
         {/* Current Active Plan Status Bar */}
-        {currentSubscription?.plan_name && (
+        {currentSubscription && (
           <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-3xl border border-slate-200 bg-white p-5 sm:px-6 shadow-sm">
             <div className="flex items-center gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#EBF5FB] text-[#0A3F61]">
@@ -304,11 +304,11 @@ export default function SubscriptionPlansPage() {
                     Current Active Plan
                   </span>
                   <span className="rounded-full bg-[#EBF5FB] px-2.5 py-0.5 text-[10px] font-extrabold text-[#0A3F61] uppercase tracking-wider">
-                    {currentSubscription.status}
+                    {currentSubscription.status || (currentSubscription.is_trial ? "trial" : "active")}
                   </span>
                 </div>
                 <h3 className="text-base font-black text-slate-900 tracking-tight">
-                  {currentSubscription.plan_name}
+                  {currentSubscription.plan_name || (currentSubscription.is_trial ? "7-Day Free Trial" : "Studio Base Plan")}
                 </h3>
               </div>
             </div>
