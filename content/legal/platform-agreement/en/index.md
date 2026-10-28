@@ -147,3 +147,4 @@ Complaints regarding platform services, intermediary obligations, or marketplace
 ### Document History & Changelog
 - **Version 0.0.1** | Effective: 1 November 2026 | Last Updated: 28 October 2026
   - Initial public legal release detailing tripartite marketplace rights, intermediary non-liability under Section 79 IT Act 2000, and separate photographer/client obligations.
+

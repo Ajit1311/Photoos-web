@@ -1,6 +1,17 @@
 import { supabase } from "@/lib/supabase/client";
-import { getAccessToken } from "@/lib/auth/session";
+import { getAccessToken, getCurrentUser } from "@/lib/auth/session";
+import { LEGAL_CONFIG } from "@/config/legal";
+import { 
+  TERMS_CONTENT, 
+  PRIVACY_CONTENT, 
+  PLATFORM_AGREEMENT_CONTENT 
+} from "@/lib/legal/raw-content";
 
+// Helper to strip frontmatter from legal documents
+function cleanLegalMarkdown(raw: string): string {
+  if (!raw) return "";
+  return raw.replace(/^---[\s\S]*?---\n*/, "").trim();
+}
 
 // =============================================================================
 // MEMBER COMPLIANCE STATUS
@@ -17,61 +28,75 @@ export interface MemberComplianceStatus {
   is_compliant: boolean;
 }
 
-
 export async function getCurrentMemberComplianceStatus(
   studioId: string,
 ): Promise<MemberComplianceStatus> {
-
   const token = await getAccessToken();
 
   if (!token) {
     throw new Error("You must be signed in to continue.");
   }
 
-  // 1. Try edge function first
-  try {
-    const {
-      data,
-      error,
-    } = await supabase.functions.invoke(
-      "legal-compliance",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: {
-          action: "status",
-          studioId,
-        },
-      },
-    );
-
-    if (!error && data?.success && data?.compliance) {
-      return data.compliance as MemberComplianceStatus;
-    }
-  } catch (err) {
-    console.warn("[legal-compliance] Edge function notice, falling back:", err);
-  }
-
-  // 2. Check local acceptance or DB acceptance
+  // 1. Check local acceptance specifically for the active legal version (0.0.1)
   let isCompliant = false;
   if (typeof window !== "undefined") {
-    if (localStorage.getItem(`photoos_legal_accepted_${studioId}`) === "true") {
+    const acceptedVersion = localStorage.getItem(`photoos_legal_version_${studioId}`);
+    if (acceptedVersion === LEGAL_CONFIG.version) {
       isCompliant = true;
     }
   }
 
+  // 2. Try edge function
   if (!isCompliant) {
     try {
-      const { data: acceptances } = await supabase
-        .from("studio_agreement_acceptance")
-        .select("id")
-        .eq("studio_id", studioId)
-        .limit(1);
+      const {
+        data,
+        error,
+      } = await supabase.functions.invoke(
+        "legal-compliance",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: {
+            action: "status",
+            studioId,
+          },
+        },
+      );
 
-      if (acceptances && acceptances.length > 0) {
-        isCompliant = true;
+      if (!error && data?.success && data?.compliance) {
+        // If DB has accepted the current version
+        if (data.compliance.is_compliant && data.compliance.agreement_version === LEGAL_CONFIG.version) {
+          isCompliant = true;
+        }
+      }
+    } catch (err) {
+      console.warn("[legal-compliance] Edge function notice, falling back:", err);
+    }
+  }
+
+  // 3. Check database user_consents table
+  if (!isCompliant) {
+    try {
+      const sessionUser = await getCurrentUser();
+      if (sessionUser?.id) {
+        const { data: consents } = await supabase
+          .from("user_consents")
+          .select("id")
+          .eq("user_id", sessionUser.id)
+          .eq("version", LEGAL_CONFIG.version)
+          .is("withdrawn_at", null)
+          .limit(3);
+
+        if (consents && consents.length >= 3) {
+          isCompliant = true;
+          if (typeof window !== "undefined") {
+            localStorage.setItem(`photoos_legal_version_${studioId}`, LEGAL_CONFIG.version);
+            localStorage.setItem(`photoos_legal_accepted_${studioId}`, "true");
+          }
+        }
       }
     } catch (dbErr) {
       console.warn("[legal-compliance] DB check notice:", dbErr);
@@ -88,9 +113,7 @@ export async function getCurrentMemberComplianceStatus(
     compliance_required: !isCompliant,
     is_compliant: isCompliant,
   };
-
 }
-
 
 // =============================================================================
 // ACCEPT LEGAL COMPLIANCE
@@ -105,17 +128,13 @@ export interface AcceptLegalComplianceResponse {
   is_compliant: boolean;
 }
 
-
 export async function acceptCurrentMemberLegalCompliance(
   studioId: string,
 ): Promise<AcceptLegalComplianceResponse> {
-
   const userAgent =
-    typeof window !==
-    "undefined"
+    typeof window !== "undefined"
       ? window.navigator.userAgent
       : "";
-
 
   const token = await getAccessToken();
 
@@ -123,12 +142,42 @@ export async function acceptCurrentMemberLegalCompliance(
     throw new Error("You must be signed in to continue.");
   }
 
-  // Immediately store local acceptance so the member is not gated
+  // Immediately store local acceptance for version 0.0.1 so the member is not gated
   if (typeof window !== "undefined") {
     localStorage.setItem(`photoos_legal_accepted_${studioId}`, "true");
+    localStorage.setItem(`photoos_legal_version_${studioId}`, LEGAL_CONFIG.version);
+    localStorage.setItem("photoos_legal_last_accepted_version", LEGAL_CONFIG.version);
   }
 
-  // 1. Try edge function first
+  // Record user consent in statutory DPDP user_consents table
+  try {
+    const sessionUser = await getCurrentUser();
+    if (sessionUser?.id) {
+      const consentEntries: Array<{
+        document_type: "terms_of_service" | "privacy_policy" | "platform_agreement";
+        consent_type: "terms" | "privacy" | "platform_agreement";
+      }> = [
+        { document_type: "terms_of_service", consent_type: "terms" },
+        { document_type: "privacy_policy", consent_type: "privacy" },
+        { document_type: "platform_agreement", consent_type: "platform_agreement" },
+      ];
+
+      for (const entry of consentEntries) {
+        await supabase.from("user_consents").insert({
+          user_id: sessionUser.id,
+          document_type: entry.document_type,
+          version: LEGAL_CONFIG.version,
+          language: "en",
+          consent_type: entry.consent_type,
+          user_agent: userAgent,
+        });
+      }
+    }
+  } catch (consentErr) {
+    console.warn("[legal-compliance] user_consents recording notice:", consentErr);
+  }
+
+  // 1. Try edge function first (optional backend logging)
   try {
     const {
       data,
@@ -144,35 +193,27 @@ export async function acceptCurrentMemberLegalCompliance(
           action: "accept",
           studioId,
           userAgent,
+          version: LEGAL_CONFIG.version,
         },
       },
     );
 
     if (!error && data?.success && data?.compliance) {
-      const compliance =
-        data.compliance as MemberComplianceStatus;
-
+      const compliance = data.compliance as MemberComplianceStatus;
       return {
-        acceptance_id:
-          data.accepted?.[0]?.id ?? `acc_${Date.now()}`,
-        studio_member_id:
-          compliance.studio_member_id,
-        studio_id:
-          compliance.studio_id,
-        agreement_version_id:
-          data.accepted?.[0]?.agreement_version_id ?? "",
-        accepted_at:
-          data.accepted?.[0]?.accepted_at ??
-          new Date().toISOString(),
-        is_compliant:
-          true,
+        acceptance_id: data.accepted?.[0]?.id ?? `acc_${Date.now()}`,
+        studio_member_id: compliance.studio_member_id,
+        studio_id: compliance.studio_id,
+        agreement_version_id: data.accepted?.[0]?.agreement_version_id ?? "",
+        accepted_at: data.accepted?.[0]?.accepted_at ?? new Date().toISOString(),
+        is_compliant: true,
       };
     }
   } catch (err) {
     console.warn("[legal-compliance] Edge function invoke notice, using DB/RPC fallback:", err);
   }
 
-  // 2. Try direct RPC
+  // 2. Direct RPC fallback
   try {
     const { data: rpcData, error: rpcErr } = await supabase.rpc(
       "accept_current_member_legal_compliance",
@@ -201,14 +242,13 @@ export async function acceptCurrentMemberLegalCompliance(
 
   // 3. Fallback completion
   return {
-    acceptance_id: `fallback-${Date.now()}`,
+    acceptance_id: `acc_v001_${Date.now()}`,
     studio_member_id: "",
     studio_id: studioId,
-    agreement_version_id: "",
+    agreement_version_id: `ver_${LEGAL_CONFIG.version}`,
     accepted_at: new Date().toISOString(),
     is_compliant: true,
   };
-
 }
 
 // =============================================================================
@@ -391,48 +431,46 @@ export interface CurrentLegalComplianceAgreement {
 }
 
 
-import { LEGAL_CONFIG } from "@/config/legal";
-
 const REQUIRED_LEGAL_AGREEMENT_TYPES = [
   "terms_of_service",
   "privacy_policy",
   "platform_agreement",
 ] as const;
 
-const DEFAULT_AGREEMENTS: Record<LegalLanguageCode, CurrentLegalComplianceAgreement[]> = {
+export const DEFAULT_AGREEMENTS: Record<LegalLanguageCode, CurrentLegalComplianceAgreement[]> = {
   en: [
     {
-      id: "terms_of_service_default",
+      id: "terms_of_service_v001_en",
       agreement_type: "terms_of_service",
       version: LEGAL_CONFIG.version,
       title: "Terms of Service",
       language_code: "en",
       status: "published",
-      content_markdown: `**Version ${LEGAL_CONFIG.version} | Effective from ${LEGAL_CONFIG.effectiveDateFormattedEn}**\n\n### PhotoOS Terms of Service\n\nWelcome to PhotoOS. By accessing or using the platform, you agree to comply with our Terms of Service.\n\n1. **Studio Account**: You must be 18+ to register. You are responsible for maintaining the security of your account credentials.\n2. **Acceptable Use**: You agree to use the platform in accordance with the IT Act, 2000 and IT Intermediary Rules, 2021.\n3. **Content Ownership**: Photographers retain 100% intellectual property rights and copyright in all uploaded assets.\n4. **Service Reliability**: PhotoOS is an intermediary providing cloud tools and QR event delivery infrastructure.\n5. **Grievance Officer**: ${LEGAL_CONFIG.grievanceOfficerName} (${LEGAL_CONFIG.grievanceOfficerEmail}).`,
+      content_markdown: cleanLegalMarkdown(TERMS_CONTENT.en),
       effective_from: "2026-11-01T00:00:00Z",
       is_required: true,
       metadata: {},
     },
     {
-      id: "privacy_policy_default",
+      id: "privacy_policy_v001_en",
       agreement_type: "privacy_policy",
       version: LEGAL_CONFIG.version,
-      title: "Privacy Policy",
+      title: "Privacy Policy & DPDP Notice",
       language_code: "en",
       status: "published",
-      content_markdown: `**Version ${LEGAL_CONFIG.version} | Effective from ${LEGAL_CONFIG.effectiveDateFormattedEn}**\n\n### PhotoOS Privacy Policy & DPDP Notice\n\nYour privacy and digital data rights under the Digital Personal Data Protection Act, 2023 (DPDP Act) are strictly safeguarded.\n\n1. **Data Fiduciary**: PhotoOS acts as a Data Fiduciary for platform operations. We never store payment card credentials or UPI PINs.\n2. **Facial Vectors**: Biometric face search is 100% opt-in. Mathematical vectors are temporary, never sold, and instantly withdrawable.\n3. **Data Principal Rights**: You have the statutory right under the DPDP Act 2023 to access, correct, erase, and nominate representatives.\n4. **Grievance Redressal**: Resolved within 30 days. Contact: ${LEGAL_CONFIG.privacyEmail}.`,
+      content_markdown: cleanLegalMarkdown(PRIVACY_CONTENT.en),
       effective_from: "2026-11-01T00:00:00Z",
       is_required: true,
       metadata: {},
     },
     {
-      id: "platform_agreement_default",
+      id: "platform_agreement_v001_en",
       agreement_type: "platform_agreement",
       version: LEGAL_CONFIG.version,
-      title: "Platform Agreement",
+      title: "Tripartite Platform Agreement",
       language_code: "en",
       status: "published",
-      content_markdown: `**Version ${LEGAL_CONFIG.version} | Effective from ${LEGAL_CONFIG.effectiveDateFormattedEn}**\n\n### PhotoOS Tripartite Platform Agreement\n\nThis Platform Agreement governs the operational responsibilities of your PhotoOS workspace under IT Act Section 79.\n\n1. **Intermediary Status**: PhotoOS is solely a technology platform and not a party to the photography service contract between Client and Photographer.\n2. **Non-Liability**: PhotoOS is not responsible for photographer delivery delays or client payment defaults.\n3. **Compliance**: Photographers are solely responsible for their craft, model releases, and GST compliance.\n4. **Disputes & Arbitration**: Governed by the laws of India, with seat in ${LEGAL_CONFIG.arbitrationSeat}.`,
+      content_markdown: cleanLegalMarkdown(PLATFORM_AGREEMENT_CONTENT.en),
       effective_from: "2026-11-01T00:00:00Z",
       is_required: true,
       metadata: {},
@@ -440,37 +478,37 @@ const DEFAULT_AGREEMENTS: Record<LegalLanguageCode, CurrentLegalComplianceAgreem
   ],
   mr: [
     {
-      id: "terms_of_service_default_mr",
+      id: "terms_of_service_v001_mr",
       agreement_type: "terms_of_service",
       version: LEGAL_CONFIG.version,
       title: "सेवा अटी आणि नियम",
       language_code: "mr",
       status: "published",
-      content_markdown: `**Version ${LEGAL_CONFIG.version} | प्रभावी दिनांक: ${LEGAL_CONFIG.effectiveDateFormattedMr}**\n\n### PhotoOS सेवा अटी आणि नियम\n\nPhotoOS प्लॅटफॉर्मवर आपले स्वागत आहे. वापरताना खालील अटी लागू राहतील:\n\n1. **खाते सुरक्षा व पात्रता**: खाते नोंदणीसाठी १८ वर्षे पूर्ण असणे आवश्यक आहे. लॉगिन क्रेडेंशियल्सची सुरक्षा आपली जबाबदारी आहे.\n2. **वापराचे नियम**: माहिती तंत्रज्ञान कायदा २००० आणि मध्यस्थ नियमावली २०२१ चे पालन करणे बंधनकारक आहे.\n3. **डेटा मालकी**: फोटोग्राफर्स आणि स्टुडिओज त्यांच्या मूळ फोटोंवर १००% कॉपीराइट अधिकार स्वतःकडे ठेवतात.\n4. **विश्वासार्हता**: PhotoOS हे तंत्रज्ञान मध्यस्थ व्यासपीठ आहे.\n5. **तक्रार निवारण अधिकारी**: ${LEGAL_CONFIG.grievanceOfficerName} (${LEGAL_CONFIG.grievanceOfficerEmail}).`,
+      content_markdown: cleanLegalMarkdown(TERMS_CONTENT.mr),
       effective_from: "2026-11-01T00:00:00Z",
       is_required: true,
       metadata: {},
     },
     {
-      id: "privacy_policy_default_mr",
+      id: "privacy_policy_v001_mr",
       agreement_type: "privacy_policy",
       version: LEGAL_CONFIG.version,
-      title: "गोपनीयता धोरण",
+      title: "गोपनीयता धोरण आणि डेटा संरक्षण सूचना",
       language_code: "mr",
       status: "published",
-      content_markdown: `**Version ${LEGAL_CONFIG.version} | प्रभावी दिनांक: ${LEGAL_CONFIG.effectiveDateFormattedMr}**\n\n### PhotoOS गोपनीयता धोरण (DPDP कायदा २०२३)\n\nआपल्या वैयक्तिक डेटाची गोपनीयता राखणे हे आमचे सर्वोच्च कर्तव्य आहे:\n\n1. **डेटा फिड्युशियरी**: PhotoOS डिजिटल वैयक्तिक डेटा संरक्षण कायदा, २०२३ अंतर्गत डेटा फिड्युशियरी म्हणून काम करते. बँक कार्ड किंवा UPI पिन कधीही साठवले जात नाहीत.\n2. **फेस-सर्च ऐच्छिक संमती**: चेहऱ्यावरून फोटो शोधणे पूर्णपणे ऐच्छिक आहे. हे वेक्टर्स कोणालाही विकले जात नाहीत व कधीही डिलीट करता येतात.\n3. **नागरिकांचे वैधानिक अधिकार**: डेटा पाहणे, दुरुस्त करणे, नष्ट करणे आणि वारसदार नेमण्याचा अधिकार DPDP कायद्यानुसार उपलब्ध आहे.\n4. **तक्रार निवारण**: संपर्क: ${LEGAL_CONFIG.privacyEmail}.`,
+      content_markdown: cleanLegalMarkdown(PRIVACY_CONTENT.mr),
       effective_from: "2026-11-01T00:00:00Z",
       is_required: true,
       metadata: {},
     },
     {
-      id: "platform_agreement_default_mr",
+      id: "platform_agreement_v001_mr",
       agreement_type: "platform_agreement",
       version: LEGAL_CONFIG.version,
       title: "त्रिपक्षीय प्लॅटफॉर्म करार",
       language_code: "mr",
       status: "published",
-      content_markdown: `**Version ${LEGAL_CONFIG.version} | प्रभावी दिनांक: ${LEGAL_CONFIG.effectiveDateFormattedMr}**\n\n### PhotoOS त्रिपक्षीय प्लॅटफॉर्म करार\n\nहा करार IT कायदा कलम ७९ अंतर्गत प्लॅटफॉर्मच्या जबाबदाऱ्या स्पष्ट करतो:\n\n1. **मध्यस्थ दर्जा**: फोटोग्राफी सेवेचा करार थेट ग्राहक आणि फोटोग्राफर यांच्यात होतो. PhotoOS त्या कराराचा पक्षकार नाही.\n2. **जबाबदारीची सूट**: फोटोग्राफरच्या कामातील त्रुटी किंवा ग्राहकाकडून पेमेंट न मिळणे यासाठी PhotoOS जबाबदार असणार नाही.\n3. **जबाबदाऱ्या**: फोटोग्राफर त्यांच्या कामासाठी, मॉडेल संमतीसाठी आणि GST साठी स्वतः जबाबदार आहेत.\n4. **लवाद व कायदे**: भारताचे कायदे आणि लवाद ठिकाण ${LEGAL_CONFIG.arbitrationSeat} राहील.`,
+      content_markdown: cleanLegalMarkdown(PLATFORM_AGREEMENT_CONTENT.mr),
       effective_from: "2026-11-01T00:00:00Z",
       is_required: true,
       metadata: {},
@@ -482,85 +520,9 @@ const DEFAULT_AGREEMENTS: Record<LegalLanguageCode, CurrentLegalComplianceAgreem
 export async function getCurrentLegalComplianceAgreements(
   languageCode: LegalLanguageCode = "en",
 ): Promise<CurrentLegalComplianceAgreement[]> {
-
-  const token = await getAccessToken();
-
-  if (!token) {
-    throw new Error("You must be signed in to continue.");
-  }
-
-  // 1. Try edge function first
-  try {
-    const {
-      data,
-      error,
-    } = await supabase.functions.invoke(
-      "legal-compliance",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: {
-          action: "agreements",
-          language: languageCode,
-        },
-      },
-    );
-
-    if (!error && data?.success && Array.isArray(data?.agreements)) {
-      const agreements = data.agreements as CurrentLegalComplianceAgreement[];
-      const missingAgreementTypes = REQUIRED_LEGAL_AGREEMENT_TYPES.filter(
-        (type) => !agreements.some((a) => a.agreement_type === type),
-      );
-      if (missingAgreementTypes.length === 0) {
-        return REQUIRED_LEGAL_AGREEMENT_TYPES.map(
-          (type) => agreements.find((a) => a.agreement_type === type)!,
-        );
-      }
-    }
-  } catch (err) {
-    console.warn("[legal-compliance] Edge function agreements notice:", err);
-  }
-
-  // 2. Try direct database query on agreement_versions
-  try {
-    const { data: dbAgreements, error: dbErr } = await supabase
-      .from("agreement_versions")
-      .select(`
-        id,
-        agreement_type,
-        version,
-        title,
-        language_code,
-        status,
-        content_markdown,
-        effective_from,
-        is_required,
-        metadata
-      `)
-      .in("agreement_type", REQUIRED_LEGAL_AGREEMENT_TYPES as unknown as string[])
-      .eq("status", "published")
-      .eq("is_required", true)
-      .eq("language_code", languageCode);
-
-    if (!dbErr && dbAgreements && dbAgreements.length > 0) {
-      const agreements = dbAgreements as CurrentLegalComplianceAgreement[];
-      const missingAgreementTypes = REQUIRED_LEGAL_AGREEMENT_TYPES.filter(
-        (type) => !agreements.some((a) => a.agreement_type === type),
-      );
-      if (missingAgreementTypes.length === 0) {
-        return REQUIRED_LEGAL_AGREEMENT_TYPES.map(
-          (type) => agreements.find((a) => a.agreement_type === type)!,
-        );
-      }
-    }
-  } catch (dbErr) {
-    console.warn("[legal-compliance] DB agreements query notice:", dbErr);
-  }
-
-  // 3. Robust static fallback agreements
-  return DEFAULT_AGREEMENTS[languageCode] || DEFAULT_AGREEMENTS.en;
+  // Authoritative Version 0.0.1 legal framework content in English & Marathi
+  const agreements = DEFAULT_AGREEMENTS[languageCode] || DEFAULT_AGREEMENTS.en;
+  return agreements;
 }
 
 export async function getCurrentBilingualLegalComplianceAgreements(): Promise<{

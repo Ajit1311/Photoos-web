@@ -237,3 +237,4 @@ export function checkLocalConsent(consentType: ConsentType): boolean {
     return false;
   }
 }
+

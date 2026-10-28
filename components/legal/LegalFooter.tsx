@@ -86,3 +86,4 @@ export function LegalFooter() {
     </footer>
   );
 }
+

@@ -73,3 +73,4 @@ export const LEGAL_CONFIG = {
 } as const;
 
 export type LegalConfigType = typeof LEGAL_CONFIG;
+

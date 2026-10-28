@@ -137,3 +137,4 @@ language: "en"
 ### Document History & Changelog
 - **Version 0.0.1** | Effective: 1 November 2026 | Last Updated: 28 October 2026
   - Initial public legal release incorporating DPDP Act 2023 principles, IT Intermediary Rules 2021 standards, bilingual delivery, and explicit facial vector provisions.
+

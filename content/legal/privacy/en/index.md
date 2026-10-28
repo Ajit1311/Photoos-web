@@ -150,3 +150,4 @@ We may update this Privacy Policy periodically to reflect technological changes 
 ### Document History & Changelog
 - **Version 0.0.1** | Effective: 1 November 2026 | Last Updated: 28 October 2026
   - Comprehensive alignment with the Digital Personal Data Protection Act, 2023 (DPDP Act) and CERT-In directions, separate biometric opt-in notices, and Data Principal rights procedures.
+

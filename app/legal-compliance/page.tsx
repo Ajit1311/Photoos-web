@@ -41,6 +41,8 @@ import {
   LEGAL_LANGUAGE_OPTIONS,
 } from "@/lib/api/legal-compliance";
 
+import { LEGAL_CONFIG } from "@/config/legal";
+
 import type {
   CurrentLegalComplianceAgreement,
   LegalLanguageCode,
@@ -832,29 +834,15 @@ export default function LegalCompliancePage() {
 
 
         /*
-         * IMPORTANT:
-         *
-         * Historical acceptance must NOT automatically complete
-         * the current Legal & Compliance review session.
-         *
-         * Even when the backend reports the member as already
-         * compliant, this page requires the user to review all
-         * three currently published documents again.
-         *
-         * The final acceptance RPC remains responsible for
-         * recording the legal acceptance.
+         * Note: If compliance is already met and the user came from an automated flow without
+         * explicit intent to review, they can proceed. However, when visiting /legal-compliance
+         * directly, we always render the published legal documents for transparent review.
          */
-        if (
-          compliance.compliance_required ===
-          false
-        ) {
-
-          router.replace(
-            "/dashboard",
-          );
-
+        const searchParams = new URLSearchParams(window.location.search);
+        const autoRedirect = searchParams.get("auto_redirect") === "true";
+        if (autoRedirect && compliance.compliance_required === false) {
+          router.replace("/dashboard");
           return;
-
         }
 
 
@@ -1739,6 +1727,12 @@ export default function LegalCompliancePage() {
                             <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-700">
 
                               Currently active
+
+                            </span>
+
+                            <span className="rounded-full border border-sky-100 bg-sky-50 px-3 py-1.5 text-[11px] font-bold text-sky-700">
+
+                              {language === "mr" ? `प्रभावी दिनांक: ${LEGAL_CONFIG.effectiveDateFormattedMr}` : `Effective from ${LEGAL_CONFIG.effectiveDateFormattedEn}`}
 
                             </span>
 

@@ -80,3 +80,4 @@ export const LEGAL_METADATA: Record<LegalDocumentType, LegalDocumentMetadata> = 
     ],
   },
 };
+

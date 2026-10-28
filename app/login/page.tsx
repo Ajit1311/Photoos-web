@@ -153,13 +153,17 @@ function LoginPageContent() {
 
             {/* Copyright & Legal Links */}
             <div className="mt-10 border-t border-border/80 pt-6 text-center space-y-2">
-              <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
+              <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-muted-foreground">
                 <Link href="/privacy" className="hover:text-foreground transition underline-offset-4 hover:underline">
                   Privacy Policy
                 </Link>
                 <span>&bull;</span>
                 <Link href="/terms" className="hover:text-foreground transition underline-offset-4 hover:underline">
                   Terms of Service
+                </Link>
+                <span>&bull;</span>
+                <Link href="/platform-agreement" className="hover:text-foreground transition underline-offset-4 hover:underline">
+                  Platform Agreement
                 </Link>
                 <span>&bull;</span>
                 <Link href="/pricing" className="hover:text-foreground transition underline-offset-4 hover:underline">

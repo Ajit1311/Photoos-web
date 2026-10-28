@@ -284,13 +284,20 @@ export function LoginForm() {
           className="font-semibold text-slate-500 underline-offset-2 hover:text-primary hover:underline"
         >
           Terms of Service
-        </Link>{" "}
-        and{" "}
+        </Link>
+        ,{" "}
         <Link
           href="/privacy"
           className="font-semibold text-slate-500 underline-offset-2 hover:text-primary hover:underline"
         >
           Privacy Policy
+        </Link>
+        {" "}and{" "}
+        <Link
+          href="/platform-agreement"
+          className="font-semibold text-slate-500 underline-offset-2 hover:text-primary hover:underline"
+        >
+          Platform Agreement
         </Link>
         .
       </p>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LEGAL_CONFIG } from "@/config/legal";
 
 export function LoginFooter() {
   return (
@@ -7,10 +8,10 @@ export function LoginFooter() {
       <div className="flex flex-col items-center gap-3 text-center">
 
         <p className="text-xs text-muted-foreground">
-          Version 1.0.0
+          Version {LEGAL_CONFIG.version}
         </p>
 
-        <div className="flex items-center gap-4 text-xs">
+        <div className="flex flex-wrap items-center justify-center gap-3 text-xs">
 
           <Link
             href="/privacy"
@@ -28,6 +29,17 @@ export function LoginFooter() {
             className="transition-colors hover:text-primary"
           >
             Terms of Service
+          </Link>
+
+          <span className="text-muted-foreground">
+            •
+          </span>
+
+          <Link
+            href="/platform-agreement"
+            className="transition-colors hover:text-primary"
+          >
+            Platform Agreement
           </Link>
 
         </div>

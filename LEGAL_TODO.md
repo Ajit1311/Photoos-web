@@ -67,3 +67,4 @@ When terms are amended in the future:
 2. Update `LEGAL_CONFIG.effectiveDate` and `LEGAL_CONFIG.lastUpdated`.
 3. Add a concise summary entry in `LEGAL_CONFIG.changelog`.
 4. The system's `<ReconsentModal />` will automatically detect the version mismatch and prompt all active authenticated users to review changes and re-consent upon their next session.
+
