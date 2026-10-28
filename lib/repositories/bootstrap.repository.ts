@@ -52,7 +52,34 @@ class BootstrapRepository {
       .limit(1)
       .maybeSingle();
 
-    if (!member) {
+    let memberData = member;
+
+    if (!memberData) {
+      try {
+        const { data: rpcRes } = await supabase.rpc("bootstrap_workspace", {
+          p_profile_id: userId,
+        });
+
+        if (rpcRes) {
+          const res = rpcRes as Record<string, unknown>;
+          const studioObj = res.studio as Record<string, unknown> | undefined;
+          const memberObj = res.membership as Record<string, unknown> | undefined;
+
+          if (studioObj && memberObj) {
+            memberData = {
+              id: memberObj.id as string,
+              studio_id: studioObj.id as string,
+              role_id: (memberObj.role_id as string) ?? "",
+              status: "active",
+            };
+          }
+        }
+      } catch (rpcErr) {
+        console.warn("[BootstrapRepository] RPC bootstrap notice:", rpcErr);
+      }
+    }
+
+    if (!memberData) {
       return {
         success: true,
         bootstrapRequired: true,
@@ -71,7 +98,7 @@ class BootstrapRepository {
     const { data: studio } = await supabase
       .from("studios")
       .select("id, name, brand_name, organization_id, status")
-      .eq("id", member.studio_id)
+      .eq("id", memberData.studio_id)
       .maybeSingle();
 
     return {
@@ -87,20 +114,20 @@ class BootstrapRepository {
       },
       workspace: {
         studio: {
-          id: studio?.id ?? member.studio_id,
+          id: studio?.id ?? memberData.studio_id,
           name: studio?.name ?? "My Studio",
           slug: "my-studio",
           status: studio?.status ?? "active",
         },
         membership: {
-          id: member.id,
-          studioId: member.studio_id,
+          id: memberData.id,
+          studioId: memberData.studio_id,
           profileId: userId,
-          roleId: member.role_id,
-          status: member.status,
+          roleId: memberData.role_id,
+          status: memberData.status,
         },
         role: {
-          id: member.role_id,
+          id: memberData.role_id,
           name: "Studio Owner",
           code: "studio_owner",
           level: 100,

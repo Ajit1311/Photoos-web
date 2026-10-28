@@ -278,29 +278,37 @@ export default function DashboardPage() {
   }
 
 
-  if (
-    bootstrap.error ||
-    dashboard.error
-  ) {
-
+  if (bootstrap.error && !bootstrap.data) {
     return (
-      <main className="flex min-h-[60vh] items-center justify-center">
-
-        <div className="rounded-[28px] border border-red-100 bg-card p-8 text-center shadow-sm">
-
-          <h1 className="text-lg font-semibold text-foreground">
-
-            Unable to load dashboard
-
+      <main className="flex min-h-[60vh] items-center justify-center px-4">
+        <div className="max-w-md w-full rounded-[28px] border border-border/80 bg-card p-8 text-center shadow-lg space-y-4">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500">
+            <RefreshCw className="h-6 w-6" />
+          </div>
+          <h1 className="text-lg font-bold text-foreground">
+            Unable to connect to workspace
           </h1>
-
-
+          <p className="text-xs leading-5 text-muted-foreground">
+            {bootstrap.error?.message || "A temporary connection error occurred while loading your studio."}
+          </p>
+          <div className="pt-2 flex flex-col gap-2.5 sm:flex-row">
+            <button
+              type="button"
+              onClick={handleRefresh}
+              className="flex-1 rounded-xl bg-primary px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/90"
+            >
+              Try Again
+            </button>
+            <Link
+              href="/login"
+              className="flex-1 rounded-xl border border-border bg-muted/40 px-4 py-2.5 text-xs font-semibold text-foreground transition hover:bg-muted"
+            >
+              Return to Login
+            </Link>
+          </div>
         </div>
-
       </main>
     );
-
-
   }
 
 
