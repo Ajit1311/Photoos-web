@@ -184,31 +184,49 @@ function OnboardingStudioPage() {
       return;
     }
 
-    if (!planId || !planCode) {
-      router.replace("/dashboard");
+    if (planId) {
+      setSubmitting(true);
+      setError(null);
+
+      const params = new URLSearchParams({
+        planId,
+        planCode: planCode ?? "",
+        billingCycle: billingCycle ?? "monthly",
+        fullName: form.fullName,
+        phone: form.phone,
+        email: form.email,
+        studioName: form.studioName,
+        location: form.location,
+      });
+
+      router.push(
+        `/onboarding/studio/payment?${params.toString()}`,
+      );
       return;
     }
 
-    setSubmitting(true);
-    setError(null);
-
-    const params = new URLSearchParams({
-      planId,
-      planCode,
-      billingCycle: billingCycle ?? "",
-      fullName: form.fullName,
-      phone: form.phone,
-      email: form.email,
-      studioName: form.studioName,
-      location: form.location,
-    });
-
-    router.push(
-      `/onboarding/studio/payment?${params.toString()}`,
-    );
+    router.replace("/dashboard");
   }
 
   function skipInformation() {
+    if (planId && mode !== "trial") {
+      const params = new URLSearchParams({
+        planId,
+        planCode: planCode ?? "",
+        billingCycle: billingCycle ?? "monthly",
+        fullName: form.fullName,
+        phone: form.phone,
+        email: form.email,
+        studioName: form.studioName,
+        location: form.location,
+      });
+
+      router.push(
+        `/onboarding/studio/payment?${params.toString()}`,
+      );
+      return;
+    }
+
     router.replace("/dashboard");
   }
 

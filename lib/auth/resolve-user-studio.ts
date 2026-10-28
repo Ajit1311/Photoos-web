@@ -1,4 +1,4 @@
-import { getAccessToken } from "@/lib/auth/session";
+import { getAccessToken, getSession } from "@/lib/auth/session";
 import { supabase } from "@/lib/supabase/client";
 
 import type {
@@ -16,63 +16,78 @@ export type ResolvedStudioMembership = {
 };
 
 export async function resolveUserStudio(): Promise<ResolvedStudioMembership | null> {
-  const accessToken =
-    await getAccessToken();
+  const session = await getSession();
+  const userId = session?.user?.id;
 
-  if (!accessToken) {
+  if (!userId) {
     return null;
   }
 
-  const {
-    data,
-    error,
-  } =
-    await supabase.functions.invoke(
-      "bootstrap",
-      {
-        method: "POST",
-        headers: {
-          Authorization:
-            `Bearer ${accessToken}`,
+  // 1. Try edge function first
+  try {
+    const accessToken = await getAccessToken();
+
+    if (accessToken) {
+      const { data, error } = await supabase.functions.invoke(
+        "bootstrap",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
         },
-      },
-    );
+      );
 
-  if (error) {
-    throw error;
+      if (!error && data?.success) {
+        const response = data as BootstrapResponse;
+        const workspace = response.workspace;
+
+        if (
+          !response.bootstrapRequired &&
+          workspace?.membership &&
+          workspace?.studio
+        ) {
+          const membership = workspace.membership;
+          return {
+            memberId: membership.id,
+            studioId: membership.studioId,
+            profileId: membership.profileId,
+            roleId: membership.roleId,
+            status: membership.status,
+            invitationStatus: "accepted",
+            joinedAt: null,
+          };
+        }
+      }
+    }
+  } catch (fnErr) {
+    console.warn("[resolveUserStudio] Edge function error, falling back to direct DB:", fnErr);
   }
 
-  if (!data?.success) {
-    throw new Error(
-      data?.error?.message ??
-        "Unable to resolve PhotoOS workspace.",
-    );
+  // 2. Direct database query fallback
+  try {
+    const { data: member, error: dbErr } = await supabase
+      .from("studio_members")
+      .select("id, studio_id, profile_id, role_id, status")
+      .eq("profile_id", userId)
+      .eq("status", "active")
+      .limit(1)
+      .maybeSingle();
+
+    if (!dbErr && member) {
+      return {
+        memberId: member.id,
+        studioId: member.studio_id,
+        profileId: member.profile_id,
+        roleId: member.role_id,
+        status: member.status,
+        invitationStatus: "accepted",
+        joinedAt: null,
+      };
+    }
+  } catch (dbErr) {
+    console.warn("[resolveUserStudio] DB query fallback error:", dbErr);
   }
 
-  const response =
-    data as BootstrapResponse;
-
-  const workspace =
-    response.workspace;
-
-  if (
-    response.bootstrapRequired ||
-    !workspace?.membership ||
-    !workspace?.studio
-  ) {
-    return null;
-  }
-
-  const membership =
-    workspace.membership;
-
-  return {
-    memberId: membership.id,
-    studioId: membership.studioId,
-    profileId: membership.profileId,
-    roleId: membership.roleId,
-    status: membership.status,
-    invitationStatus: "accepted",
-    joinedAt: null,
-  };
+  return null;
 }
