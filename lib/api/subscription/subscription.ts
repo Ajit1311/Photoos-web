@@ -88,15 +88,15 @@ export async function getSubscriptionAccessDetails(
     console.warn("[SUBSCRIPTION ACCESS] DB fallback error:", dbErr);
   }
 
-  // 3. Brand new onboarding studio fallback: 14-day Free Trial
+  // 3. Brand new onboarding studio fallback: 7-day Free Trial
   const now = Date.now();
-  const trialEnd = now + 14 * 24 * 60 * 60 * 1000;
+  const trialEnd = now + 7 * 24 * 60 * 60 * 1000;
 
   return {
     subscription_id: null,
     plan_id: null,
     plan: "Free Trial",
-    plan_name: "14-Day Free Trial",
+    plan_name: "7-Day Free Trial",
     plan_type: "studio_software",
     price: 0,
     currency: "INR",
@@ -105,7 +105,7 @@ export async function getSubscriptionAccessDetails(
     access_status: "trial",
     has_access: true,
     is_trial: true,
-    trial_days: 14,
+    trial_days: 7,
     trial_start_at: new Date(now).toISOString(),
     trial_end_at: new Date(trialEnd).toISOString(),
     subscription_start_at: null,
@@ -113,7 +113,7 @@ export async function getSubscriptionAccessDetails(
     effective_access_end_at: new Date(trialEnd).toISOString(),
     expired_at: null,
     next_billing_at: null,
-    days_remaining: 14,
+    days_remaining: 7,
     is_expiring_soon: false,
     features: {},
     limits: {},
