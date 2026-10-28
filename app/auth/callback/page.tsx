@@ -5,58 +5,95 @@ import {
   useEffect,
 } from "react";
 
-import { useRouter } from "next/navigation";
-
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 
 function AuthCallbackContent() {
   const router = useRouter();
-
-  const next =
-    typeof window !== "undefined"
-      ? new URLSearchParams(
-          window.location.search,
-        ).get("next")
-      : null;
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     let mounted = true;
 
     async function completeLogin() {
       try {
+        const code = searchParams.get("code");
+        const tokenHash = searchParams.get("token_hash");
+        const next = searchParams.get("next");
+        const callbackError = searchParams.get("error");
+        const errorDescription = searchParams.get("error_description");
+
+        if (callbackError) {
+          throw new Error(errorDescription || callbackError);
+        }
+
+        // 1. If PKCE authorization code is returned from Google / OAuth
+        if (code) {
+          const { error: exchangeError } =
+            await supabase.auth.exchangeCodeForSession(code);
+
+          if (exchangeError) {
+            console.error("[AuthCallback] Code exchange error:", exchangeError);
+            throw exchangeError;
+          }
+        } else if (tokenHash) {
+          // 2. If token hash (OTP or Magic Link)
+          const type = (searchParams.get("type") as "email" | "magiclink" | null) || "email";
+          const { error: otpError } =
+            await supabase.auth.verifyOtp({
+              token_hash: tokenHash,
+              type,
+            });
+
+          if (otpError) {
+            console.error("[AuthCallback] OTP verification error:", otpError);
+            throw otpError;
+          }
+        } else if (typeof window !== "undefined" && window.location.hash) {
+          // 3. If hash parameters (#access_token=...&refresh_token=...)
+          const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+          const accessToken = hashParams.get("access_token");
+          const refreshToken = hashParams.get("refresh_token");
+
+          if (accessToken && refreshToken) {
+            const { error: setSessionError } =
+              await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken,
+              });
+
+            if (setSessionError) {
+              console.error("[AuthCallback] Set session error:", setSessionError);
+              throw setSessionError;
+            }
+          }
+        }
+
+        // 4. Verify and establish session
         const {
           data,
-          error,
-        } =
-          await supabase.auth.getSession();
+          error: sessionError,
+        } = await supabase.auth.getSession();
 
-        if (error) {
-          throw error;
+        if (sessionError) {
+          throw sessionError;
         }
 
         if (!data.session) {
-          throw new Error(
-            "Authentication session could not be established.",
-          );
+          throw new Error("Authentication session could not be established.");
         }
 
         if (mounted) {
-          const loadingUrl =
-            new URL(
-              "/auth/loading",
-              window.location.origin,
-            );
+          const loadingUrl = new URL(
+            "/auth/loading",
+            window.location.origin,
+          );
 
           if (next) {
-            loadingUrl.searchParams.set(
-              "next",
-              next,
-            );
+            loadingUrl.searchParams.set("next", next);
           }
 
-          router.replace(
-            loadingUrl.toString(),
-          );
+          router.replace(loadingUrl.toString());
         }
       } catch (error) {
         console.error(
@@ -65,9 +102,8 @@ function AuthCallbackContent() {
         );
 
         if (mounted) {
-          router.replace(
-            "/login?error=authentication_failed",
-          );
+          const errMessage = error instanceof Error ? encodeURIComponent(error.message) : "authentication_failed";
+          router.replace(`/login?error=${errMessage}`);
         }
       }
     }
@@ -77,7 +113,7 @@ function AuthCallbackContent() {
     return () => {
       mounted = false;
     };
-  }, [router, next]);
+  }, [router, searchParams]);
 
   return (
     <main className="flex min-h-screen items-center justify-center">
@@ -112,11 +148,7 @@ function AuthCallbackFallback() {
 
 export default function AuthCallbackPage() {
   return (
-    <Suspense
-      fallback={
-        <AuthCallbackFallback />
-      }
-    >
+    <Suspense fallback={<AuthCallbackFallback />}>
       <AuthCallbackContent />
     </Suspense>
   );
