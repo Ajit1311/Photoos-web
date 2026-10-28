@@ -1,30 +1,9 @@
 import { supabase } from "@/lib/supabase/client";
 import { getAccessToken, getSession } from "@/lib/auth/session";
 import type { SubscriptionAccessDetails } from "@/types/subscription/subscription";
+import { getPlanConfig, PLAN_CONFIGS } from "@/lib/subscription/plan-access";
 
-const DEFAULT_STUDIO_PLAN_FEATURES = {
-  dashboard: true,
-  crm: true,
-  projects: true,
-  events: true,
-  gallery: true,
-  chat: true,
-  reports: true,
-  whatsapp: true,
-  analytics: true,
-  automation: true,
-  ai_features: true,
-  priority_support: true,
-  qr_sharing: true,
-  client_selfie_upload: true,
-  face_matching: true,
-  matched_photo_delivery: true,
-  watermark: true,
-  marketing: true,
-  finance: true,
-  team: true,
-  marketplace: true,
-};
+const DEFAULT_STUDIO_PLAN_FEATURES = PLAN_CONFIGS.photoos_free_trial_7_day.features;
 
 export async function getSubscriptionAccessDetails(
   studioId: string,
@@ -67,7 +46,17 @@ export async function getSubscriptionAccessDetails(
         trial_start_at,
         trial_end_at,
         subscription_start_at,
-        subscription_end_at
+        subscription_end_at,
+        subscription_plans:plan_id (
+          plan_code,
+          name,
+          price,
+          currency,
+          billing_cycle,
+          features,
+          limits,
+          metadata
+        )
       `)
       .eq("studio_id", studioId)
       .order("created_at", { ascending: false })
@@ -81,20 +70,42 @@ export async function getSubscriptionAccessDetails(
       const isTrial = sub.status === "trial";
       const hasAccess = (isTrial && trialEnd > now) || (sub.status === "active" && (!subEnd || subEnd > now));
 
+      // Resolve plan details from DB or preset catalog
+      const rawPlan = sub.subscription_plans as unknown as {
+        plan_code?: string;
+        name?: string;
+        price?: number;
+        currency?: string;
+        billing_cycle?: string;
+        features?: Record<string, unknown>;
+        limits?: Record<string, unknown>;
+      } | null;
+
+      const planCode = rawPlan?.plan_code || (isTrial ? "photoos_free_trial_7_day" : "business_starter_monthly");
+      const planConfig = isTrial ? PLAN_CONFIGS.photoos_free_trial_7_day : getPlanConfig(planCode);
+
+      const resolvedFeatures = (rawPlan?.features && Object.keys(rawPlan.features).length > 0)
+        ? rawPlan.features
+        : planConfig.features;
+
+      const resolvedLimits = (rawPlan?.limits && Object.keys(rawPlan.limits).length > 0)
+        ? rawPlan.limits
+        : planConfig.limits;
+
       return {
         subscription_id: sub.id,
         plan_id: sub.plan_id,
-        plan: "PhotoOS Studio Plan",
-        plan_name: "PhotoOS Studio Plan",
+        plan: planCode,
+        plan_name: rawPlan?.name || planConfig.name,
         plan_type: "studio_software",
-        price: 0,
-        currency: "INR",
-        billing_cycle: "monthly",
+        price: rawPlan?.price ?? planConfig.price,
+        currency: rawPlan?.currency || "INR",
+        billing_cycle: (rawPlan?.billing_cycle as "monthly" | "yearly") || planConfig.billing_cycle,
         status: hasAccess ? sub.status : "expired",
         access_status: hasAccess ? (isTrial ? "trial" : "active") : "expired",
         has_access: hasAccess,
         is_trial: isTrial,
-        trial_days: 14,
+        trial_days: isTrial ? 7 : 0,
         trial_start_at: sub.trial_start_at,
         trial_end_at: sub.trial_end_at,
         subscription_start_at: sub.subscription_start_at,
@@ -104,8 +115,8 @@ export async function getSubscriptionAccessDetails(
         next_billing_at: null,
         days_remaining: Math.max(0, Math.ceil(((isTrial ? trialEnd : subEnd) - now) / (1000 * 60 * 60 * 24))),
         is_expiring_soon: false,
-        features: DEFAULT_STUDIO_PLAN_FEATURES,
-        limits: {},
+        features: resolvedFeatures,
+        limits: resolvedLimits,
       } as unknown as SubscriptionAccessDetails;
     }
   } catch (dbErr) {
@@ -115,12 +126,13 @@ export async function getSubscriptionAccessDetails(
   // 3. Brand new onboarding studio fallback: 7-day Free Trial
   const now = Date.now();
   const trialEnd = now + 7 * 24 * 60 * 60 * 1000;
+  const trialConfig = PLAN_CONFIGS.photoos_free_trial_7_day;
 
   return {
     subscription_id: null,
     plan_id: null,
-    plan: "Free Trial",
-    plan_name: "7-Day Free Trial",
+    plan: trialConfig.plan_code,
+    plan_name: trialConfig.name,
     plan_type: "studio_software",
     price: 0,
     currency: "INR",
@@ -139,8 +151,8 @@ export async function getSubscriptionAccessDetails(
     next_billing_at: null,
     days_remaining: 7,
     is_expiring_soon: false,
-    features: DEFAULT_STUDIO_PLAN_FEATURES,
-    limits: {},
+    features: trialConfig.features,
+    limits: trialConfig.limits,
   } as unknown as SubscriptionAccessDetails;
 }
 

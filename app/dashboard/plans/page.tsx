@@ -31,6 +31,7 @@ import {
   formatPlanLimit,
   getPlanLimit,
   hasPlanFeature,
+  isVaultPlan,
   type PlanFeatureKey,
 } from "@/lib/subscription/plan-access";
 
@@ -557,6 +558,27 @@ export default function PlansPage() {
 
         </button>
 
+        {isVaultPlan(subscription?.plan) && (
+          <div className="mt-6 rounded-3xl border border-blue-200 bg-gradient-to-r from-blue-950 via-[#0A3F61] to-[#0D5C8A] p-6 text-white shadow-md">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-blue-100">
+                  Studio Vault &bull; Monsoon Off-Season Pause
+                </span>
+                <h3 className="mt-2 text-xl font-bold">Studio Vault is Currently Active</h3>
+                <p className="mt-1 text-sm text-blue-100 max-w-xl">
+                  Your client galleries, QR downloads, and face matching are 100% active with zero data deletion. New event uploads are paused until wedding season resumes in October.
+                </p>
+              </div>
+              <button
+                onClick={handleUpgrade}
+                className="inline-flex shrink-0 items-center justify-center rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-[#0A3F61] shadow-sm hover:bg-blue-50 transition"
+              >
+                Reactivate Studio Plan
+              </button>
+            </div>
+          </div>
+        )}
 
         <div
           className="

@@ -6,6 +6,7 @@ import {
 } from "react";
 
 import Link from "next/link";
+import PlanFeatureGate from "@/components/subscription/PlanFeatureGate";
 
 import {
   getStudioBookingRequests,
@@ -464,8 +465,12 @@ export default function MarketplaceLeadsPage() {
 
 
   return (
-
-    <div className="mx-auto max-w-7xl space-y-7">
+    <PlanFeatureGate
+      feature="marketplace"
+      title="Studio Marketplace Locked"
+      description="Receiving direct client leads from the PhotoOS Marketplace requires Studio Pro (Business Booster) or Business Elite."
+    >
+      <div className="mx-auto max-w-7xl space-y-7">
 
 
       <section className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_18px_60px_rgb(15,23,42,0.06)]">
@@ -1021,8 +1026,7 @@ export default function MarketplaceLeadsPage() {
 
       </section>
 
-    </div>
-
+      </div>
+    </PlanFeatureGate>
   );
-
 }

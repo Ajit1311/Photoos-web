@@ -30,6 +30,7 @@ import type {
 type PlanTab =
   | "monthly"
   | "yearly"
+  | "vault"
   | "addons";
 
 
@@ -443,8 +444,9 @@ const isAddonPlan = (
   plan: SubscriptionPlan,
 ) => {
   return (
-    plan.plan_type ===
-    "marketplace"
+    plan.plan_type === "marketplace" ||
+    plan.plan_type === "addon" ||
+    plan.plan_code.startsWith("addon_")
   );
 };
 
@@ -455,6 +457,24 @@ const getPlanIcon = (
   const code =
     plan.plan_code
       .toLowerCase();
+
+  if (
+    code.includes("vault")
+  ) {
+    return "🌧️";
+  }
+
+  if (
+    code.includes("addon_extra_event")
+  ) {
+    return "🎟️";
+  }
+
+  if (
+    code.includes("addon_storage")
+  ) {
+    return "💾";
+  }
 
   if (
     code.includes(
@@ -628,23 +648,39 @@ export default function SubscriptionPlansPage() {
     useMemo(
       () => {
         if (
-          activeTab ===
-          "addons"
+          activeTab === "vault"
+        ) {
+          return plans.filter((plan) =>
+            plan.plan_code.toLowerCase().includes("vault")
+          );
+        }
+
+        if (
+          activeTab === "addons"
         ) {
           return plans.filter(
             isAddonPlan,
           );
         }
 
+        if (
+          activeTab === "yearly"
+        ) {
+          return plans.filter(
+            (plan) =>
+              !isAddonPlan(plan) &&
+              !plan.plan_code.toLowerCase().includes("vault") &&
+              plan.billing_cycle === "yearly" &&
+              plan.plan_type === "studio_software",
+          );
+        }
+
         return plans.filter(
-          (
-            plan,
-          ) =>
-            !isAddonPlan(
-              plan,
-            ) &&
-            plan.billing_cycle ===
-              activeTab,
+          (plan) =>
+            !isAddonPlan(plan) &&
+            !plan.plan_code.toLowerCase().includes("vault") &&
+            plan.billing_cycle === "monthly" &&
+            plan.plan_type === "studio_software",
         );
       },
       [
@@ -664,13 +700,11 @@ export default function SubscriptionPlansPage() {
             </p>
 
             <h1 className="mt-2 text-3xl font-bold tracking-tight">
-              Subscription Plans
+              Subscription Plans &amp; Retention Architecture
             </h1>
 
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              Choose the plan that fits your studio or
-              extend your subscription with optional
-              add-ons.
+              Choose the right tier for your wedding season, pause cleanly with Studio Vault during monsoons, or expand capacity with peak season add-ons.
             </p>
           </div>
 
@@ -697,7 +731,7 @@ export default function SubscriptionPlansPage() {
         </div>
 
 
-        <div className="mt-8 inline-flex rounded-2xl border bg-muted/30 p-1">
+        <div className="mt-8 flex flex-wrap gap-2 rounded-2xl border bg-muted/30 p-1.5">
           <button
             type="button"
             onClick={
@@ -709,11 +743,11 @@ export default function SubscriptionPlansPage() {
             className={
               activeTab ===
               "monthly"
-                ? "rounded-xl bg-white px-5 py-3 text-sm font-semibold shadow-sm"
-                : "rounded-xl px-5 py-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                ? "rounded-xl bg-white px-5 py-2.5 text-sm font-semibold shadow-sm text-slate-900"
+                : "rounded-xl px-5 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             }
           >
-            Monthly
+            Monthly Plans
           </button>
 
           <button
@@ -727,11 +761,32 @@ export default function SubscriptionPlansPage() {
             className={
               activeTab ===
               "yearly"
-                ? "rounded-xl bg-white px-5 py-3 text-sm font-semibold shadow-sm"
-                : "rounded-xl px-5 py-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                ? "rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm"
+                : "rounded-xl px-5 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             }
           >
-            Yearly
+            Annual Shield (13 Months)
+            <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+              Save 2 Mo + 1 Free
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={
+              () =>
+                setActiveTab(
+                  "vault",
+                )
+            }
+            className={
+              activeTab ===
+              "vault"
+                ? "rounded-xl bg-[#0a3f61] px-5 py-2.5 text-sm font-semibold text-white shadow-sm"
+                : "rounded-xl px-5 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            }
+          >
+            🌧️ Studio Vault (Off-Season Pause)
           </button>
 
           <button
@@ -745,13 +800,79 @@ export default function SubscriptionPlansPage() {
             className={
               activeTab ===
               "addons"
-                ? "rounded-xl bg-[#0a3f61] px-5 py-3 text-sm font-semibold text-white shadow-sm"
-                : "rounded-xl px-5 py-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                ? "rounded-xl bg-purple-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm"
+                : "rounded-xl px-5 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             }
           >
-            Add-on Plans
+            ⚡ Modular Add-Ons
           </button>
         </div>
+
+        {/* Studio Vault Overview Banner */}
+        {activeTab === "vault" && (
+          <div className="mt-8 rounded-3xl border border-blue-200 bg-gradient-to-r from-blue-950 via-[#0A3F61] to-[#0D5C8A] p-6 text-white shadow-md sm:p-8">
+            <div className="flex flex-col gap-2">
+              <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-blue-100">
+                Monsoon Retention &amp; Pause Architecture (&quot;Studio Vault&quot;)
+              </span>
+              <h2 className="mt-2 text-2xl font-bold sm:text-3xl">
+                Keep Galleries 100% Live &bull; Pay Only ₹199/mo In Off-Season
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-blue-100">
+                Engineered specifically to solve off-season churn (June to September) when Indian wedding work halts. Instead of losing client access or canceling subscriptions, Studio Vault safely pauses your event creation pipeline while keeping your client galleries permanently online.
+              </p>
+            </div>
+
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 border-t border-white/15 pt-6 text-xs text-blue-100">
+              <div className="rounded-xl bg-white/10 p-3.5">
+                <div className="font-semibold text-white">🔒 100% Client &amp; Guest Access</div>
+                <p className="mt-1 text-blue-200 leading-relaxed">Guests scan QR codes, download full-res photos, run AI face match, and comment with zero interruption.</p>
+              </div>
+              <div className="rounded-xl bg-white/10 p-3.5">
+                <div className="font-semibold text-white">⏸️ Upload Pipeline Paused</div>
+                <p className="mt-1 text-blue-200 leading-relaxed">0 new event creations; shoot pipeline safely suspended while keeping budget low.</p>
+              </div>
+              <div className="rounded-xl bg-white/10 p-3.5">
+                <div className="font-semibold text-white">🛡️ Zero Data Pruning</div>
+                <p className="mt-1 text-blue-200 leading-relaxed">All Cloudflare R2 image assets remain permanently protected with zero deletion risk.</p>
+              </div>
+              <div className="rounded-xl bg-white/10 p-3.5">
+                <div className="font-semibold text-white">⚡ 1-Click Reactivation</div>
+                <p className="mt-1 text-blue-200 leading-relaxed">Instantly restore full Studio Starter or Pro features whenever your season starts in October.</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Annual Shield Overview Banner */}
+        {activeTab === "yearly" && (
+          <div className="mt-8 rounded-3xl border border-emerald-200 bg-gradient-to-r from-emerald-950 via-[#074739] to-[#0A5C4A] p-6 text-white shadow-md sm:p-8">
+            <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-emerald-100">
+              Option 2: Annual Shield
+            </span>
+            <h2 className="mt-2 text-2xl font-bold sm:text-3xl">
+              13 Months Total: Complete Off-Season Monsoon Coverage
+            </h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-emerald-100">
+              All yearly subscribers bypass the off-season problem automatically: with <strong>2 Months Free + 1 Extra Bonus Month (13 months total)</strong>, the entire June to September monsoon period is covered with zero additional charges or gallery downtime.
+            </p>
+          </div>
+        )}
+
+        {/* Modular Add-Ons Overview Banner */}
+        {activeTab === "addons" && (
+          <div className="mt-8 rounded-3xl border border-purple-200 bg-gradient-to-r from-purple-950 via-[#3B1963] to-[#581C87] p-6 text-white shadow-md sm:p-8">
+            <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-purple-200">
+              Peak Season Expansion
+            </span>
+            <h2 className="mt-2 text-2xl font-bold sm:text-3xl">
+              Modular High-Margin Add-Ons
+            </h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-purple-200">
+              Studios can expand limits dynamically during peak wedding months without forcing an entire tier upgrade. Add extra event passes or boost Cloudflare R2 storage on demand.
+            </p>
+          </div>
+        )}
 
 
         {loading && (
@@ -966,20 +1087,33 @@ export default function SubscriptionPlansPage() {
                             )}&planCode=${encodeURIComponent(
                               plan.plan_code,
                             )}&planType=addon`}
-                            className="inline-flex w-full items-center justify-center rounded-xl bg-[#0a3f61] px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                            className="inline-flex w-full items-center justify-center rounded-xl bg-purple-600 px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 shadow-md"
                           >
-                            Choose Add-on
+                            Get Add-on
                           </Link>
-                        ) : (
+                        ) : plan.plan_code.toLowerCase().includes("vault") ? (
                           <Link
-                            href={`/onboarding/studio?planId=${encodeURIComponent(
+                            href={`/dashboard/plans/payment?planId=${encodeURIComponent(
                               plan.id,
                             )}&planCode=${encodeURIComponent(
                               plan.plan_code,
-                            )}&billingCycle=${encodeURIComponent(
+                            )}&planType=studio_software&billingCycle=${encodeURIComponent(
                               plan.billing_cycle,
                             )}`}
-                            className="inline-flex w-full items-center justify-center rounded-xl bg-[#0a3f61] px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                            className="inline-flex w-full items-center justify-center rounded-xl bg-[#0a3f61] px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 shadow-md"
+                          >
+                            Activate Studio Vault
+                          </Link>
+                        ) : (
+                          <Link
+                            href={`/dashboard/plans/payment?planId=${encodeURIComponent(
+                              plan.id,
+                            )}&planCode=${encodeURIComponent(
+                              plan.plan_code,
+                            )}&planType=studio_software&billingCycle=${encodeURIComponent(
+                              plan.billing_cycle,
+                            )}`}
+                            className="inline-flex w-full items-center justify-center rounded-xl bg-[#0a3f61] px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 shadow-md"
                           >
                             Choose Plan
                           </Link>

@@ -31,6 +31,8 @@ import {
   resolveUserStudio,
 } from "@/lib/auth/resolve-user-studio";
 
+import PlanFeatureGate from "@/components/subscription/PlanFeatureGate";
+
 import {
   getStudioReport,
 } from "@/lib/api/reports/get-studio-report";
@@ -720,8 +722,8 @@ export default function ReportsPage() {
 
 
   return (
-
-    <main className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
+    <PlanFeatureGate feature="reports">
+      <main className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
 
       <div className="mx-auto max-w-7xl space-y-8">
 
@@ -1873,8 +1875,8 @@ export default function ReportsPage() {
 
       </div>
 
-    </main>
-
+      </main>
+    </PlanFeatureGate>
   );
 
 }

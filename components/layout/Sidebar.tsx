@@ -38,8 +38,9 @@ import {
   usePlanAccess,
 } from "@/hooks/usePlanAccess";
 
-import type {
-  PlanFeatureKey,
+import {
+  type PlanFeatureKey,
+  isVaultPlan,
 } from "@/lib/subscription/plan-access";
 
 
@@ -67,6 +68,7 @@ export default function Sidebar({
   const {
     loading:
       planLoading,
+    planCode,
     canAccess,
   } =
     usePlanAccess();
@@ -501,35 +503,49 @@ export default function Sidebar({
                               visibleItems.map(
                                 (
                                   item,
-                                ) => (
-                                  <div
-                                    key={
-                                      item.href
-                                    }
-                                    onClick={() =>
-                                      setMobileOpen(
-                                        false,
-                                      )
-                                    }
-                                  >
+                                ) => {
+                                  const isLocked = item.requiredFeature
+                                    ? !canAccess(item.requiredFeature as PlanFeatureKey)
+                                    : false;
+                                  const isVault = isVaultPlan(planCode);
+                                  const badge =
+                                    item.requiredFeature === "events" && isVault
+                                      ? "Paused"
+                                      : undefined;
 
-                                    <SidebarItem
-                                      href={
+                                  return (
+                                    <div
+                                      key={
                                         item.href
                                       }
-                                      title={
-                                        item.title
+                                      onClick={() =>
+                                        setMobileOpen(
+                                          false,
+                                        )
                                       }
-                                      icon={
-                                        item.icon
-                                      }
-                                    />
-
-                                  </div>
-                                ),
+                                    >
+                                      <SidebarItem
+                                        href={
+                                          item.href
+                                        }
+                                        title={
+                                          item.title
+                                        }
+                                        icon={
+                                          item.icon
+                                        }
+                                        locked={
+                                          isLocked
+                                        }
+                                        badge={
+                                          badge
+                                        }
+                                      />
+                                    </div>
+                                  );
+                                },
                               )
                             }
-
                           </SidebarGroup>
                         ) : (
                           /*
@@ -555,6 +571,9 @@ export default function Sidebar({
                                   const Icon =
                                     item.icon;
 
+                                  const isLocked = item.requiredFeature
+                                    ? !canAccess(item.requiredFeature as PlanFeatureKey)
+                                    : false;
 
                                   return (
                                     <Link
@@ -565,7 +584,9 @@ export default function Sidebar({
                                         item.href
                                       }
                                       title={
-                                        item.title
+                                        isLocked
+                                          ? `${item.title} (Upgrade Required)`
+                                          : item.title
                                       }
                                       aria-label={
                                         item.title
@@ -577,6 +598,7 @@ export default function Sidebar({
                                       }
                                       className="
                                         group
+                                        relative
                                         flex
                                         items-center
                                         justify-center
@@ -600,6 +622,10 @@ export default function Sidebar({
                                           group-hover:text-white
                                         "
                                       />
+
+                                      {isLocked && (
+                                        <span className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-amber-400" />
+                                      )}
 
                                     </Link>
                                   );
