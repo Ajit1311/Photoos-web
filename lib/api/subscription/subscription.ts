@@ -2,6 +2,30 @@ import { supabase } from "@/lib/supabase/client";
 import { getAccessToken, getSession } from "@/lib/auth/session";
 import type { SubscriptionAccessDetails } from "@/types/subscription/subscription";
 
+const DEFAULT_STUDIO_PLAN_FEATURES = {
+  dashboard: true,
+  crm: true,
+  projects: true,
+  events: true,
+  gallery: true,
+  chat: true,
+  reports: true,
+  whatsapp: true,
+  analytics: true,
+  automation: true,
+  ai_features: true,
+  priority_support: true,
+  qr_sharing: true,
+  client_selfie_upload: true,
+  face_matching: true,
+  matched_photo_delivery: true,
+  watermark: true,
+  marketing: true,
+  finance: true,
+  team: true,
+  marketplace: true,
+};
+
 export async function getSubscriptionAccessDetails(
   studioId: string,
 ): Promise<SubscriptionAccessDetails | null> {
@@ -80,7 +104,7 @@ export async function getSubscriptionAccessDetails(
         next_billing_at: null,
         days_remaining: Math.max(0, Math.ceil(((isTrial ? trialEnd : subEnd) - now) / (1000 * 60 * 60 * 24))),
         is_expiring_soon: false,
-        features: {},
+        features: DEFAULT_STUDIO_PLAN_FEATURES,
         limits: {},
       } as unknown as SubscriptionAccessDetails;
     }
@@ -115,7 +139,7 @@ export async function getSubscriptionAccessDetails(
     next_billing_at: null,
     days_remaining: 7,
     is_expiring_soon: false,
-    features: {},
+    features: DEFAULT_STUDIO_PLAN_FEATURES,
     limits: {},
   } as unknown as SubscriptionAccessDetails;
 }

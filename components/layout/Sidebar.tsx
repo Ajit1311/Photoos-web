@@ -455,44 +455,16 @@ export default function Sidebar({
                       (
                         item,
                       ) => {
-
                         const hasAdminAccess =
                           !item.requiresPlatformAdmin ||
-                          adminState ===
-                            "admin";
+                          adminState === "admin";
 
-
-                        if (
-                          !hasAdminAccess
-                        ) {
-
+                        if (!hasAdminAccess) {
                           return false;
-
                         }
 
-
-                        if (
-                          planLoading
-                        ) {
-
-                          return true;
-
-                        }
-
-
-                        if (
-                          !item.requiredFeature
-                        ) {
-
-                          return true;
-
-                        }
-
-
-                        return canAccess(
-                          item.requiredFeature as PlanFeatureKey,
-                        );
-
+                        // Always display all standard studio workspace options
+                        return true;
                       },
                     );
 

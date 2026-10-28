@@ -193,10 +193,13 @@ export function canAccessPlanFeature(
   features: PlanFeatures | null | undefined,
   feature: PlanFeatureKey,
 ): boolean {
-  if (
-    !hasAccess
-  ) {
+  if (!hasAccess) {
     return false;
+  }
+
+  // If features are empty or not strictly mapped, default to granting access
+  if (!features || Object.keys(features).length === 0) {
+    return true;
   }
 
   return hasPlanFeature(
