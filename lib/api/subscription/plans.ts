@@ -324,7 +324,32 @@ export async function getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
       .eq("is_active", true);
 
     if (!error && data && data.length > 0) {
-      return data.map((plan) => normalizePlan(plan as Record<string, unknown>));
+      const dbPlans = data.map((plan) => normalizePlan(plan as Record<string, unknown>));
+      const existingCodes = new Set(dbPlans.map((p) => p.plan_code.toLowerCase().trim()));
+
+      // Merge any catalog fallback plans that are not yet in the remote DB (e.g. Studio Vault, Modular Add-Ons)
+      const missingFallbacks = FALLBACK_PLANS.filter(
+        (fallbackPlan) => !existingCodes.has(fallbackPlan.plan_code.toLowerCase().trim()),
+      );
+
+      // Enrich yearly plans with Annual Shield badge if not set
+      const enrichedDbPlans = dbPlans.map((p) => {
+        if (p.billing_cycle === "yearly" && !p.metadata?.annual_shield) {
+          return {
+            ...p,
+            name: p.name.includes("Annual Shield") ? p.name : `${p.name} (Annual Shield)`,
+            metadata: {
+              ...p.metadata,
+              annual_shield: true,
+              annual_shield_badge: "Annual Shield (13 Months)",
+              bonus_months: "2 Free + 1 Bonus Month",
+            },
+          };
+        }
+        return p;
+      });
+
+      return [...enrichedDbPlans, ...missingFallbacks];
     }
   } catch (err) {
     console.warn("[getSubscriptionPlans] Failed to fetch from DB, using fallback:", err);
