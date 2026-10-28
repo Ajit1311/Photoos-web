@@ -681,3 +681,4 @@ export default function GuestLiveEventPage() {
     </div>
   );
 }
+

@@ -207,6 +207,13 @@ export async function prepareAsset(
   const width = normalizeDimension(payload.width);
   const height = normalizeDimension(payload.height);
 
+  // Normalize asset type to match DB constraint: 'photo' | 'video' | 'raw' | 'audio' | 'document' | 'other'
+  const normalizedAssetType = ["photo", "video", "raw", "audio", "document", "other"].includes(
+    (payload.assetType || "").toLowerCase(),
+  )
+    ? (payload.assetType || "").toLowerCase()
+    : "photo";
+
   // 1. Try Edge function first
   try {
     const headers = await getHeaders(studioId);
@@ -217,7 +224,7 @@ export async function prepareAsset(
         headers,
         body: {
           album_id: payload.albumId,
-          asset_type: payload.assetType,
+          asset_type: normalizedAssetType,
           original_filename: payload.originalFilename,
           mime_type: payload.mimeType,
           file_size: payload.fileSize,
@@ -236,7 +243,7 @@ export async function prepareAsset(
           id: rpc.asset_id,
           studio_id: studioId,
           album_id: payload.albumId,
-          asset_type: payload.assetType,
+          asset_type: normalizedAssetType,
           original_filename: payload.originalFilename,
           storage_filename: rpc.storage_filename ?? `${Date.now()}-${payload.originalFilename}`,
           storage_bucket: rpc.bucket ?? "assets",
@@ -260,7 +267,7 @@ export async function prepareAsset(
       "prepare_asset",
       {
         p_album_id: payload.albumId,
-        p_asset_type: payload.assetType || "image",
+        p_asset_type: normalizedAssetType,
         p_original_filename: payload.originalFilename,
         p_mime_type: payload.mimeType,
         p_file_size: payload.fileSize,
@@ -274,7 +281,7 @@ export async function prepareAsset(
           id: row.asset_id,
           studio_id: studioId,
           album_id: payload.albumId,
-          asset_type: payload.assetType || "image",
+          asset_type: normalizedAssetType,
           original_filename: payload.originalFilename,
           storage_filename: row.storage_filename,
           storage_bucket: row.bucket || "assets",
@@ -287,6 +294,8 @@ export async function prepareAsset(
           status: "uploading",
         };
       }
+    } else if (rpcError) {
+      console.warn("[prepareAsset] RPC returned error, trying direct table fallback:", rpcError);
     }
   } catch (rpcErr) {
     console.warn("[prepareAsset] RPC fallback notice:", rpcErr);
@@ -296,6 +305,24 @@ export async function prepareAsset(
   const assetId = crypto.randomUUID();
   const safeName = payload.originalFilename.replace(/[^a-zA-Z0-9.-]/g, "_");
   const storageFilename = `${Date.now()}-${safeName}`;
+
+  // Resolve sort order for this album to avoid uq_assets_album_sort_order conflict
+  let nextSortOrder = 1;
+  try {
+    const { data: maxOrderData } = await supabase
+      .from("assets")
+      .select("sort_order")
+      .eq("album_id", payload.albumId)
+      .order("sort_order", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (maxOrderData?.sort_order) {
+      nextSortOrder = Number(maxOrderData.sort_order) + 1;
+    }
+  } catch {
+    nextSortOrder = Date.now() % 1000000;
+  }
 
   // Resolve context for canonical 7-part storage path: org/studio/project/album/asset/variant/filename
   let orgId = studioId;
@@ -324,19 +351,23 @@ export async function prepareAsset(
       id: assetId,
       studio_id: studioId,
       album_id: payload.albumId,
-      asset_type: payload.assetType || "image",
+      asset_type: normalizedAssetType,
       original_filename: payload.originalFilename,
       storage_filename: storageFilename,
       storage_bucket: "assets",
       storage_path: storagePath,
-      mime_type: payload.mimeType,
-      file_size: payload.fileSize,
+      mime_type: payload.mimeType || "image/jpeg",
+      file_size: payload.fileSize || 0,
+      width,
+      height,
+      sort_order: nextSortOrder,
+      processing_status: "uploading",
+      status: "active",
       metadata: {
         width,
         height,
         ...(payload.metadata ?? {}),
       },
-      status: "pending",
     })
     .select()
     .single();
@@ -358,6 +389,11 @@ export async function prepareAsset(
       checksum: payload.checksum ?? null,
       status: "uploading",
     };
+  }
+
+  if (insertError) {
+    console.error("[prepareAsset] Direct DB insert failed:", insertError);
+    throw new Error(insertError.message || "Failed to prepare asset for upload.");
   }
 
   throw new Error("Failed to prepare asset for upload.");
@@ -463,7 +499,8 @@ export async function completeAsset(
     const { data: updated, error: updateError } = await supabase
       .from("assets")
       .update({
-        status: "ready",
+        status: "active",
+        processing_status: "ready",
         storage_path: payload.storagePath,
         storage_filename: payload.storageFilename,
         mime_type: payload.mimeType,
