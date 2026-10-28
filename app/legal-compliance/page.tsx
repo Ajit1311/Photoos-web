@@ -24,9 +24,6 @@ import {
   useRouter,
 } from "next/navigation";
 
-import { onAuthStateChanged } from "firebase/auth";
-import { firebaseAuth } from "@/lib/firebase/client";
-
 import {
   getCurrentUser,
 } from "@/lib/auth/session";
@@ -741,29 +738,17 @@ export default function LegalCompliancePage() {
         }
 
 
-        const firebaseUser =
-          await new Promise<
-            import("firebase/auth").User | null
-          >((resolve) => {
-            const unsubscribe =
-              onAuthStateChanged(
-                firebaseAuth,
-                (currentUser) => {
-                  unsubscribe();
-                  resolve(currentUser);
-                },
-              );
-          });
+        const sessionUser =
+          await getCurrentUser();
 
-
-        if (!firebaseUser) {
-
+        if (!sessionUser) {
           router.replace(
-            "/login",
+            `/login?next=${encodeURIComponent(
+              window.location.pathname +
+              window.location.search,
+            )}`,
           );
-
           return;
-
         }
 
 

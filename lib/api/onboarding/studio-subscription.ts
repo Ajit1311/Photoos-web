@@ -65,16 +65,43 @@ export async function bootstrapOnboardingStudio(): Promise<BootstrapStudioResult
     .limit(1)
     .maybeSingle();
 
-  if (!member) {
-    throw new Error("Studio workspace could not be found.");
+  if (member?.studio_id && member?.id) {
+    return {
+      organization_id: "",
+      studio_id: member.studio_id,
+      membership_id: member.id,
+      created: false,
+    };
   }
 
-  return {
-    organization_id: "",
-    studio_id: member.studio_id,
-    membership_id: member.id,
-    created: false,
-  };
+  // 3. If no active membership found, bootstrap via RPC
+  try {
+    const { data: rpcRes, error: rpcErr } = await supabase.rpc("bootstrap_workspace", {
+      p_profile_id: userId,
+    });
+
+    if (!rpcErr && rpcRes) {
+      const res = rpcRes as Record<string, unknown>;
+      const studioObj = res.studio as Record<string, unknown> | undefined;
+      const memberObj = res.membership as Record<string, unknown> | undefined;
+
+      const studioId = (studioObj?.id ?? res.studio_id ?? "") as string;
+      const memberId = (memberObj?.id ?? res.membership_id ?? "") as string;
+
+      if (studioId && memberId) {
+        return {
+          organization_id: (res.organization_id ?? "") as string,
+          studio_id: studioId,
+          membership_id: memberId,
+          created: true,
+        };
+      }
+    }
+  } catch (rpcErr) {
+    console.warn("[bootstrapOnboardingStudio] RPC bootstrap error:", rpcErr);
+  }
+
+  throw new Error("Studio workspace could not be found.");
 }
 
 export async function createOnboardingSubscription(

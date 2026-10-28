@@ -89,5 +89,36 @@ export async function resolveUserStudio(): Promise<ResolvedStudioMembership | nu
     console.warn("[resolveUserStudio] DB query fallback error:", dbErr);
   }
 
+  // 3. If no member found, try bootstrapping workspace via RPC
+  try {
+    const { data: rpcRes, error: rpcErr } = await supabase.rpc("bootstrap_workspace", {
+      p_profile_id: userId,
+    });
+
+    if (!rpcErr && rpcRes) {
+      const res = rpcRes as Record<string, unknown>;
+      const studioObj = res.studio as Record<string, unknown> | undefined;
+      const memberObj = res.membership as Record<string, unknown> | undefined;
+
+      const studioId = (studioObj?.id ?? res.studio_id ?? "") as string;
+      const memberId = (memberObj?.id ?? res.membership_id ?? "") as string;
+      const roleId = (memberObj?.role_id ?? res.role_id ?? "") as string;
+
+      if (studioId && memberId) {
+        return {
+          memberId,
+          studioId,
+          profileId: userId,
+          roleId,
+          status: "active",
+          invitationStatus: "accepted",
+          joinedAt: null,
+        };
+      }
+    }
+  } catch (rpcErr) {
+    console.warn("[resolveUserStudio] RPC bootstrap error:", rpcErr);
+  }
+
   return null;
 }
