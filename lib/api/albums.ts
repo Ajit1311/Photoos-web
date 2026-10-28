@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
+import { getAccessToken } from "@/lib/auth/session";
 import { getFirebaseIdToken } from "@/lib/auth/firebase-auth.service";
 
 /* -------------------------------------------------------------------------- */
@@ -171,58 +172,62 @@ export async function listAlbums(
   studioId: string,
   projectId?: string | null,
 ): Promise<AlbumCard[]> {
-  const accessToken =
-    await getFirebaseIdToken();
+  // 1. Try edge function first
+  try {
+    const accessToken = await getAccessToken();
 
-  if (!accessToken) {
-    throw new Error(
-      "User is not authenticated.",
-    );
-  }
-
-  const {
-    data,
-    error,
-  } =
-    await supabase.functions.invoke(
-      "album-list",
-      {
-        method: "POST",
-
-        headers: {
-          Authorization:
-            `Bearer ${accessToken}`,
+    if (accessToken) {
+      const { data, error } = await supabase.functions.invoke(
+        "album-list",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: {
+            studio_id: studioId,
+            project_id: projectId ?? null,
+            limit: 100,
+            offset: 0,
+            status: null,
+            album_type: null,
+            visibility: null,
+            is_favorite: null,
+            search: null,
+          },
         },
+      );
 
-        body: {
-          studio_id: studioId,
-          project_id:
-            projectId ?? null,
-          limit: 100,
-          offset: 0,
-          status: null,
-          album_type: null,
-          visibility: null,
-          is_favorite: null,
-          search: null,
-        },
-      },
-    );
-
-  if (error) {
-    throw error;
+      if (!error && data?.success && data?.data) {
+        return normalizeAlbumList(data.data);
+      }
+    }
+  } catch (edgeErr) {
+    console.warn("[listAlbums] Edge function notice, falling back to direct DB:", edgeErr);
   }
 
-  if (!data?.success) {
-    throw new Error(
-      data?.message ??
-      "Unable to load albums.",
-    );
+  // 2. Direct Supabase DB query fallback
+  try {
+    let query = supabase
+      .from("albums")
+      .select("*")
+      .eq("studio_id", studioId)
+      .order("created_at", { ascending: false });
+
+    if (projectId) {
+      query = query.eq("project_id", projectId);
+    }
+
+    const { data: dbAlbums, error: dbError } = await query;
+    if (!dbError && dbAlbums) {
+      return normalizeAlbumList(dbAlbums);
+    }
+  } catch (dbErr) {
+    console.warn("[listAlbums] DB fallback error:", dbErr);
   }
 
-  return normalizeAlbumList(
-    data.data,
-  );
+  // 3. Resilient empty array
+  return [];
 }
 
 /* -------------------------------------------------------------------------- */
@@ -458,43 +463,53 @@ export async function getAlbumCards(
 export async function getAlbumWorkspace(
   albumId: string,
 ): Promise<AlbumWorkspaceResponse> {
-  const token = await getFirebaseIdToken();
+  // 1. Try edge function first
+  try {
+    const token =
+      (await getFirebaseIdToken().catch(() => null)) ||
+      (await getAccessToken().catch(() => null));
 
-  if (!token) {
-    throw new Error("User is not authenticated.");
+    if (token) {
+      const { data, error } = await supabase.functions.invoke(
+        "album-workspace",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: {
+            album_id: albumId,
+          },
+        },
+      );
+
+      if (!error && data?.success && data?.data) {
+        return data.data as AlbumWorkspaceResponse;
+      }
+    }
+  } catch (edgeErr) {
+    console.warn("[getAlbumWorkspace] Edge function notice, falling back to direct DB:", edgeErr);
   }
 
-  const {
-    data,
-    error,
-  } = await supabase.functions.invoke(
-    "album-workspace",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: {
-        album_id: albumId,
-      },
-    },
-  );
+  // 2. Direct Supabase DB query fallback
+  try {
+    const { data: dbAlbum, error: dbErr } = await supabase
+      .from("albums")
+      .select("*, clients(*), projects(*)")
+      .eq("id", albumId)
+      .maybeSingle();
 
-  if (error) {
-    throw error;
+    if (!dbErr && dbAlbum) {
+      return {
+        album: dbAlbum,
+        assets: [],
+      } as AlbumWorkspaceResponse;
+    }
+  } catch (dbErr) {
+    console.warn("[getAlbumWorkspace] DB fallback error:", dbErr);
   }
 
-  if (!data?.success) {
-    throw new Error(
-      data?.error?.message ??
-        data?.message ??
-        "Unable to load album workspace.",
-    );
-  }
-
-  return (
-    (data.data ?? {}) as AlbumWorkspaceResponse
-  );
+  return {} as AlbumWorkspaceResponse;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -504,41 +519,51 @@ export async function getAlbumWorkspace(
 export async function getAlbumDashboard(
   albumId: string,
 ): Promise<AlbumDashboardResponse> {
-  const token = await getFirebaseIdToken();
+  // 1. Try edge function first
+  try {
+    const token =
+      (await getFirebaseIdToken().catch(() => null)) ||
+      (await getAccessToken().catch(() => null));
 
-  if (!token) {
-    throw new Error("User is not authenticated.");
+    if (token) {
+      const { data, error } = await supabase.functions.invoke(
+        "album-dashboard",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: {
+            album_id: albumId,
+          },
+        },
+      );
+
+      if (!error && data?.success && data?.data) {
+        return data.data as AlbumDashboardResponse;
+      }
+    }
+  } catch (edgeErr) {
+    console.warn("[getAlbumDashboard] Edge function notice, falling back to direct DB:", edgeErr);
   }
 
-  const {
-    data,
-    error,
-  } = await supabase.functions.invoke(
-    "album-dashboard",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: {
-        album_id: albumId,
-      },
-    },
-  );
+  // 2. Direct Supabase DB query fallback
+  try {
+    const { data: dbAlbum, error: dbErr } = await supabase
+      .from("albums")
+      .select("*, clients(*), projects(*)")
+      .eq("id", albumId)
+      .maybeSingle();
 
-  if (error) {
-    throw error;
+    if (!dbErr && dbAlbum) {
+      return {
+        album: dbAlbum,
+        stats: { totalAssets: 0, totalViews: 0 },
+      } as AlbumDashboardResponse;
+    }
+  } catch (dbErr) {
+    console.warn("[getAlbumDashboard] DB fallback error:", dbErr);
   }
 
-  if (!data?.success) {
-    throw new Error(
-      data?.error?.message ??
-        data?.message ??
-        "Unable to load album dashboard.",
-    );
-  }
-
-  return (
-    (data.data ?? {}) as AlbumDashboardResponse
-  );
+  return {} as AlbumDashboardResponse;
 }

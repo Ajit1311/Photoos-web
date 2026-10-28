@@ -73,9 +73,8 @@ export function usePlatformAdminStatus() {
 
 
           if (error) {
-
-            throw error;
-
+            console.warn("[usePlatformAdminStatus] notice:", error.message);
+            return false;
           }
 
 

@@ -1,5 +1,9 @@
 "use client";
 
+import Link from "next/link";
+import { useSubscriptionAccess } from "@/context/SubscriptionAccessContext";
+import { CancelSubscriptionModal } from "@/components/subscription/CancelSubscriptionModal";
+
 import {
   useCallback,
   useEffect,
@@ -401,6 +405,8 @@ function getDisplaySchemaVersion(
 
 
 export default function SettingsPage() {
+  const { data: subscription, reload: reloadSubscription } = useSubscriptionAccess();
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
 
   const [
     softwareUpdate,
@@ -1325,6 +1331,57 @@ export default function SettingsPage() {
         </button>
 
       </section>
+
+      {/* Subscription & Billing Section */}
+      <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_4px_20px_rgb(15,23,42,0.03)] sm:p-8">
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#EBF5FB] text-[#0A3F61]">
+              <ShieldCheck className="h-6 w-6 stroke-[2]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Subscription &amp; Billing
+                </span>
+                <span className="rounded-full bg-[#EBF5FB] px-2.5 py-0.5 text-[10px] font-extrabold text-[#0A3F61] uppercase tracking-wider">
+                  {subscription?.status ?? "Active"}
+                </span>
+              </div>
+              <h2 className="mt-1 text-xl font-black text-slate-900 tracking-tight">
+                {subscription?.plan_name ?? "PhotoOS Studio Plan"}
+              </h2>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Manage your active plan, upgrade capacity, or cancel subscription anytime.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/dashboard/subscription-plans"
+              className="inline-flex items-center justify-center rounded-xl bg-[#0A3F61] px-5 py-2.5 text-xs font-semibold text-white shadow-md hover:bg-[#07324D] transition"
+            >
+              Change / Upgrade Plan
+            </Link>
+            <button
+              type="button"
+              onClick={() => setCancelModalOpen(true)}
+              className="inline-flex items-center justify-center rounded-xl border border-red-200 bg-red-50/60 px-4 py-2.5 text-xs font-semibold text-red-600 hover:bg-red-100 hover:text-red-700 transition shadow-sm"
+            >
+              Cancel Subscription
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <CancelSubscriptionModal
+        isOpen={cancelModalOpen}
+        onClose={() => setCancelModalOpen(false)}
+        subscriptionId={subscription?.subscription_id}
+        planName={subscription?.plan_name}
+        onSuccess={() => void reloadSubscription()}
+      />
 
 
       {/* Software Update */}

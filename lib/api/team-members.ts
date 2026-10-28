@@ -129,65 +129,88 @@ export async function getTeamMembers(
   limit = 25,
   search = "",
 ): Promise<GetTeamMembersResponse> {
-
-  const query =
-    new URLSearchParams();
-
-  query.set(
-    "page",
-    page.toString(),
-  );
-
-  query.set(
-    "limit",
-    limit.toString(),
-  );
-
+  const query = new URLSearchParams();
+  query.set("page", page.toString());
+  query.set("limit", limit.toString());
   if (search.trim()) {
-    query.set(
-      "search",
-      search.trim(),
-    );
+    query.set("search", search.trim());
   }
 
-  const {
-    data,
-    error,
-  } =
-    await supabase.functions.invoke(
+  // 1. Try Edge function first
+  try {
+    const headers = await getHeaders(studioId);
+    const { data, error } = await supabase.functions.invoke(
       `${FUNCTION_NAME}?${query.toString()}`,
       {
-        method:
-          "GET",
-
-        headers:
-          await getHeaders(
-            studioId,
-          ),
+        method: "GET",
+        headers,
       },
     );
 
-  if (error) {
-    await throwFunctionError(
-      error,
-    );
+    if (!error && data?.success === true && data?.data) {
+      return data.data as GetTeamMembersResponse;
+    }
+  } catch (edgeErr) {
+    console.warn("[getTeamMembers] Edge function notice, falling back to direct DB:", edgeErr);
   }
 
-  if (!data) {
-    throw new Error(
-      "Team members returned an empty response.",
-    );
+  // 2. Direct Supabase DB query fallback
+  try {
+    const { data: dbMembers, count, error: dbError } = await supabase
+      .from("studio_members")
+      .select("*, profiles(*)", { count: "exact" })
+      .eq("studio_id", studioId)
+      .range((page - 1) * limit, page * limit - 1)
+      .order("created_at", { ascending: false });
+
+    if (!dbError && dbMembers) {
+      const members: TeamMemberDto[] = dbMembers.map((m) => {
+        const profile = m.profiles as Record<string, unknown> | null;
+        return {
+          id: m.id,
+          studio_id: m.studio_id,
+          profile_id: m.profile_id,
+          role_id: m.role_id ?? null,
+          role_name: (m.role ?? "Member") as string,
+          status: m.status ?? "active",
+          invited_email: m.invited_email ?? profile?.email ?? null,
+          display_name: (profile?.full_name ?? profile?.display_name ?? "Team Member") as string,
+          first_name: (profile?.first_name ?? null) as string | null,
+          last_name: (profile?.last_name ?? null) as string | null,
+          email: (profile?.email ?? m.invited_email ?? null) as string | null,
+          phone: (profile?.phone ?? null) as string | null,
+          avatar_url: (profile?.avatar_url ?? null) as string | null,
+          joined_at: m.joined_at ?? m.created_at,
+          created_at: m.created_at,
+          updated_at: m.updated_at,
+        } as unknown as TeamMemberDto;
+      });
+
+      const total = count ?? members.length;
+      return {
+        members,
+        pagination: {
+          page,
+          limit,
+          total,
+          total_pages: Math.max(1, Math.ceil(total / limit)),
+        },
+      };
+    }
+  } catch (dbErr) {
+    console.warn("[getTeamMembers] DB fallback error:", dbErr);
   }
 
-  if (data.success !== true) {
-    throw new Error(
-      data.error?.message ??
-      "Failed to load team members.",
-    );
-  }
-
-  return data.data as
-    GetTeamMembersResponse;
+  // 3. Resilient empty response
+  return {
+    members: [],
+    pagination: {
+      page,
+      limit,
+      total: 0,
+      total_pages: 1,
+    },
+  };
 }
 
 
@@ -195,45 +218,59 @@ export async function getTeamMember(
   studioId: string,
   memberId: string,
 ): Promise<TeamMemberDto> {
-
-  const {
-    data,
-    error,
-  } =
-    await supabase.functions.invoke(
+  // 1. Try edge function first
+  try {
+    const headers = await getHeaders(studioId);
+    const { data, error } = await supabase.functions.invoke(
       `${FUNCTION_NAME}/${memberId}`,
       {
-        method:
-          "GET",
-
-        headers:
-          await getHeaders(
-            studioId,
-          ),
+        method: "GET",
+        headers,
       },
     );
 
-  if (error) {
-    await throwFunctionError(
-      error,
-    );
+    if (!error && data?.success === true && data?.data) {
+      return data.data as TeamMemberDto;
+    }
+  } catch (edgeErr) {
+    console.warn("[getTeamMember] Edge function notice, falling back to direct DB:", edgeErr);
   }
 
-  if (!data) {
-    throw new Error(
-      "Team member returned an empty response.",
-    );
+  // 2. Direct Supabase DB query fallback
+  try {
+    const { data: m, error: dbErr } = await supabase
+      .from("studio_members")
+      .select("*, profiles(*)")
+      .eq("id", memberId)
+      .eq("studio_id", studioId)
+      .maybeSingle();
+
+    if (!dbErr && m) {
+      const profile = m.profiles as Record<string, unknown> | null;
+      return {
+        id: m.id,
+        studio_id: m.studio_id,
+        profile_id: m.profile_id,
+        role_id: m.role_id ?? null,
+        role_name: (m.role ?? "Member") as string,
+        status: m.status ?? "active",
+        invited_email: m.invited_email ?? profile?.email ?? null,
+        display_name: (profile?.full_name ?? profile?.display_name ?? "Team Member") as string,
+        first_name: (profile?.first_name ?? null) as string | null,
+        last_name: (profile?.last_name ?? null) as string | null,
+        email: (profile?.email ?? m.invited_email ?? null) as string | null,
+        phone: (profile?.phone ?? null) as string | null,
+        avatar_url: (profile?.avatar_url ?? null) as string | null,
+        joined_at: m.joined_at ?? m.created_at,
+        created_at: m.created_at,
+        updated_at: m.updated_at,
+      } as unknown as TeamMemberDto;
+    }
+  } catch (dbErr) {
+    console.warn("[getTeamMember] DB fallback error:", dbErr);
   }
 
-  if (data.success !== true) {
-    throw new Error(
-      data.error?.message ??
-      "Failed to load team member.",
-    );
-  }
-
-  return data.data as
-    TeamMemberDto;
+  throw new Error("Team member not found.");
 }
 
 

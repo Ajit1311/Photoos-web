@@ -6,6 +6,10 @@ import {
   getFirebaseIdToken,
 } from "@/lib/auth/firebase-auth.service";
 
+import {
+  getAccessToken,
+} from "@/lib/auth/session";
+
 import type {
   WorkspaceSettingsResponse,
 } from "@/types/workspace-settings/workspace-setting";
@@ -14,50 +18,48 @@ import type {
 export async function getWorkspaceSettings(
   studioId: string,
 ): Promise<WorkspaceSettingsResponse> {
+  // 1. Try edge function first
+  try {
+    const accessToken =
+      (await getFirebaseIdToken().catch(() => null)) ||
+      (await getAccessToken().catch(() => null));
 
-  const accessToken =
-    await getFirebaseIdToken();
-
-  if (!accessToken) {
-    throw new Error(
-      "User is not authenticated.",
-    );
-  }
-
-  const {
-    data,
-    error,
-  } =
-    await supabase.functions.invoke(
-      "workspace-settings",
-      {
-        method: "POST",
-
-        headers: {
-          Authorization:
-            `Bearer ${accessToken}`,
+    if (accessToken) {
+      const { data, error } = await supabase.functions.invoke(
+        "workspace-settings",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: {
+            action: "get",
+            studioId,
+          },
         },
+      );
 
-        body: {
-          action: "get",
-          studioId,
-        },
-      },
-    );
-
-  if (error) {
-    throw error;
+      if (!error && data?.success && Array.isArray(data.data)) {
+        return data.data as WorkspaceSettingsResponse;
+      }
+    }
+  } catch (err) {
+    console.warn("[getWorkspaceSettings] Edge function notice, falling back to direct DB:", err);
   }
 
-  if (!data?.success) {
-    throw new Error(
-      data?.message ??
-      "Unable to load workspace settings.",
-    );
+  // 2. Direct Supabase DB query fallback
+  try {
+    const { data: dbSettings, error: dbErr } = await supabase
+      .from("workspace_settings")
+      .select("*")
+      .eq("studio_id", studioId);
+
+    if (!dbErr && dbSettings) {
+      return dbSettings as WorkspaceSettingsResponse;
+    }
+  } catch (dbErr) {
+    console.warn("[getWorkspaceSettings] DB fallback notice:", dbErr);
   }
 
-  return (
-    data.data ??
-    []
-  ) as WorkspaceSettingsResponse;
+  return [];
 }

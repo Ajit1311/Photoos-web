@@ -188,46 +188,77 @@ function normalizeNullableText(
 export async function getStudioProfile(
   studioId: string,
 ): Promise<StudioProfile> {
+  // 1. Try RPC
+  try {
+    const {
+      data,
+      error,
+    } =
+      await supabase.rpc(
+        "get_studio_profile",
+        {
+          p_studio_id:
+            studioId,
+        },
+      );
 
-  const {
-    data,
-    error,
-  } =
-    await supabase.rpc(
-      "get_studio_profile",
-      {
-        p_studio_id:
-          studioId,
-      },
-    );
-
-  if (error) {
-    console.error(
-      "[StudioProfile RPC ERROR]",
-      {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code,
-      },
-    );
-
-    throw error;
+    if (!error && data) {
+      return data as StudioProfile;
+    }
+  } catch (rpcErr) {
+    console.warn("[getStudioProfile] RPC notice, falling back to direct DB:", rpcErr);
   }
 
-  console.log(
-    "[StudioProfile RPC DATA]",
-    data,
-  );
+  // 2. Direct Supabase DB query fallback
+  try {
+    const { data: studio, error: dbError } = await supabase
+      .from("studios")
+      .select("*")
+      .eq("id", studioId)
+      .maybeSingle();
 
-  if (!data) {
-    throw new Error(
-      "Studio profile was not found.",
-    );
+    if (!dbError && studio) {
+      return {
+        id: studio.id,
+        name: studio.name ?? "My Studio",
+        owner_name: null,
+        description: studio.description ?? null,
+        contact_email: studio.contact_email ?? studio.email ?? null,
+        contact_phone: studio.contact_phone ?? studio.phone ?? null,
+        address: studio.address ?? null,
+        city: studio.city ?? null,
+        state: studio.state ?? null,
+        country: studio.country ?? null,
+        postal_code: studio.postal_code ?? null,
+        website: studio.website ?? null,
+        instagram_url: studio.instagram_url ?? null,
+        facebook_url: studio.facebook_url ?? null,
+        youtube_url: studio.youtube_url ?? null,
+        logo_url: studio.logo_url ?? null,
+      } as StudioProfile;
+    }
+  } catch (dbErr) {
+    console.warn("[getStudioProfile] DB fallback error:", dbErr);
   }
 
-  return data as StudioProfile;
-
+  return {
+    id: studioId,
+    name: "My Studio",
+    owner_name: null,
+    description: null,
+    contact_email: null,
+    contact_phone: null,
+    address: null,
+    city: null,
+    state: null,
+    country: null,
+    postal_code: null,
+    website: null,
+    instagram_url: null,
+    facebook_url: null,
+    youtube_url: null,
+    logo_url: null,
+  } as StudioProfile;
 }
 
 

@@ -87,7 +87,7 @@ export function useProjects(
 
     loading:
       bootstrapLoading ||
-      query.isPending,
+      (Boolean(studioId) ? query.isPending : false),
 
     refreshing:
       query.isFetching,

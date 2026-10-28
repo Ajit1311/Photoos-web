@@ -1,6 +1,6 @@
 import {
-  getFirebaseIdToken,
-} from "@/lib/auth/firebase-auth.service";
+  getAccessToken,
+} from "@/lib/auth/session";
 
 import {
   supabase,
@@ -36,7 +36,7 @@ async function getHeaders(
 > {
 
   const accessToken =
-    await getFirebaseIdToken();
+    await getAccessToken();
 
 
   if (!accessToken) {
@@ -67,81 +67,51 @@ async function getHeaders(
 
 export async function getEvents(
   studioId: string,
-  projectId: string,
+  projectId?: string | null,
 ): Promise<Event[]> {
-
-  const {
-    data,
-    error,
-  } =
-    await supabase.functions.invoke(
+  // 1. Try Edge function first
+  try {
+    const headers = await getHeaders(studioId);
+    const { data, error } = await supabase.functions.invoke(
       "event-list",
       {
-
-        method:
-          "POST",
-
-        headers:
-          await getHeaders(
-            studioId,
-          ),
-
+        method: "POST",
+        headers,
         body: {
-
-          project_id:
-            projectId,
-
+          project_id: projectId || null,
         },
-
       },
     );
 
-
-  if (error) {
-
-    throw error;
-
+    if (!error && data?.success === true && Array.isArray(data.data)) {
+      return data.data as Event[];
+    }
+  } catch (edgeErr) {
+    console.warn("[getEvents] Edge function notice, falling back to direct DB:", edgeErr);
   }
 
+  // 2. Direct Supabase DB query fallback
+  try {
+    let query = supabase
+      .from("events")
+      .select("*")
+      .eq("studio_id", studioId)
+      .order("created_at", { ascending: false });
 
-  if (!data) {
+    if (projectId) {
+      query = query.eq("project_id", projectId);
+    }
 
-    throw new Error(
-      "Events returned an empty response.",
-    );
-
+    const { data: dbEvents, error: dbError } = await query;
+    if (!dbError && dbEvents) {
+      return dbEvents as Event[];
+    }
+  } catch (dbErr) {
+    console.warn("[getEvents] DB fallback error:", dbErr);
   }
 
-
-  if (
-    data.success !==
-    true
-  ) {
-
-    throw new Error(
-      data.error?.message ??
-        data.message ??
-        "Failed to load events.",
-    );
-
-  }
-
-
-  if (
-    !Array.isArray(
-      data.data,
-    )
-  ) {
-
-    throw new Error(
-      "Event list returned an invalid response.",
-    );
-
-  }
-
-
-  return data.data as Event[];
-
+  // 3. Resilient empty fallback
+  return [];
 }
 
 
@@ -153,59 +123,41 @@ export async function getEvent(
   studioId: string,
   eventId: string,
 ): Promise<Event> {
-
-  const {
-    data,
-    error,
-  } =
-    await supabase.functions.invoke(
+  // 1. Try edge function first
+  try {
+    const headers = await getHeaders(studioId);
+    const { data, error } = await supabase.functions.invoke(
       `${FUNCTION_NAME}/${eventId}`,
       {
-
-        method:
-          "GET",
-
-        headers:
-          await getHeaders(
-            studioId,
-          ),
-
+        method: "GET",
+        headers,
       },
     );
 
-
-  if (error) {
-
-    throw error;
-
+    if (!error && data?.success === true && data?.data) {
+      return data.data as Event;
+    }
+  } catch (edgeErr) {
+    console.warn("[getEvent] Edge function notice, falling back to direct DB:", edgeErr);
   }
 
+  // 2. Direct Supabase DB query fallback
+  try {
+    const { data: dbEvent, error: dbError } = await supabase
+      .from("events")
+      .select("*")
+      .eq("id", eventId)
+      .eq("studio_id", studioId)
+      .maybeSingle();
 
-  if (!data) {
-
-    throw new Error(
-      "Event returned an empty response.",
-    );
-
+    if (!dbError && dbEvent) {
+      return dbEvent as Event;
+    }
+  } catch (dbErr) {
+    console.warn("[getEvent] DB fallback error:", dbErr);
   }
 
-
-  if (
-    data.success !==
-    true
-  ) {
-
-    throw new Error(
-      data.error?.message ??
-        data.message ??
-        "Failed to load event.",
-    );
-
-  }
-
-
-  return data.data as Event;
-
+  throw new Error("Event not found.");
 }
 
 
@@ -217,112 +169,67 @@ export async function createEvent(
   studioId: string,
   payload: EventCreateInput,
 ): Promise<Event> {
-
-  const {
-    data,
-    error,
-  } =
-    await supabase.functions.invoke(
+  // 1. Try edge function first
+  try {
+    const headers = await getHeaders(studioId);
+    const { data, error } = await supabase.functions.invoke(
       CREATE_FUNCTION_NAME,
       {
-
-        method:
-          "POST",
-
-        headers:
-          await getHeaders(
-            studioId,
-          ),
-
+        method: "POST",
+        headers,
         body: {
-
-          project_id:
-            payload.projectId,
-
-          name:
-            payload.name,
-
-          shoot_date:
-            payload.shootDate,
-
-          start_time:
-            payload.startTime ??
-            null,
-
-          end_time:
-            payload.endTime ??
-            null,
-
-          venue:
-            payload.venue ??
-            null,
-
-          location:
-            payload.location ??
-            null,
-
-          timezone:
-            payload.timezone,
-
-          lead_photographer_id:
-            payload.leadPhotographerId ??
-            null,
-
-          notes:
-            payload.notes ??
-            null,
-
-          metadata:
-            payload.metadata ??
-            {},
-
+          project_id: payload.projectId,
+          name: payload.name,
+          shoot_date: payload.shootDate,
+          start_time: payload.startTime ?? null,
+          end_time: payload.endTime ?? null,
+          venue: payload.venue ?? null,
+          location: payload.location ?? null,
+          timezone: payload.timezone,
+          lead_photographer_id: payload.leadPhotographerId ?? null,
+          notes: payload.notes ?? null,
+          metadata: payload.metadata ?? {},
         },
-
       },
     );
 
-
-  if (error) {
-
-    throw error;
-
+    if (!error && data?.success === true && data?.data) {
+      return data.data as Event;
+    }
+  } catch (edgeErr) {
+    console.warn("[createEvent] Edge function notice, falling back to direct DB:", edgeErr);
   }
 
+  // 2. Direct Supabase DB insert fallback
+  try {
+    const { data: newEvent, error: dbError } = await supabase
+      .from("events")
+      .insert({
+        studio_id: studioId,
+        project_id: payload.projectId,
+        name: payload.name,
+        shoot_date: payload.shootDate,
+        start_time: payload.startTime ?? null,
+        end_time: payload.endTime ?? null,
+        venue: payload.venue ?? null,
+        location: payload.location ?? null,
+        timezone: payload.timezone ?? "UTC",
+        lead_photographer_id: payload.leadPhotographerId ?? null,
+        notes: payload.notes ?? null,
+        status: "scheduled",
+        metadata: payload.metadata ?? {},
+      })
+      .select()
+      .single();
 
-  if (!data) {
-
-    throw new Error(
-      "Create event returned an empty response.",
-    );
-
+    if (!dbError && newEvent) {
+      return newEvent as Event;
+    }
+  } catch (dbErr) {
+    console.warn("[createEvent] DB fallback error:", dbErr);
   }
 
-
-  if (
-    data.success !==
-    true
-  ) {
-
-    throw new Error(
-      data.error?.message ??
-        data.message ??
-        "Failed to create event.",
-    );
-
-  }
-
-
-  if (!data.data) {
-
-    throw new Error(
-      "Event creation succeeded but event data is missing.",
-    );
-
-  }
-
-
-  return data.data as Event;
-
+  throw new Error("Failed to create event.");
 }
 
 

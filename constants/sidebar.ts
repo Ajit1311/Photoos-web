@@ -158,9 +158,14 @@ export const sidebar: SidebarGroupConfig[] = [
     group: "Subscription",
     items: [
       {
-        title: "Upgrade Plan",
+        title: "Subscription Plans",
         href: "/dashboard/subscription-plans",
         icon: ArrowUpCircle,
+      },
+      {
+        title: "Plans & Billing",
+        href: "/dashboard/plans",
+        icon: CreditCard,
       },
     ],
   },

@@ -3,8 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 
 import {
-  useBootstrapContext,
-} from "@/context/BootstrapContext";
+  useStudioId,
+} from "@/hooks/useStudioId";
 
 import {
   getEvents,
@@ -30,43 +30,30 @@ export function useEvents(
 ) {
 
   const {
-    data: bootstrap,
-    loading: bootstrapLoading,
-  } =
-    useBootstrapContext();
-
-
-  // Use the same studio ID source
-  // used by the authenticated workspace hooks.
-  const studioId =
-    bootstrap?.workspace?.membership?.studioId;
-
+    studioId,
+    bootstrapLoading,
+  } = useStudioId();
 
   const projectId =
     options?.projectId;
 
-
   const query =
     useQuery<Event[], Error>({
-
       queryKey: [
         ...EVENTS_QUERY_KEY,
         studioId,
         projectId,
       ],
 
-
       enabled:
         !bootstrapLoading &&
-        Boolean(studioId) &&
-        Boolean(projectId),
-
+        Boolean(studioId),
 
       queryFn:
         () =>
           getEvents(
             studioId!,
-            projectId!,
+            projectId || null,
           ),
 
 
@@ -96,7 +83,7 @@ export function useEvents(
 
     loading:
       bootstrapLoading ||
-      query.isPending,
+      (Boolean(studioId) ? query.isPending : false),
 
 
     refreshing:

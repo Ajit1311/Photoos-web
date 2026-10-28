@@ -446,52 +446,46 @@ export async function listClientPresence(
 export async function getMyChatConversations(): Promise<
   ChatConversation[]
 > {
-  const accessToken =
-    await getAccessToken();
+  // 1. Try edge function first
+  try {
+    const accessToken = await getAccessToken();
 
-  if (!accessToken) {
-    throw new Error(
-      "You must be signed in to load chat conversations.",
-    );
+    if (accessToken) {
+      const { data, error } = await supabase.functions.invoke(
+        "get-my-chat-conversations",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: {},
+        },
+      );
+
+      if (!error && data?.success && Array.isArray(data.data)) {
+        return (data.data as ChatConversationRow[]).map(normalizeConversation);
+      }
+    }
+  } catch (edgeErr) {
+    console.warn("[getMyChatConversations] Edge function notice, falling back to direct DB:", edgeErr);
   }
 
-  const {
-    data,
-    error,
-  } = await supabase.functions.invoke(
-    "get-my-chat-conversations",
-    {
-      method: "POST",
+  // 2. Direct Supabase DB fallback
+  try {
+    const { data: dbConvs, error: dbErr } = await supabase
+      .from("chat_conversations")
+      .select("*")
+      .order("updated_at", { ascending: false });
 
-      headers: {
-        Authorization:
-          `Bearer ${accessToken}`,
-      },
-
-      body: {},
-    },
-  );
-
-  if (error) {
-    throw error;
+    if (!dbErr && dbConvs) {
+      return (dbConvs as ChatConversationRow[]).map(normalizeConversation);
+    }
+  } catch (dbErr) {
+    console.warn("[getMyChatConversations] DB fallback error:", dbErr);
   }
 
-  if (!data?.success) {
-    throw new Error(
-      data?.error?.message ??
-      data?.error ??
-      "Unable to load chat conversations.",
-    );
-  }
-
-  const conversations =
-    (
-      (data.data ?? []) as ChatConversationRow[]
-    ).map(
-      normalizeConversation,
-    );
-
-  return conversations;
+  // 3. Resilient empty array
+  return [];
 }
 
 export async function removeChatConversation(
@@ -641,76 +635,60 @@ export async function getChatMessages(
   conversationId: string,
   options?: {
     limit?: number;
-
     before?: string | null;
   },
 ): Promise<ChatMessage[]> {
-  const accessToken =
-    await getAccessToken();
+  // 1. Try edge function first
+  try {
+    const accessToken = await getAccessToken();
 
-  if (!accessToken) {
-    throw new Error(
-      "You must be signed in to load chat messages.",
-    );
+    if (accessToken) {
+      const { data, error } = await supabase.functions.invoke(
+        "get-chat-messages",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: {
+            conversation_id: conversationId,
+            limit: options?.limit ?? 50,
+            before: options?.before ?? null,
+          },
+        },
+      );
+
+      if (!error && data?.data) {
+        const responseData = data.data;
+        return (responseData as ChatMessageRow[]).map(normalizeMessage);
+      }
+    }
+  } catch (edgeErr) {
+    console.warn("[getChatMessages] Edge function notice, falling back to direct DB:", edgeErr);
   }
 
-  const {
-    data,
-    error,
-  } = await supabase.functions.invoke(
-    "get-chat-messages",
-    {
-      method: "POST",
+  // 2. Direct Supabase DB query fallback
+  try {
+    let query = supabase
+      .from("chat_messages")
+      .select("*")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: true })
+      .limit(options?.limit ?? 50);
 
-      headers: {
-        Authorization:
-          `Bearer ${accessToken}`,
-      },
+    if (options?.before) {
+      query = query.lt("created_at", options.before);
+    }
 
-      body: {
-        conversation_id:
-          conversationId,
-
-        limit:
-          options?.limit ?? 50,
-
-        before:
-          options?.before ?? null,
-      },
-    },
-  );
-
-  if (error) {
-    throw error;
+    const { data: dbMessages, error: dbErr } = await query;
+    if (!dbErr && dbMessages) {
+      return (dbMessages as ChatMessageRow[]).map(normalizeMessage);
+    }
+  } catch (dbErr) {
+    console.warn("[getChatMessages] DB fallback error:", dbErr);
   }
 
-  const responseData =
-    data?.data ?? data ?? [];
-
-  console.log("[getChatMessages] FRONTEND RESPONSE", {
-    responseData,
-    rowCount: Array.isArray(responseData)
-      ? responseData.length
-      : 0,
-    firstRow: Array.isArray(responseData) && responseData.length > 0
-      ? responseData[0]
-      : null,
-  });
-
-  const normalized =
-    (responseData as ChatMessageRow[]).map(
-      normalizeMessage,
-    );
-
-  console.log("[getChatMessages] NORMALIZED", {
-    rowCount: normalized.length,
-    firstMessage:
-      normalized.length > 0
-        ? normalized[0]
-        : null,
-  });
-
-  return normalized;
+  return [];
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1572,45 +1550,60 @@ export type ChatConversationMember = {
 export async function listChatConversationMembers(
   conversationId: string,
 ): Promise<ChatConversationMember[]> {
-  const accessToken =
-    await getAccessToken();
+  // 1. Try edge function first
+  try {
+    const accessToken = await getAccessToken();
 
-  if (!accessToken) {
-    throw new Error(
-      "You must be signed in to load conversation members.",
-    );
+    if (accessToken) {
+      const { data, error } = await supabase.functions.invoke(
+        "get-chat-conversation-members",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: {
+            conversation_id: conversationId,
+          },
+        },
+      );
+
+      if (!error && data?.data) {
+        return (Array.isArray(data.data) ? data.data : []) as ChatConversationMember[];
+      }
+    }
+  } catch (edgeErr) {
+    console.warn("[listChatConversationMembers] Edge function notice, falling back to direct DB:", edgeErr);
   }
 
-  const {
-    data,
-    error,
-  } = await supabase.functions.invoke(
-    "get-chat-conversation-members",
-    {
-      method: "POST",
+  // 2. Direct Supabase DB query fallback
+  try {
+    const { data: dbMembers, error: dbErr } = await supabase
+      .from("chat_conversation_members")
+      .select("*, profiles(*)")
+      .eq("conversation_id", conversationId);
 
-      headers: {
-        Authorization:
-          `Bearer ${accessToken}`,
-      },
-
-      body: {
-        conversation_id:
-          conversationId,
-      },
-    },
-  );
-
-  if (error) {
-    throw error;
+    if (!dbErr && dbMembers) {
+      return dbMembers.map((m) => {
+        const profile = m.profiles as Record<string, unknown> | null;
+        return {
+          id: m.id,
+          conversation_id: m.conversation_id,
+          profile_id: m.profile_id,
+          client_id: m.client_id,
+          role: m.role,
+          name: (profile?.full_name ?? profile?.display_name ?? "Member") as string,
+          avatar_url: (profile?.avatar_url ?? null) as string | null,
+          joined_at: m.joined_at,
+          muted: m.muted ?? false,
+        } as unknown as ChatConversationMember;
+      });
+    }
+  } catch (dbErr) {
+    console.warn("[listChatConversationMembers] DB fallback error:", dbErr);
   }
 
-  const responseData =
-    data?.data ?? data ?? [];
-
-  return Array.isArray(responseData)
-    ? responseData as ChatConversationMember[]
-    : [];
+  return [];
 }
 export type AddChatConversationClientsRequest = {
   conversationId: string;

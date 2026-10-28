@@ -50,6 +50,7 @@ import {
 import {
   SubscriptionBillingCard,
 } from "@/components/subscription/SubscriptionBillingCard";
+import { CancelSubscriptionModal } from "@/components/subscription/CancelSubscriptionModal";
 
 
 const FEATURE_DETAILS:
@@ -260,6 +261,12 @@ export default function PlansPage() {
   const [
     renewingMainPlan,
     setRenewingMainPlan,
+  ] =
+    useState(false);
+
+  const [
+    cancelModalOpen,
+    setCancelModalOpen,
   ] =
     useState(false);
 
@@ -771,6 +778,16 @@ export default function PlansPage() {
                                 )
                               }
 
+                              {subscription?.subscription_id && (
+                                <button
+                                  type="button"
+                                  onClick={() => setCancelModalOpen(true)}
+                                  className="mt-3 text-xs font-semibold text-red-600 hover:text-red-700 hover:underline transition"
+                                >
+                                  Cancel Subscription
+                                </button>
+                              )}
+
                             </div>
 
 
@@ -911,6 +928,16 @@ export default function PlansPage() {
                                 )
                               }
 
+                              {subscription?.subscription_id && (
+                                <button
+                                  type="button"
+                                  onClick={() => setCancelModalOpen(true)}
+                                  className="mt-3 text-xs font-semibold text-red-600 hover:text-red-700 hover:underline transition"
+                                >
+                                  Cancel Subscription
+                                </button>
+                              )}
+
                             </p>
 
                           </div>
@@ -953,6 +980,16 @@ export default function PlansPage() {
                                   expiryDate,
                                 )
                               }
+
+                              {subscription?.subscription_id && (
+                                <button
+                                  type="button"
+                                  onClick={() => setCancelModalOpen(true)}
+                                  className="mt-3 text-xs font-semibold text-red-600 hover:text-red-700 hover:underline transition"
+                                >
+                                  Cancel Subscription
+                                </button>
+                              )}
 
                             </p>
 
@@ -1095,6 +1132,16 @@ export default function PlansPage() {
 
                                 )
                               }
+
+                              {subscription?.subscription_id && (
+                                <button
+                                  type="button"
+                                  onClick={() => setCancelModalOpen(true)}
+                                  className="mt-3 text-xs font-semibold text-red-600 hover:text-red-700 hover:underline transition"
+                                >
+                                  Cancel Subscription
+                                </button>
+                              )}
 
                             </div>
                           }
@@ -2164,6 +2211,16 @@ export default function PlansPage() {
                                 )
                               }
 
+                              {subscription?.subscription_id && (
+                                <button
+                                  type="button"
+                                  onClick={() => setCancelModalOpen(true)}
+                                  className="mt-3 text-xs font-semibold text-red-600 hover:text-red-700 hover:underline transition"
+                                >
+                                  Cancel Subscription
+                                </button>
+                              )}
+
                             </div>
                           )
                         : (
@@ -2228,6 +2285,16 @@ export default function PlansPage() {
 
       </div>
 
+      <CancelSubscriptionModal
+        isOpen={cancelModalOpen}
+        onClose={() => setCancelModalOpen(false)}
+        subscriptionId={subscription?.subscription_id}
+        planName={subscription?.plan_name}
+        onSuccess={() => {
+          setCancelModalOpen(false);
+          window.location.reload();
+        }}
+      />
     </main>
   );
 }

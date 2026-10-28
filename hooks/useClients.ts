@@ -33,6 +33,7 @@ export function useClients(
 ) {
   const {
     studioId,
+    bootstrapLoading,
   } = useStudioId();
 
   const page =
@@ -144,7 +145,7 @@ export function useClients(
       query.data?.pagination ?? null,
 
     loading:
-      query.isPending,
+      bootstrapLoading || (Boolean(studioId) ? query.isPending : false),
 
     refreshing:
       query.isFetching,

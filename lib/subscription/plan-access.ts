@@ -67,7 +67,7 @@ export type PlanPresetConfig = {
 };
 
 export const PLAN_CONFIGS: Record<string, PlanPresetConfig> = {
-  // Free 7-Day Trial (Limited access & usage)
+  // Free 7-Day Trial (Full feature exploration with limited trial usage)
   photoos_free_trial_7_day: {
     plan_code: "photoos_free_trial_7_day",
     name: "7-Day Free Trial",
@@ -85,22 +85,22 @@ export const PLAN_CONFIGS: Record<string, PlanPresetConfig> = {
       face_matching: true,
       matched_photo_delivery: true,
       finance: true,
-      watermark: false,
-      reports: false,
-      whatsapp: false,
-      analytics: false,
-      automation: false,
-      ai_features: false,
+      watermark: true,
+      reports: true,
+      whatsapp: true,
+      analytics: true,
+      automation: true,
+      ai_features: true,
       priority_support: false,
-      marketing: false,
-      team: false,
-      marketplace: false,
+      marketing: true,
+      team: true,
+      marketplace: true,
     },
     limits: {
       storage_gb: 5,
       events_per_month: 1,
       users: 1,
-      watermark_photos: 0,
+      watermark_photos: 50,
       photos_per_event: 500,
     },
     metadata: {

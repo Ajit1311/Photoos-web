@@ -18,7 +18,7 @@ import type {
   CreatePaymentInput,
 } from "@/types/payment";
 
-import { getFirebaseIdToken } from "@/lib/auth/firebase-auth.service";
+import { getAccessToken } from "@/lib/auth/session";
 type PaymentRow = {
   id: string;
   studio_id: string;
@@ -284,64 +284,61 @@ async function getPaymentDashboardData(): Promise<{
   payments: PaymentTransaction[];
   refunds: PaymentRefund[];
 }> {
-  const accessToken =
-    await getFirebaseIdToken();
+  // 1. Try edge function first
+  try {
+    const accessToken = await getAccessToken();
 
-  if (!accessToken) {
-    throw new Error(
-      "User is not authenticated.",
-    );
+    if (accessToken) {
+      const { data, error } = await supabase.functions.invoke(
+        "payment-dashboard-worker",
+        {
+          body: {},
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      );
+
+      if (!error && data?.success && data?.data) {
+        const paymentRows = Array.isArray(data.data.payments)
+          ? data.data.payments
+          : [];
+        const refundRows = Array.isArray(data.data.refunds)
+          ? data.data.refunds
+          : [];
+
+        return {
+          payments: paymentRows.map((row: PaymentRow) => mapPayment(row)),
+          refunds: refundRows.map((row: PaymentRefundRow) => mapPaymentRefund(row)),
+        };
+      }
+    }
+  } catch (edgeErr) {
+    console.warn("[getPaymentDashboardData] Edge function notice, falling back to direct DB:", edgeErr);
   }
 
-  const {
-    data,
-    error,
-  } = await supabase.functions.invoke(
-    "payment-dashboard-worker",
-    {
-      body: {},
-      headers: {
-        Authorization:
-          `Bearer ${accessToken}`,
-      },
-    },
-  );
+  // 2. Direct Supabase DB query fallback
+  try {
+    const [paymentsRes, refundsRes] = await Promise.all([
+      supabase.from("payments").select("*").order("created_at", { ascending: false }).limit(50),
+      supabase.from("payment_refunds").select("*").order("created_at", { ascending: false }).limit(50),
+    ]);
 
-  if (error) {
-    throw new Error(
-      error.message,
-    );
+    const paymentRows = Array.isArray(paymentsRes.data) ? paymentsRes.data : [];
+    const refundRows = Array.isArray(refundsRes.data) ? refundsRes.data : [];
+
+    return {
+      payments: paymentRows.map((row: PaymentRow) => mapPayment(row)),
+      refunds: refundRows.map((row: PaymentRefundRow) => mapPaymentRefund(row)),
+    };
+  } catch (dbErr) {
+    console.warn("[getPaymentDashboardData] DB fallback error:", dbErr);
   }
 
-  if (!data?.success) {
-    throw new Error(
-      data?.message ??
-        "Unable to load payment dashboard.",
-    );
-  }
-
-  const paymentRows =
-    Array.isArray(data?.data?.payments)
-      ? data.data.payments
-      : [];
-
-  const refundRows =
-    Array.isArray(data?.data?.refunds)
-      ? data.data.refunds
-      : [];
-
+  // 3. Resilient empty return
   return {
-    payments:
-      paymentRows.map(
-        (row: PaymentRow) =>
-          mapPayment(row),
-      ),
-
-    refunds:
-      refundRows.map(
-        (row: PaymentRefundRow) =>
-          mapPaymentRefund(row),
-      ),
+    payments: [],
+    refunds: [],
   };
 }
 

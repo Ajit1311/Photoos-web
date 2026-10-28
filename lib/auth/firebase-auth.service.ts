@@ -135,14 +135,28 @@ export async function sendFirebasePasswordReset(
 export async function getFirebaseIdToken(
   forceRefresh = false,
 ): Promise<string | null> {
-  const user =
-    firebaseAuth.currentUser;
+  const user = firebaseAuth.currentUser;
 
-  if (!user) {
-    return null;
+  if (user) {
+    try {
+      return await user.getIdToken(forceRefresh);
+    } catch {
+      // Fall through to Supabase token
+    }
   }
 
-  return user.getIdToken(forceRefresh);
+  // Fallback to Supabase Auth session token
+  try {
+    const { getAccessToken } = await import("@/lib/auth/session");
+    const supabaseToken = await getAccessToken();
+    if (supabaseToken) {
+      return supabaseToken;
+    }
+  } catch (err) {
+    console.warn("[getFirebaseIdToken] Supabase auth fallback notice:", err);
+  }
+
+  return null;
 }
 
 export function subscribeToFirebaseAuth(

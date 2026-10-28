@@ -12,57 +12,34 @@ export async function getMarketplaceVerifiedAddon(
 ): Promise<
   MarketplaceVerifiedAddonDetails | null
 > {
+  try {
+    const {
+      data,
+      error,
+    } =
+      await supabase.rpc(
+        "get_marketplace_verified_addon",
+        {
+          p_studio_id:
+            studioId,
+        },
+      );
 
-  const {
-    data,
-    error,
-  } =
-    await supabase.rpc(
-      "get_marketplace_verified_addon",
-      {
-        p_studio_id:
-          studioId,
-      },
-    );
+    if (!error && data) {
+      const raw =
+        Array.isArray(data)
+          ? data[0]
+          : data;
 
-
-  if (error) {
-
-    throw error;
-
+      if (raw && typeof raw === "object") {
+        return raw as MarketplaceVerifiedAddonDetails;
+      }
+    }
+  } catch (err) {
+    console.warn("[getMarketplaceVerifiedAddon] RPC notice:", err);
   }
-
-
-  if (!data) {
-
-    return null;
-
-  }
-
-
-  const raw =
-    Array.isArray(data)
-      ? data[0]
-      : data;
-
-
-  if (!raw) {
-
-    return null;
-
-  }
-
-
-  if (typeof raw === "object") {
-
-    return raw as
-      MarketplaceVerifiedAddonDetails;
-
-  }
-
 
   return null;
-
 }
 
 

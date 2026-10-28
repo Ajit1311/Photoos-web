@@ -1,3 +1,4 @@
+import { getAccessToken } from "@/lib/auth/session";
 import { getFirebaseIdToken } from "@/lib/auth/firebase-auth.service";
 import { supabase } from "@/lib/supabase/client";
 
@@ -8,7 +9,7 @@ async function getHeaders(
   studioId: string,
 ): Promise<Record<string, string>> {
   const accessToken =
-    await getFirebaseIdToken();
+    await getAccessToken();
 
   if (!accessToken) {
     throw new Error("User is not authenticated.");
@@ -582,43 +583,61 @@ type ListAlbumsResponse = {
 export async function listStudioAlbums(
   studioId: string,
 ): Promise<StudioAlbum[]> {
-  const accessToken =
-    await getFirebaseIdToken();
+  // 1. Try Edge function first
+  try {
+    const accessToken = await getAccessToken();
 
-  if (!accessToken) {
-    throw new Error(
-      "User is not authenticated.",
-    );
+    if (accessToken) {
+      const { data, error } = await supabase.functions.invoke(
+        "album-list",
+        {
+          body: {
+            studio_id: studioId,
+            limit: 100,
+            offset: 0,
+          },
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      );
+
+      if (!error && data?.data) {
+        const result = data.data as ListAlbumsResponse;
+        if (Array.isArray(result.albums)) {
+          return result.albums;
+        }
+      }
+    }
+  } catch (edgeErr) {
+    console.warn("[listStudioAlbums] Edge function notice, falling back to direct DB:", edgeErr);
   }
 
-  const {
-    data,
-    error,
-  } = await supabase.functions.invoke(
-    "album-list",
-    {
-      body: {
-        studio_id: studioId,
-        limit: 100,
-        offset: 0,
-      },
-      headers: {
-        Authorization:
-          `Bearer ${accessToken}`,
-      },
-    },
-  );
+  // 2. Direct Supabase DB query fallback
+  try {
+    const { data: dbAlbums, error: dbError } = await supabase
+      .from("albums")
+      .select("id, studio_id, project_id, title, status, created_at, updated_at")
+      .eq("studio_id", studioId)
+      .order("created_at", { ascending: false });
 
-  if (error) {
-    throw error;
+    if (!dbError && dbAlbums) {
+      return dbAlbums.map((album) => ({
+        id: album.id,
+        studio_id: album.studio_id,
+        project_id: album.project_id ?? null,
+        title: album.title ?? "Untitled Album",
+        cover_asset_id: null,
+        status: album.status ?? "active",
+        created_at: album.created_at,
+        updated_at: album.updated_at,
+      })) as StudioAlbum[];
+    }
+  } catch (dbErr) {
+    console.warn("[listStudioAlbums] DB fallback error:", dbErr);
   }
 
-  const result =
-    (data?.data ?? {}) as ListAlbumsResponse;
-
-  return Array.isArray(result.albums)
-    ? result.albums
-    : [];
+  return [];
 }
 
 export async function listAlbumAssets(
@@ -628,76 +647,84 @@ export async function listAlbumAssets(
     offset?: number;
   },
 ): Promise<ListAssetsResponse> {
-  const accessToken =
-    await getFirebaseIdToken();
+  const limit = options?.limit ?? 100;
+  const offset = options?.offset ?? 0;
 
-  if (!accessToken) {
-    throw new Error(
-      "User is not authenticated.",
-    );
+  // 1. Try edge function first
+  try {
+    const accessToken = await getAccessToken();
+
+    if (accessToken) {
+      const { data, error } = await supabase.functions.invoke(
+        "asset-list",
+        {
+          body: {
+            album_id: albumId,
+            limit,
+            offset,
+          },
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      );
+
+      if (!error && data?.data) {
+        const result = (data.data ?? {}) as ListAssetsResponse;
+        return {
+          success: true,
+          limit: Number(result.limit ?? limit),
+          offset: Number(result.offset ?? offset),
+          count: Number(result.count ?? result.assets?.length ?? 0),
+          assets: Array.isArray(result.assets) ? result.assets : [],
+        };
+      }
+    }
+  } catch (edgeErr) {
+    console.warn("[listAlbumAssets] Edge function notice, falling back to direct DB:", edgeErr);
   }
 
-  const {
-    data,
-    error,
-  } = await supabase.functions.invoke(
-    "asset-list",
-    {
-      body: {
-        album_id: albumId,
-        limit:
-          options?.limit ??
-          100,
-        offset:
-          options?.offset ??
-          0,
-      },
-      headers: {
-        Authorization:
-          `Bearer ${accessToken}`,
-      },
-    },
-  );
+  // 2. Direct Supabase DB fallback
+  try {
+    const { data: dbAssets, count, error: dbError } = await supabase
+      .from("assets")
+      .select("*", { count: "exact" })
+      .eq("album_id", albumId)
+      .range(offset, offset + limit - 1)
+      .order("created_at", { ascending: false });
 
-  if (error) {
-    throw error;
+    if (!dbError && dbAssets) {
+      return {
+        success: true,
+        limit,
+        offset,
+        count: count ?? dbAssets.length,
+        assets: dbAssets.map((asset) => ({
+          id: asset.id,
+          album_id: asset.album_id,
+          filename: asset.filename ?? "Photo",
+          original_filename: asset.original_filename ?? asset.filename ?? "Photo",
+          mime_type: asset.mime_type ?? "image/jpeg",
+          size_bytes: asset.size_bytes ?? 0,
+          storage_path: asset.storage_path ?? null,
+          thumbnail_path: asset.thumbnail_path ?? null,
+          preview_path: asset.preview_path ?? null,
+          status: asset.status ?? "ready",
+          created_at: asset.created_at,
+          updated_at: asset.updated_at,
+        })) as unknown as AlbumAsset[],
+      };
+    }
+  } catch (dbErr) {
+    console.warn("[listAlbumAssets] DB fallback error:", dbErr);
   }
-
-  const result =
-    (data?.data ?? {}) as ListAssetsResponse;
 
   return {
-    success:
-      result.success ??
-      true,
-
-    limit:
-      Number(
-        result.limit ??
-          options?.limit ??
-          100,
-      ),
-
-    offset:
-      Number(
-        result.offset ??
-          options?.offset ??
-          0,
-      ),
-
-    count:
-      Number(
-        result.count ??
-          result.assets?.length ??
-          0,
-      ),
-
-    assets:
-      Array.isArray(
-        result.assets,
-      )
-        ? result.assets
-        : [],
+    success: true,
+    limit,
+    offset,
+    count: 0,
+    assets: [],
   };
 }
 

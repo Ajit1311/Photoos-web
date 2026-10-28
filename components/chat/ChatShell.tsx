@@ -429,8 +429,7 @@ export default function ChatShell() {
                 null
               }
               loading={
-                clientsLoading ||
-                conversationsLoading
+                conversationsLoading && displayedConversations.length === 0
               }
               startingClientId={
                 startingClientId

@@ -19,6 +19,8 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { getSubscriptionPlans } from "@/lib/api/subscription/plans";
 import type { SubscriptionPlan } from "@/types/subscription/plan";
+import { useSubscriptionAccess } from "@/context/SubscriptionAccessContext";
+import { CancelSubscriptionModal } from "@/components/subscription/CancelSubscriptionModal";
 
 type PlanTab = "monthly" | "yearly" | "vault" | "addons";
 
@@ -206,6 +208,8 @@ export default function SubscriptionPlansPage() {
   const [activeTab, setActiveTab] = useState<PlanTab>("monthly");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { data: currentSubscription, reload: reloadSubscription } = useSubscriptionAccess();
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
 
   const loadPlans = async () => {
     try {
@@ -286,6 +290,54 @@ export default function SubscriptionPlansPage() {
             Refresh Plans
           </button>
         </div>
+
+        {/* Current Active Plan Status Bar */}
+        {currentSubscription?.plan_name && (
+          <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-3xl border border-slate-200 bg-white p-5 sm:px-6 shadow-sm">
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#EBF5FB] text-[#0A3F61]">
+                <ShieldCheck className="h-6 w-6 stroke-[2]" />
+              </span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    Current Active Plan
+                  </span>
+                  <span className="rounded-full bg-[#EBF5FB] px-2.5 py-0.5 text-[10px] font-extrabold text-[#0A3F61] uppercase tracking-wider">
+                    {currentSubscription.status}
+                  </span>
+                </div>
+                <h3 className="text-base font-black text-slate-900 tracking-tight">
+                  {currentSubscription.plan_name}
+                </h3>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              <Link
+                href="/dashboard/plans"
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-sm"
+              >
+                Billing Details
+              </Link>
+              <button
+                type="button"
+                onClick={() => setCancelModalOpen(true)}
+                className="rounded-xl border border-red-200 bg-red-50/60 px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-100 hover:text-red-700 transition shadow-sm"
+              >
+                Cancel Subscription
+              </button>
+            </div>
+          </div>
+        )}
+
+        <CancelSubscriptionModal
+          isOpen={cancelModalOpen}
+          onClose={() => setCancelModalOpen(false)}
+          subscriptionId={currentSubscription?.subscription_id}
+          planName={currentSubscription?.plan_name}
+          onSuccess={() => void reloadSubscription()}
+        />
 
         {/* Cohesive Brand Tabs Navigation */}
         <div className="mt-8 inline-flex flex-wrap items-center gap-1.5 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm">
