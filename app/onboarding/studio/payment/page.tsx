@@ -231,23 +231,34 @@ function StudioOnboardingPaymentContent() {
   );
 
 
-  const selectedPlan =
-    planId
-      ? plans.find(
-          (plan) =>
-            plan.id === planId ||
-            plan.plan_code === planId ||
-            plan.plan_code.toLowerCase().includes(planId.toLowerCase().replace("tier_", "").replace("plan_", "")) ||
-            plan.name.toLowerCase().includes(planId.toLowerCase().replace("tier_", "").replace("plan_", ""))
-        ) ?? plans[0] ?? null
-      : planCode
-        ? plans.find(
-            (plan) =>
-              plan.plan_code === planCode ||
-              plan.plan_code.toLowerCase().includes(planCode.toLowerCase().replace("tier_", "").replace("plan_", "")) ||
-              plan.name.toLowerCase().includes(planCode.toLowerCase().replace("tier_", "").replace("plan_", ""))
-          ) ?? plans[0] ?? null
-        : plans[0] ?? null;
+  const selectedPlan = (() => {
+    const cycle = billingCycle === "yearly" ? "yearly" : "monthly";
+    const needle = (planId || planCode || "").toLowerCase().replace("tier_", "").replace("plan_", "");
+
+    if (needle) {
+      // 1. Match with preferred billing cycle
+      const cycleMatch = plans.find(
+        (p) =>
+          (p.id === planId ||
+           p.plan_code.toLowerCase().includes(needle) ||
+           p.name.toLowerCase().includes(needle)) &&
+          p.billing_cycle === cycle,
+      );
+      if (cycleMatch) return cycleMatch;
+
+      // 2. Any match with needle
+      const anyMatch = plans.find(
+        (p) =>
+          p.id === planId ||
+          p.plan_code.toLowerCase().includes(needle) ||
+          p.name.toLowerCase().includes(needle),
+      );
+      if (anyMatch) return anyMatch;
+    }
+
+    // Default to first plan of matching cycle
+    return plans.find((p) => p.billing_cycle === cycle) ?? plans[0] ?? null;
+  })();
 
 
   function handleBack() {
