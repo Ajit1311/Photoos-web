@@ -124,6 +124,9 @@ function StudioOnboardingPaymentContent() {
   const billingCycle =
     searchParams.get("billingCycle");
 
+  const mode =
+    searchParams.get("mode");
+
 
   const [
     plans,
@@ -259,6 +262,20 @@ function StudioOnboardingPaymentContent() {
     // Default to first plan of matching cycle
     return plans.find((p) => p.billing_cycle === cycle) ?? plans[0] ?? null;
   })();
+
+  // Trial safety guard: Free trial must never show payment page, redirect to legal compliance directly
+  useEffect(() => {
+    if (loadingPlan) return;
+    const isTrial =
+      mode === "trial" ||
+      (selectedPlan && (selectedPlan.price === 0 || selectedPlan.trial_days > 0)) ||
+      (planId && planId.toLowerCase().includes("trial")) ||
+      (planCode && planCode.toLowerCase().includes("trial"));
+
+    if (isTrial) {
+      router.replace("/legal-compliance");
+    }
+  }, [loadingPlan, mode, selectedPlan, planId, planCode, router]);
 
 
   function handleBack() {

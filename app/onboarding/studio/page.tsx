@@ -7,6 +7,10 @@ import { Building2, MapPin, Phone, User, Mail } from "lucide-react";
 import { getSession, getAccessToken } from "@/lib/auth/session";
 import { getBootstrap } from "@/lib/api/bootstrap";
 import { updateStudioProfile } from "@/lib/api/studio-profile";
+import {
+  bootstrapOnboardingStudio,
+  createOnboardingSubscription,
+} from "@/lib/api/onboarding/studio-subscription";
 import { supabaseUrl } from "@/lib/supabase/config";
 
 type StudioForm = {
@@ -25,6 +29,12 @@ function OnboardingStudioPage() {
   const planCode = searchParams.get("planCode");
   const billingCycle = searchParams.get("billingCycle");
   const mode = searchParams.get("mode");
+
+  const isTrial =
+    mode === "trial" ||
+    !planId ||
+    planId.toLowerCase().includes("trial") ||
+    planCode?.toLowerCase().includes("trial");
 
   const [form, setForm] = useState<StudioForm>({
     fullName: "",
@@ -123,6 +133,15 @@ function OnboardingStudioPage() {
         console.warn("[Onboarding] Bootstrap notice:", bootErr);
       }
 
+      if (!studioId) {
+        try {
+          const res = await bootstrapOnboardingStudio();
+          studioId = res.studio_id;
+        } catch (bootErr2) {
+          console.warn("[Onboarding] Studio bootstrap fallback:", bootErr2);
+        }
+      }
+
       // 2. If details are provided, update studio profile
       const hasStudioDetails =
         form.fullName.trim() ||
@@ -148,38 +167,25 @@ function OnboardingStudioPage() {
         }
       }
 
-      // 3. Try to activate trial if edge function is available
-      const token = await getAccessToken();
-      if (token && planId) {
+      // 3. Activate 7-day trial subscription in database
+      if (studioId) {
         try {
-          await fetch(
-            `${supabaseUrl}/functions/v1/create-subscription-trial`,
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                plan_id: planId,
-              }),
-            },
-          );
+          await createOnboardingSubscription(studioId, planId || "photoos_free_trial_7_day");
         } catch (trialErr) {
-          console.warn("[Onboarding] Trial edge function notice:", trialErr);
+          console.warn("[Onboarding] Trial subscription setup notice:", trialErr);
         }
       }
 
-      // 4. Smoothly navigate to dashboard
-      router.replace("/dashboard");
+      // 4. Smoothly navigate to legal compliance
+      router.replace("/legal-compliance");
     } catch (err) {
       console.warn("[Onboarding] Navigation fallback:", err);
-      router.replace("/dashboard");
+      router.replace("/legal-compliance");
     }
   }
 
   function continueToPayment() {
-    if (mode === "trial") {
+    if (isTrial) {
       void startTrial();
       return;
     }
@@ -205,10 +211,15 @@ function OnboardingStudioPage() {
       return;
     }
 
-    router.replace("/dashboard");
+    void startTrial();
   }
 
   function skipInformation() {
+    if (isTrial) {
+      void startTrial();
+      return;
+    }
+
     const params = new URLSearchParams({
       ...(planId ? { planId } : {}),
       ...(planCode ? { planCode } : {}),
@@ -472,7 +483,7 @@ function OnboardingStudioPage() {
                 >
                   {submitting
                     ? "Starting..."
-                    : mode === "trial"
+                    : isTrial
                       ? "Start Free Trial"
                       : "Continue to Payment"}
                 </button>
