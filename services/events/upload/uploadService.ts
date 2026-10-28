@@ -306,22 +306,65 @@ export class UploadService {
 
       /*
        * ------------------------------------------------------------
-       * 2. Resolve Main Album
+       * 2. Resolve Project, Studio, and Main Album
        * ------------------------------------------------------------
        */
 
       stage =
         "resolve_album";
 
-      const album =
-        await getOrCreateMainAlbum(
-          request.studioId,
-          request.projectId,
-        );
+      let projectId = request.projectId;
+      let studioId = request.studioId;
+
+      if (!projectId || !studioId) {
+        const { supabase } = await import("@/lib/supabase/client");
+        const { data: ev } = await supabase
+          .from("events")
+          .select("project_id, studio_id")
+          .eq("id", request.eventId)
+          .maybeSingle();
+        if (ev) {
+          projectId = projectId || ev.project_id;
+          studioId = studioId || ev.studio_id;
+        }
+      }
+
+      let album: { id: string } | null = null;
+      try {
+        if (projectId && studioId) {
+          album = await getOrCreateMainAlbum(studioId, projectId);
+        }
+      } catch (albumErr) {
+        console.warn("[uploadService] getOrCreateMainAlbum notice, using DB fallback:", albumErr);
+      }
+
+      if (!album?.id && projectId && studioId) {
+        const { supabase } = await import("@/lib/supabase/client");
+        const { data: existingAlbum } = await supabase
+          .from("albums")
+          .select("id")
+          .eq("project_id", projectId)
+          .maybeSingle();
+
+        if (existingAlbum?.id) {
+          album = existingAlbum;
+        } else {
+          const { data: createdAlbum } = await supabase
+            .from("albums")
+            .insert({
+              studio_id: studioId,
+              project_id: projectId,
+              title: "Main Album",
+            })
+            .select("id")
+            .maybeSingle();
+          album = createdAlbum;
+        }
+      }
 
       if (!album?.id) {
         throw new Error(
-          "Main Album could not be resolved.",
+          "Main Album could not be resolved for this event.",
         );
       }
 
@@ -380,7 +423,7 @@ export class UploadService {
 
       preparedAsset =
         await prepareAsset(
-          request.studioId,
+          studioId,
           {
             albumId:
               album.id,
@@ -716,7 +759,7 @@ export class UploadService {
       try {
         completedAsset =
           await completeAsset(
-            request.studioId,
+            studioId,
             {
               assetId:
                 preparedAsset.id,

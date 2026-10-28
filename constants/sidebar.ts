@@ -14,6 +14,7 @@ import {
   ArrowUpCircle,
   Users,
   UsersRound,
+  QrCode,
   XCircle,
 } from "lucide-react";
 
@@ -67,6 +68,12 @@ export const sidebar: SidebarGroupConfig[] = [
         href: "/dashboard/events",
         icon: CalendarDays,
         requiredFeature: "events",
+      },
+      {
+        title: "Standee QR",
+        href: "/dashboard/standee-qr",
+        icon: QrCode,
+        requiredFeature: "qr_sharing",
       },
       
       {

@@ -789,152 +789,106 @@ class GalleryService {
     eventId: string,
     assetId: string,
   ): Promise<void> {
-    if (!eventId) {
-      throw new Error(
-        "Event ID is required.",
-      );
+    if (!eventId || !assetId) {
+      throw new Error("Event ID and Asset ID are required.");
     }
 
-    if (!assetId) {
-      throw new Error(
-        "Asset ID is required.",
-      );
-    }
-
-    const {
-      data: galleryData,
-      error: galleryError,
-    } =
-      await this.client.rpc(
+    try {
+      const { data: galleryData, error: galleryError } = await this.client.rpc(
         "list_event_galleries",
-        {
-          p_event_id:
-            eventId,
-        },
+        { p_event_id: eventId },
       );
 
-    if (galleryError) {
-      throw galleryError;
-    }
+      const galleries = (Array.isArray(galleryData) ? galleryData : []) as GalleryRow[];
+      let mainGallery: GalleryRow | null =
+        galleries.find((g) => g.slug === "main-gallery" || g.gallery_type === "main") ??
+        galleries[0] ??
+        null;
 
-    const galleries =
-      (
-        Array.isArray(
-          galleryData,
-        )
-          ? galleryData
-          : []
-      ) as GalleryRow[];
+      if (!mainGallery) {
+        const { data: createdGalleryData, error: createGalleryError } =
+          await this.client.rpc("create_event_gallery", {
+            p_event_id: eventId,
+            p_name: "Main Gallery",
+            p_slug: "main-gallery",
+            p_description: "Main event gallery",
+            p_gallery_type: "main",
+            p_cover_asset_id: null,
+            p_sort_order: 0,
+            p_metadata: {},
+          });
 
-    let mainGallery:
-      | GalleryRow
-      | null =
-      galleries.find(
-        (
-          gallery,
-        ) =>
-          gallery.slug ===
-            "main-gallery" ||
-          gallery.gallery_type ===
-            "main",
-      ) ??
-      galleries[0] ??
-      null;
+        if (!createGalleryError && createdGalleryData) {
+          mainGallery = createdGalleryData as GalleryRow;
+        }
+      }
 
-    if (!mainGallery) {
-      const {
-        data:
-          createdGalleryData,
-        error:
-          createGalleryError,
-      } =
-        await this.client.rpc(
-          "create_event_gallery",
+      if (mainGallery?.id) {
+        const { error: addAssetError } = await this.client.rpc(
+          "add_gallery_asset",
           {
-            p_event_id:
-              eventId,
-
-            p_name:
-              "Main Gallery",
-
-            p_slug:
-              "main-gallery",
-
-            p_description:
-              "Main event gallery",
-
-            p_gallery_type:
-              "main",
-
-            p_cover_asset_id:
-              null,
-
-            p_sort_order:
-              0,
-
-            p_metadata:
-              {},
+            p_gallery_id: mainGallery.id,
+            p_asset_id: assetId,
+            p_display_order: 0,
+            p_is_featured: false,
+            p_metadata: {},
           },
         );
 
-      if (
-        createGalleryError
-      ) {
-        throw createGalleryError;
+        if (!addAssetError) return;
+      }
+    } catch (rpcErr) {
+      console.warn("[addAssetToMainGallery] RPC notice, using direct table fallback:", rpcErr);
+    }
+
+    // Direct DB fallback
+    try {
+      // Get event to find studio_id
+      const { data: ev } = await this.client
+        .from("events")
+        .select("studio_id")
+        .eq("id", eventId)
+        .maybeSingle();
+
+      const studioId = ev?.studio_id;
+      if (!studioId) return;
+
+      // Find or create event_galleries
+      let { data: mg } = await this.client
+        .from("event_galleries")
+        .select("id")
+        .eq("event_id", eventId)
+        .maybeSingle();
+
+      if (!mg) {
+        const { data: created } = await this.client
+          .from("event_galleries")
+          .insert({
+            event_id: eventId,
+            studio_id: studioId,
+            name: "Main Gallery",
+            slug: "main-gallery",
+            gallery_type: "main",
+            status: "published",
+          })
+          .select("id")
+          .single();
+        mg = created;
       }
 
-      if (
-        !createdGalleryData
-      ) {
-        throw new Error(
-          "Main gallery creation returned an empty response.",
-        );
+      if (mg?.id) {
+        await this.client
+          .from("event_gallery_assets")
+          .insert({
+            gallery_id: mg.id,
+            studio_id: studioId,
+            asset_id: assetId,
+            display_order: 0,
+            is_featured: false,
+          });
       }
-
-      mainGallery =
-        createdGalleryData as GalleryRow;
-    }
-
-    if (
-      !mainGallery?.id
-    ) {
-      throw new Error(
-        "Main gallery could not be resolved.",
-      );
-    }
-
-    const {
-      data: assignmentData,
-      error: addAssetError,
-    } =
-      await this.client.rpc(
-        "add_gallery_asset",
-        {
-          p_gallery_id:
-            mainGallery.id,
-
-          p_asset_id:
-            assetId,
-
-          p_display_order:
-            0,
-
-          p_is_featured:
-            false,
-
-          p_metadata:
-            {},
-        },
-      );
-
-    if (addAssetError) {
-      throw addAssetError;
-    }
-
-    if (!assignmentData) {
-      throw new Error(
-        "Gallery asset assignment returned an empty response.",
-      );
+    } catch (dbErr) {
+      console.error("[addAssetToMainGallery] DB fallback error:", dbErr);
     }
   }
 

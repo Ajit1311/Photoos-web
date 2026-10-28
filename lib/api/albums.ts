@@ -239,38 +239,60 @@ export async function createAlbum(
   projectId: string,
   title: string,
 ): Promise<AlbumCard> {
-  const {
-    data,
-    error,
-  } = await supabase.rpc(
-    "create_album",
-    {
-      p_studio_id: studioId,
-      p_project_id: projectId,
-      p_title: title,
-      p_description: null,
-      p_album_type: "standard",
-      p_visibility: "private",
-      p_sequence: 1,
-      p_cover_asset_id: null,
-      p_metadata: {},
-    },
-  );
+  try {
+    const {
+      data,
+      error,
+    } = await supabase.rpc(
+      "create_album",
+      {
+        p_studio_id: studioId,
+        p_project_id: projectId,
+        p_title: title,
+        p_description: null,
+        p_album_type: "standard",
+        p_visibility: "private",
+        p_sequence: 1,
+        p_cover_asset_id: null,
+        p_metadata: {},
+      },
+    );
 
-  if (error) {
-    throw error;
+    if (!error && data) {
+      const album = normalizeCreatedAlbum(data);
+      if (album?.id) {
+        return album;
+      }
+    }
+  } catch (rpcErr) {
+    console.warn("[createAlbum] RPC error, falling back to direct DB insert:", rpcErr);
   }
 
-  const album =
-    normalizeCreatedAlbum(data);
+  // Direct DB insert fallback
+  const { data: inserted, error: insertError } = await supabase
+    .from("albums")
+    .insert({
+      studio_id: studioId,
+      project_id: projectId,
+      title: title,
+      album_type: "standard",
+      visibility: "private",
+    })
+    .select("*")
+    .single();
 
-  if (!album?.id) {
+  if (insertError) {
+    throw insertError;
+  }
+
+  const result = normalizeCreatedAlbum(inserted) || (inserted as unknown as AlbumCard);
+  if (!result?.id) {
     throw new Error(
       "Album was created but the album response does not contain an ID.",
     );
   }
 
-  return album;
+  return result;
 }
 
 /* -------------------------------------------------------------------------- */
