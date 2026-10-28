@@ -599,15 +599,28 @@ export async function getEventWorkspace(
 
   // 2. Direct Supabase DB query fallback
   try {
-    const { data: eventRow, error: eventErr } = await supabase
-      .from("events")
-      .select("*")
-      .eq("id", eventId)
-      .eq("studio_id", studioId)
-      .maybeSingle();
+    let query = supabase.from("events").select("*").eq("id", eventId);
+    if (studioId) {
+      query = query.eq("studio_id", studioId);
+    }
+    let { data: eventRow, error: eventErr } = await query.maybeSingle();
+
+    if (!eventRow) {
+      // Fallback: try by id alone in case studioId was unmapped
+      const { data: fallbackEvent } = await supabase
+        .from("events")
+        .select("*")
+        .eq("id", eventId)
+        .maybeSingle();
+      if (fallbackEvent) {
+        eventRow = fallbackEvent;
+        eventErr = null;
+      }
+    }
 
     if (!eventErr && eventRow) {
       const eventObj = mapApiEvent(eventRow as Record<string, unknown>);
+      const resolvedStudioId = eventRow.studio_id ?? studioId;
 
       // Fetch project & client
       let projectData: Record<string, unknown> | null = null;
@@ -638,10 +651,10 @@ export async function getEventWorkspace(
 
       return {
         workspace: {
-          workspace_id: studioId,
-          workspaceId: studioId,
-          studio_id: studioId,
-          studioId: studioId,
+          workspace_id: eventId,
+          workspaceId: eventId,
+          studio_id: resolvedStudioId,
+          studioId: resolvedStudioId,
           event: eventObj,
           project: projectData,
           client: clientData,

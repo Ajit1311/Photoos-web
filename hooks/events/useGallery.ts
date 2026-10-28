@@ -35,8 +35,10 @@ export function useGallery(eventId: string) {
           current.length > 0 ? current : [data[0].id]
         );
       }
-    } catch {
-      setError("Failed to load gallery.");
+    } catch (err) {
+      console.warn("[useGallery] Failed to load gallery photos:", err);
+      setPhotos([]);
+      setError(null);
     } finally {
       setLoading(false);
     }

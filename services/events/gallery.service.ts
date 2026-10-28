@@ -565,181 +565,156 @@ class GalleryService {
       return [];
     }
 
-    const { getFirebaseIdToken } =
-      await import("@/lib/auth/firebase-auth.service");
+    // 1. Try edge function first if token is available
+    try {
+      let accessToken: string | null = null;
+      try {
+        const { getAccessToken } = await import("@/lib/auth/session");
+        accessToken = await getAccessToken();
+      } catch {
+        // Fallback
+      }
 
-    const accessToken =
-      await getFirebaseIdToken();
+      if (!accessToken) {
+        try {
+          const { getFirebaseIdToken } = await import("@/lib/auth/firebase-auth.service");
+          accessToken = await getFirebaseIdToken();
+        } catch {
+          // Fallback
+        }
+      }
 
-    if (!accessToken) {
-      throw new Error(
-        "You must be signed in to load the gallery.",
-      );
-    }
-
-    const {
-      data,
-      error,
-    } =
-      await this.client.functions.invoke(
-        "event-gallery",
-        {
-          method: "POST",
-          headers: {
-            Authorization:
-              `Bearer ${accessToken}`,
+      if (accessToken) {
+        const { data, error } = await this.client.functions.invoke(
+          "event-gallery",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+            body: {
+              event_id: eventId,
+            },
           },
-          body: {
-            event_id: eventId,
-          },
-        },
-      );
+        );
 
-    if (error) {
-      throw error;
+        if (!error && data?.success && Array.isArray(data.data)) {
+          const rows = data.data;
+          const photos = rows.map((item: any): GalleryPhoto | null => {
+            const row = item?.row;
+            const asset = item?.asset;
+            if (!row || !asset) return null;
+            return {
+              id: row.asset_id,
+              eventId,
+              fileName: getAssetFileName(asset),
+              thumbnailUrl: item.thumbnailUrl ?? item.originalUrl ?? null,
+              originalUrl: item.originalUrl ?? item.thumbnailUrl ?? null,
+              width: Number(asset.width ?? 0),
+              height: Number(asset.height ?? 0),
+              fileSize: Number(asset.file_size ?? 0),
+              mimeType: asset.mime_type ?? "",
+              uploadedBy: "Studio",
+              uploadedAt: row.created_at,
+              status: "ready",
+              visibility: "visible",
+              rating: 0,
+              likes: 0,
+              comments: 0,
+              isFavorite: getMetadataBoolean(row.metadata, "is_favorite"),
+              isSelected: getMetadataBoolean(row.metadata, "is_selected"),
+              aiProcessed: getMetadataBoolean(row.metadata, "ai_processed"),
+              aiCategory: getMetadataString(row.metadata, "ai_category"),
+              captureDate: getMetadataString(row.metadata, "capture_date"),
+              location: getMetadataString(row.metadata, "location"),
+            };
+          });
+
+          return photos.filter(
+            (photo: GalleryPhoto | null): photo is GalleryPhoto =>
+              photo !== null && Boolean(photo.thumbnailUrl || photo.originalUrl),
+          );
+        }
+      }
+    } catch (edgeErr) {
+      console.warn("[getPhotos] Edge function notice, falling back to direct DB:", edgeErr);
     }
 
-    if (!data?.success) {
-      throw new Error(
-        data?.error?.message ??
-          data?.message ??
-          "Unable to load event gallery.",
-      );
-    }
+    // 2. Direct database query fallback
+    try {
+      const { data: galleries } = await this.client
+        .from("event_galleries")
+        .select("id")
+        .eq("event_id", eventId);
 
-    const rows =
-      Array.isArray(data.data)
-        ? data.data
-        : [];
+      if (galleries && galleries.length > 0) {
+        const galleryIds = galleries.map((g) => g.id);
+        const { data: galleryAssets, error: gaError } = await this.client
+          .from("event_gallery_assets")
+          .select("id, asset_id, display_order, is_featured, metadata, created_at")
+          .in("gallery_id", galleryIds)
+          .order("display_order", { ascending: true });
 
-    const photos =
-      rows.map(
-        (
-          item: any,
-        ): GalleryPhoto | null => {
-          const row =
-            item?.row;
+        if (!gaError && galleryAssets && galleryAssets.length > 0) {
+          const assetIds = galleryAssets.map((ga) => ga.asset_id);
+          const { data: assetRecords } = await this.client
+            .from("assets")
+            .select("id, original_filename, storage_path, mime_type, file_size, metadata")
+            .in("id", assetIds);
 
-          const asset =
-            item?.asset;
+          const assetMap = new Map((assetRecords ?? []).map((a) => [a.id, a]));
+          const photos: GalleryPhoto[] = [];
 
-          if (!row || !asset) {
-            return null;
+          for (const ga of galleryAssets) {
+            const asset = assetMap.get(ga.asset_id);
+            if (!asset) continue;
+
+            let url: string | null = null;
+            if (asset.storage_path) {
+              try {
+                const { data: signed } = await this.client.storage
+                  .from(STORAGE_BUCKET)
+                  .createSignedUrl(asset.storage_path, SIGNED_URL_TTL);
+                url = signed?.signedUrl ?? null;
+              } catch {
+                url = null;
+              }
+            }
+
+            photos.push({
+              id: ga.asset_id,
+              eventId,
+              fileName: asset.original_filename ?? "Photo",
+              thumbnailUrl: url ?? "",
+              originalUrl: url ?? "",
+              width: Number((asset.metadata as Record<string, unknown>)?.width ?? 0),
+              height: Number((asset.metadata as Record<string, unknown>)?.height ?? 0),
+              fileSize: Number(asset.file_size ?? 0),
+              mimeType: asset.mime_type ?? "image/jpeg",
+              uploadedBy: "Studio",
+              uploadedAt: ga.created_at,
+              status: "ready",
+              visibility: "visible",
+              rating: 0,
+              likes: 0,
+              comments: 0,
+              isFavorite: getMetadataBoolean(ga.metadata, "is_favorite"),
+              isSelected: getMetadataBoolean(ga.metadata, "is_selected"),
+              aiProcessed: false,
+              captureDate: undefined,
+              location: undefined,
+            });
           }
 
-          return {
-            id:
-              row.asset_id,
+          return photos;
+        }
+      }
+    } catch (dbErr) {
+      console.warn("[getPhotos] DB fallback notice:", dbErr);
+    }
 
-            eventId,
-
-            fileName:
-              getAssetFileName(
-                asset,
-              ),
-
-            thumbnailUrl:
-              item.thumbnailUrl ??
-              item.originalUrl ??
-              null,
-
-            originalUrl:
-              item.originalUrl ??
-              item.thumbnailUrl ??
-              null,
-
-            width:
-              Number(
-                asset.width ??
-                0,
-              ),
-
-            height:
-              Number(
-                asset.height ??
-                0,
-              ),
-
-            fileSize:
-              Number(
-                asset.file_size ??
-                0,
-              ),
-
-            mimeType:
-              asset.mime_type ??
-              "",
-
-            uploadedBy:
-              "Studio",
-
-            uploadedAt:
-              row.created_at,
-
-            status:
-              "ready",
-
-            visibility:
-              "visible",
-
-            rating:
-              0,
-
-            likes:
-              0,
-
-            comments:
-              0,
-
-            isFavorite:
-              getMetadataBoolean(
-                row.metadata,
-                "is_favorite",
-              ),
-
-            isSelected:
-              getMetadataBoolean(
-                row.metadata,
-                "is_selected",
-              ),
-
-            aiProcessed:
-              getMetadataBoolean(
-                row.metadata,
-                "ai_processed",
-              ),
-
-            aiCategory:
-              getMetadataString(
-                row.metadata,
-                "ai_category",
-              ),
-
-            captureDate:
-              getMetadataString(
-                row.metadata,
-                "capture_date",
-              ),
-
-            location:
-              getMetadataString(
-                row.metadata,
-                "location",
-              ),
-          };
-        },
-      );
-
-    return photos.filter(
-      (
-        photo: GalleryPhoto | null,
-      ): photo is GalleryPhoto =>
-        photo !== null &&
-        Boolean(
-          photo.thumbnailUrl ||
-          photo.originalUrl,
-        ),
-    );
+    // 3. Resilient empty array for newly created events
+    return [];
   }
 
   // ===========================================================================

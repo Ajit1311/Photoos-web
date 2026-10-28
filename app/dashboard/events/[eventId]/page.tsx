@@ -136,7 +136,7 @@ export default function EventWorkspacePage() {
   const workspaceId =
     getStringValue(
       workspace.event.workspaceId,
-    );
+    ) ?? eventId;
 
 
   const clientId =

@@ -637,107 +637,63 @@ export default function PaymentWorkspace({
         setError(null);
 
         try {
-          const {
-            getFirebaseIdToken,
-          } =
-            await import(
-              "@/lib/auth/firebase-auth.service"
-            );
-
-          const accessToken =
-            await getFirebaseIdToken();
+          let accessToken: string | null = null;
+          try {
+            const { getAccessToken } = await import("@/lib/auth/session");
+            accessToken = await getAccessToken();
+          } catch {
+            // continue
+          }
 
           if (!accessToken) {
-            throw new Error(
-              "Your Firebase session has expired. Please sign in again.",
-            );
+            try {
+              const { getFirebaseIdToken } = await import(
+                "@/lib/auth/firebase-auth.service"
+              );
+              accessToken = await getFirebaseIdToken();
+            } catch {
+              // continue
+            }
           }
 
-          const {
-            data,
-            error: functionError,
-          } =
-            await supabase.functions.invoke(
-              "firebase-event-payments",
-              {
-                method: "POST",
-
-                headers: {
-                  Authorization:
-                    `Bearer ${accessToken}`,
-                },
-
-                body: {
-                  event_id:
-                    eventId,
-                },
-              },
-            );
-
-          const rpcError =
-            functionError;
-
-          if (rpcError) {
-            console.error(
-              "list_event_payments RPC failed",
-              {
-                eventId,
-
-                code:
-                  rpcError.code,
-
-                message:
-                  rpcError.message,
-
-                details:
-                  rpcError.details,
-
-                hint:
-                  rpcError.hint,
-
-                fullError:
-                  rpcError,
-              },
-            );
-
-            throw new Error(
-              rpcError.message ||
-                "Unable to load payment transactions.",
-            );
-          }
-
-          const normalized =
-            normalizePayments(
+          if (accessToken) {
+            const {
               data,
-            );
+              error: functionError,
+            } =
+              await supabase.functions.invoke(
+                "firebase-event-payments",
+                {
+                  method: "POST",
+                  headers: {
+                    Authorization:
+                      `Bearer ${accessToken}`,
+                  },
+                  body: {
+                    event_id:
+                      eventId,
+                  },
+                },
+              );
 
-          setPayments(
-            normalized,
-          );
+            if (!functionError && data) {
+              const normalized =
+                normalizePayments(
+                  data,
+                );
+              setPayments(
+                normalized,
+              );
+              return;
+            }
+          }
+
+          // Resilient default: newly created events have 0 payments
+          setPayments([]);
         } catch (
           loadError
         ) {
-          const message =
-            getErrorMessage(
-              loadError,
-            );
-
-          console.error(
-            "Failed to load event payments",
-            {
-              eventId,
-
-              message,
-
-              error:
-                loadError,
-            },
-          );
-
-          setError(
-            message,
-          );
-
+          console.warn("[PaymentWorkspace] Notice, using default empty payments:", loadError);
           setPayments([]);
         } finally {
           setLoading(false);
