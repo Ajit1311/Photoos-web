@@ -975,12 +975,10 @@ useEffect(() => {
         eventId && (
 
         <GalleryQRCodeModal
-          eventId={
-            eventId
-          }
-          onClose={
-            handleCloseQR
-          }
+          eventId={eventId}
+          eventName={workspace?.event?.name || "Event Gallery"}
+          studioName={bootstrap?.workspace?.studio?.name || "Photo Studio"}
+          onClose={handleCloseQR}
         />
 
       )}

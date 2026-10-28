@@ -6,28 +6,36 @@ import {
   CalendarDays,
   Camera,
   CheckCircle2,
-  ChevronLeft,
+  Clock,
+  Crown,
   Download,
-  Eye,
   Heart,
   Image as ImageIcon,
   Loader2,
-  Lock,
+  MessageCircle,
+  MessageSquare,
   Phone,
-  RefreshCw,
-  Search,
+  Send,
   Share2,
   ShieldCheck,
   Sparkles,
+  Star,
   Upload,
   User,
   X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { galleryService } from "@/services/events/gallery.service";
+import {
+  addPhotoComment,
+  togglePhotoFavorite,
+  togglePhotoSelection,
+  type PhotoComment,
+} from "@/lib/api/photo-interactions";
 import type { GalleryPhoto } from "@/types/events/gallery";
 
-type GuestStep = "consent" | "selfie" | "matching" | "gallery";
+type UserRole = "bride_groom" | "guest" | null;
+type GuestStep = "role_select" | "guest_consent" | "selfie" | "matching" | "gallery";
 
 interface EventDetails {
   id: string;
@@ -55,32 +63,43 @@ export default function GuestLiveEventPage() {
     : (params?.eventId as string);
 
   // Flow State
-  const [step, setStep] = useState<GuestStep>("consent");
+  const [role, setRole] = useState<UserRole>(null);
+  const [step, setStep] = useState<GuestStep>("role_select");
   const [loading, setLoading] = useState(true);
 
   // Event & Studio Info
   const [event, setEvent] = useState<EventDetails | null>(null);
   const [studio, setStudio] = useState<StudioDetails | null>(null);
 
-  // Step 1: Guest Form & DPDP Consent
+  // Guest Details & DPDP Consent
   const [guestName, setGuestName] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
   const [consentGiven, setConsentGiven] = useState(false);
   const [formError, setFormError] = useState("");
 
-  // Step 2: Selfie Capture
+  // Selfie & Face Scan
   const [selfieDataUrl, setSelfieDataUrl] = useState<string | null>(null);
+  const [matchedPhotos, setMatchedPhotos] = useState<GalleryPhoto[]>([]);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
-  // Step 3: Photos & Matching
+  // Photos & Gallery View
   const [allPhotos, setAllPhotos] = useState<GalleryPhoto[]>([]);
-  const [matchedPhotos, setMatchedPhotos] = useState<GalleryPhoto[]>([]);
-  const [viewMode, setViewMode] = useState<"matched" | "all">("matched");
+  const [galleryTab, setGalleryTab] = useState<"all" | "matched" | "selected" | "favorites">("all");
   const [previewPhoto, setPreviewPhoto] = useState<GalleryPhoto | null>(null);
-  const [likedPhotoIds, setLikedPhotoIds] = useState<Set<string>>(new Set());
 
-  // Load Event and Studio Metadata
+  // Interactive Sets
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [commentsMap, setCommentsMap] = useState<Map<string, PhotoComment[]>>(new Map());
+
+  // Comment Modal
+  const [commentingPhoto, setCommentingPhoto] = useState<GalleryPhoto | null>(null);
+  const [newCommentText, setNewCommentText] = useState("");
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
+
+  // Load Event & Studio Context
   const loadEventContext = useCallback(async () => {
     if (!eventId || !studioId) return;
 
@@ -108,6 +127,15 @@ export default function GuestLiveEventPage() {
         setStudio(studioRes.data as StudioDetails);
       }
       setAllPhotos(photosRes || []);
+
+      const favs = new Set<string>();
+      const sels = new Set<string>();
+      (photosRes || []).forEach((p) => {
+        if (p.isFavorite) favs.add(p.id);
+        if (p.isSelected) sels.add(p.id);
+      });
+      setFavoriteIds(favs);
+      setSelectedIds(sels);
     } catch (err) {
       console.error("[GuestLiveEventPage] Error loading context:", err);
     } finally {
@@ -119,7 +147,7 @@ export default function GuestLiveEventPage() {
     void loadEventContext();
   }, [loadEventContext]);
 
-  // Handle Consent Submission
+  // Guest Consent Form
   const handleProceedToSelfie = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
@@ -129,46 +157,35 @@ export default function GuestLiveEventPage() {
       return;
     }
     if (!guestPhone.trim() || guestPhone.length < 10) {
-      setFormError("कृपया वैध मोबाईल क्रमांक प्रविष्ट करा (Please enter a valid mobile number)");
+      setFormError("कृपया वैध मोबाईल क्रमांक प्रविष्ट करा (Please enter mobile number)");
       return;
     }
     if (!consentGiven) {
-      setFormError("DPDP कायद्यानुसार फोटो मॅचिंगसाठी संमती आवश्यक आहे (Consent required)");
+      setFormError("DPDP कायद्यानुसार फेशिअल मॅचिंगसाठी संमती आवश्यक आहे (Consent required)");
       return;
     }
-
-    // Save guest session locally
-    try {
-      localStorage.setItem(
-        `photoos_guest_${eventId}`,
-        JSON.stringify({ name: guestName, phone: guestPhone, timestamp: Date.now() }),
-      );
-    } catch {}
 
     setStep("selfie");
   };
 
-  // Handle Image File Selection
+  // Image Selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      setSelfieDataUrl(dataUrl);
+      setSelfieDataUrl(event.target?.result as string);
     };
     reader.readAsDataURL(file);
   };
 
-  // Trigger AI Face Matching
+  // AI Face Matching
   const handleMatchPhotos = async () => {
     if (!selfieDataUrl) return;
-
     setStep("matching");
 
     try {
-      // 1. Try AI face search endpoint if available
       let matchedIds: string[] = [];
       try {
         const response = await fetch("/api/ai/face-search", {
@@ -176,8 +193,8 @@ export default function GuestLiveEventPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             image: selfieDataUrl,
-            eventId: eventId,
-            studioId: studioId,
+            eventId,
+            studioId,
             guestPhone,
           }),
         });
@@ -188,50 +205,89 @@ export default function GuestLiveEventPage() {
             matchedIds = result.matchedAssetIds;
           }
         }
-      } catch (aiErr) {
-        console.warn("[FaceSearch] AI endpoint skipped, using gallery fallback:", aiErr);
+      } catch {
+        // Fallback
       }
 
-      // 2. Fallback matching logic
       if (matchedIds.length > 0) {
         const matched = allPhotos.filter((p) => matchedIds.includes(p.id));
         setMatchedPhotos(matched.length > 0 ? matched : allPhotos);
       } else {
-        // If AI model is still processing initial assets, show all photos with badge
         setMatchedPhotos(allPhotos);
       }
 
-      // Small delay for natural scanning experience
       await new Promise((resolve) => setTimeout(resolve, 1500));
+      setGalleryTab("matched");
       setStep("gallery");
-    } catch (err) {
-      console.error("[handleMatchPhotos] Error:", err);
+    } catch {
       setMatchedPhotos(allPhotos);
       setStep("gallery");
     }
   };
 
-  // Toggle Like Photo
-  const toggleLike = (photoId: string) => {
-    setLikedPhotoIds((prev) => {
+  // Toggle Favorite
+  const handleToggleFavorite = async (photoId: string) => {
+    const nextFav = !favoriteIds.has(photoId);
+    setFavoriteIds((prev) => {
       const next = new Set(prev);
-      if (next.has(photoId)) {
-        next.delete(photoId);
-      } else {
-        next.add(photoId);
-      }
+      if (nextFav) next.add(photoId);
+      else next.delete(photoId);
       return next;
     });
+
+    void togglePhotoFavorite(photoId, nextFav);
+  };
+
+  // Toggle Album Selection
+  const handleToggleSelection = async (photoId: string) => {
+    const nextSelected = !selectedIds.has(photoId);
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (nextSelected) next.add(photoId);
+      else next.delete(photoId);
+      return next;
+    });
+
+    const clientLabel =
+      role === "bride_groom"
+        ? `${guestName || "Bride & Groom"} (VIP Client)`
+        : `${guestName || "Guest"}`;
+
+    void togglePhotoSelection(photoId, nextSelected, clientLabel);
+  };
+
+  // Post Comment
+  const handlePostComment = async () => {
+    if (!commentingPhoto || !newCommentText.trim()) return;
+
+    try {
+      setSubmittingComment(true);
+      const author = guestName.trim() || (role === "bride_groom" ? "Bride & Groom" : "Guest");
+
+      const res = await addPhotoComment(commentingPhoto.id, author, newCommentText.trim());
+      if (res.success && res.comment) {
+        setCommentsMap((prev) => {
+          const next = new Map(prev);
+          const current = next.get(commentingPhoto.id) || [];
+          next.set(commentingPhoto.id, [...current, res.comment!]);
+          return next;
+        });
+        setNewCommentText("");
+      }
+    } catch (err) {
+      console.error("[handlePostComment] Error:", err);
+    } finally {
+      setSubmittingComment(false);
+    }
   };
 
   // Download Single Photo
   const handleDownload = (photo: GalleryPhoto) => {
     const url = photo.originalUrl || photo.thumbnailUrl;
     if (!url) return;
-
     const link = document.createElement("a");
     link.href = url;
-    link.download = photo.fileName || `EventPhoto-${photo.id}.jpg`;
+    link.download = photo.fileName || `Photo-${photo.id}.jpg`;
     link.target = "_blank";
     link.click();
   };
@@ -240,18 +296,25 @@ export default function GuestLiveEventPage() {
   const handleWhatsAppShare = (photo: GalleryPhoto) => {
     const url = photo.originalUrl || photo.thumbnailUrl;
     const eventTitle = event?.name || "Event";
-    const message = encodeURIComponent(
-      `Check out my photo from ${eventTitle}! 📸✨\n${url}`,
+    const msg = encodeURIComponent(
+      `Check out this photo from ${eventTitle}! 📸✨\n${url}`,
     );
-    window.open(`https://api.whatsapp.com/send?text=${message}`, "_blank");
+    window.open(`https://api.whatsapp.com/send?text=${msg}`, "_blank");
   };
 
   const displayedPhotos = useMemo(() => {
-    if (viewMode === "matched" && matchedPhotos.length > 0) {
-      return matchedPhotos;
+    switch (galleryTab) {
+      case "matched":
+        return matchedPhotos.length > 0 ? matchedPhotos : allPhotos;
+      case "selected":
+        return allPhotos.filter((p) => selectedIds.has(p.id));
+      case "favorites":
+        return allPhotos.filter((p) => favoriteIds.has(p.id));
+      case "all":
+      default:
+        return allPhotos;
     }
-    return allPhotos;
-  }, [viewMode, matchedPhotos, allPhotos]);
+  }, [galleryTab, matchedPhotos, allPhotos, selectedIds, favoriteIds]);
 
   if (loading) {
     return (
@@ -267,16 +330,23 @@ export default function GuestLiveEventPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       {/* Top Mobile Bar */}
-      <header className="sticky top-0 z-30 border-b border-white/10 bg-[#071f31]/90 px-4 py-3 backdrop-blur-md">
-        <div className="mx-auto flex max-w-lg items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500/20 text-[#EF8619]">
-              <Sparkles className="h-5 w-5" />
+      <header className="sticky top-0 z-30 border-b border-white/10 bg-[#071f31]/95 px-4 py-3 backdrop-blur-md">
+        <div className="mx-auto flex max-w-2xl items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-orange-500/20 text-[#EF8619]">
+              {role === "bride_groom" ? <Crown className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
             </div>
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-orange-400">
-                {studio?.brand_name || studio?.name || "Studio Gallery"}
-              </p>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-orange-400">
+                  {studio?.brand_name || studio?.name || "Studio Gallery"}
+                </span>
+                {role === "bride_groom" && (
+                  <span className="rounded-full bg-amber-400/20 px-2 py-0.2 text-[9px] font-bold text-amber-300">
+                    VIP CLIENT
+                  </span>
+                )}
+              </div>
               <h1 className="text-sm font-bold text-white line-clamp-1">
                 {event?.name || "Live Event"}
               </h1>
@@ -287,34 +357,33 @@ export default function GuestLiveEventPage() {
             <button
               type="button"
               onClick={() => setStep("selfie")}
-              className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white transition hover:bg-white/20"
+              className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20"
             >
               <Camera className="h-3.5 w-3.5" />
-              Re-scan
+              <span>Face Scan</span>
             </button>
           )}
         </div>
       </header>
 
       {/* Main Container */}
-      <main className="mx-auto max-w-lg p-4 pb-20">
-        {/* STEP 1: DPDP Legal Consent & Guest Info */}
-        {step === "consent" && (
-          <div className="space-y-6 animate-in fade-in">
-            {/* Hero Card */}
-            <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-[#0A3F61] to-[#071f31] p-6 text-center shadow-xl">
+      <main className="mx-auto max-w-2xl p-4 pb-24">
+        {/* STEP 1: ROLE SELECTION (Bride & Groom vs Guest) */}
+        {step === "role_select" && (
+          <div className="space-y-6 text-center animate-in fade-in">
+            <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-[#0A3F61] to-[#071f31] p-6 shadow-xl">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-orange-400">
-                <Camera className="h-7 w-7" />
+                <Sparkles className="h-7 w-7" />
               </div>
-              <h2 className="mt-4 text-xl font-bold text-white">
-                Find Your Photos Instantly!
+              <h2 className="mt-4 text-2xl font-bold text-white">
+                Welcome to {event?.name || "Wedding Gallery"}!
               </h2>
               <p className="mt-1 text-xs text-sky-200">
-                Take a quick selfie and our AI will automatically find all photos of you from this event.
+                Please select how you would like to view photos today
               </p>
 
               {event?.shoot_date && (
-                <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-black/30 px-3 py-1 text-xs text-slate-300">
+                <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-black/30 px-3.5 py-1 text-xs text-slate-300">
                   <CalendarDays className="h-3.5 w-3.5 text-orange-400" />
                   <span>{event.shoot_date}</span>
                   {event.venue && <span>• {event.venue}</span>}
@@ -322,14 +391,104 @@ export default function GuestLiveEventPage() {
               )}
             </div>
 
-            {/* Guest Form */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {/* Bride & Groom VIP Option */}
+              <div
+                onClick={() => {
+                  setRole("bride_groom");
+                  setStep("gallery");
+                }}
+                className="group relative flex cursor-pointer flex-col items-center justify-between rounded-3xl border-2 border-amber-400/40 bg-gradient-to-b from-amber-950/20 via-slate-900 to-slate-900 p-6 text-center transition hover:border-amber-400 hover:shadow-xl hover:shadow-amber-500/10"
+              >
+                <div className="inline-flex rounded-full bg-amber-400/20 px-3 py-1 text-[10px] font-bold tracking-wider text-amber-300 uppercase">
+                  VIP Host Access
+                </div>
+
+                <div className="my-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-400/10 text-amber-400 group-hover:scale-110 transition">
+                  <Crown className="h-8 w-8" />
+                </div>
+
+                <div className="space-y-1">
+                  <h3 className="text-lg font-bold text-white">
+                    Bride & Groom / Family
+                  </h3>
+                  <p className="text-xs text-slate-300">
+                    नवरदेव आणि नवरी / मुख्य कुटुंब
+                  </p>
+                  <p className="mt-2 text-[11px] text-amber-200/80">
+                    ✨ View ALL event photos, Star album selection & comment directly
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  className="mt-6 w-full rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 py-3 text-xs font-bold text-black shadow transition group-hover:brightness-110"
+                >
+                  Enter as Bride & Groom
+                </button>
+              </div>
+
+              {/* Guest Option */}
+              <div
+                onClick={() => {
+                  setRole("guest");
+                  setStep("guest_consent");
+                }}
+                className="group relative flex cursor-pointer flex-col items-center justify-between rounded-3xl border-2 border-sky-400/30 bg-gradient-to-b from-sky-950/20 via-slate-900 to-slate-900 p-6 text-center transition hover:border-sky-400 hover:shadow-xl hover:shadow-sky-500/10"
+              >
+                <div className="inline-flex rounded-full bg-sky-400/20 px-3 py-1 text-[10px] font-bold tracking-wider text-sky-300 uppercase">
+                  AI Face Match
+                </div>
+
+                <div className="my-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-sky-400/10 text-sky-400 group-hover:scale-110 transition">
+                  <Camera className="h-8 w-8" />
+                </div>
+
+                <div className="space-y-1">
+                  <h3 className="text-lg font-bold text-white">
+                    Wedding Guest / Relative
+                  </h3>
+                  <p className="text-xs text-slate-300">
+                    पाहुणे / मित्रपरिवार
+                  </p>
+                  <p className="mt-2 text-[11px] text-sky-200/80">
+                    🔍 Take a selfie to instantly find all photos of you from this event
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  className="mt-6 w-full rounded-2xl bg-[#0A3F61] py-3 text-xs font-bold text-white shadow transition group-hover:bg-[#08334f]"
+                >
+                  Find My Photos with AI
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 2: GUEST FORM & DPDP CONSENT */}
+        {step === "guest_consent" && (
+          <div className="space-y-6 animate-in fade-in">
             <form
               onSubmit={handleProceedToSelfie}
               className="space-y-4 rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-sm"
             >
-              <h3 className="text-sm font-bold tracking-wide text-white uppercase">
-                Guest Verification
-              </h3>
+              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <div className="flex items-center gap-2">
+                  <Camera className="h-5 w-5 text-orange-400" />
+                  <h3 className="text-base font-bold text-white">
+                    Guest Verification
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setStep("role_select")}
+                  className="text-xs text-slate-400 hover:text-white"
+                >
+                  Change Profile
+                </button>
+              </div>
 
               {formError && (
                 <div className="rounded-xl border border-red-500/30 bg-red-950/40 p-3 text-xs font-medium text-red-300">
@@ -337,7 +496,6 @@ export default function GuestLiveEventPage() {
                 </div>
               )}
 
-              {/* Full Name */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-300">
                   Your Full Name (तुमचे नाव) *
@@ -355,7 +513,6 @@ export default function GuestLiveEventPage() {
                 </div>
               </div>
 
-              {/* Mobile Number */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-300">
                   WhatsApp / Mobile Number *
@@ -373,46 +530,35 @@ export default function GuestLiveEventPage() {
                 </div>
               </div>
 
-              {/* DPDP Legal Compliance Box */}
+              {/* DPDP Consent */}
               <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
                 <div className="flex items-start gap-3">
                   <input
                     type="checkbox"
-                    id="dpdpConsent"
+                    id="guestDpdpLive"
                     checked={consentGiven}
                     onChange={(e) => setConsentGiven(e.target.checked)}
                     className="mt-1 h-4 w-4 rounded border-slate-700 bg-white/10 text-[#EF8619] focus:ring-0"
                   />
-                  <label
-                    htmlFor="dpdpConsent"
-                    className="text-xs leading-relaxed text-slate-300"
-                  >
-                    <span className="font-semibold text-white">
-                      DPDP Act 2023 Biometric Consent:
-                    </span>{" "}
-                    मी या कार्यक्रमातील माझे फोटो शोधण्यासाठी माझा सेल्फी फेस मॅचिंगसाठी वापरण्यास संमती देत आहे. हा डेटा सुरक्षित ठेवला जाईल व फोटो डिलिव्हरीनंतर हटवला जाईल.
+                  <label htmlFor="guestDpdpLive" className="text-xs leading-relaxed text-slate-300">
+                    <span className="font-semibold text-white">DPDP Act 2023 Biometric Consent:</span>{" "}
+                    मी या कार्यक्रमातील माझे फोटो शोधण्यासाठी फेशिअल मॅचिंगसाठी संमती देत आहे. हा डेटा सुरक्षित राहून केवळ फोटो मॅचिंगसाठी वापरला जाईल.
                   </label>
-                </div>
-
-                <div className="mt-2.5 flex items-center gap-1.5 text-[11px] text-sky-300/80">
-                  <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
-                  <span>256-bit encrypted • Legal compliance assured</span>
                 </div>
               </div>
 
-              {/* Submit Button */}
               <button
                 type="submit"
                 className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#EF8619] py-3.5 text-sm font-bold text-white shadow-lg transition hover:bg-[#d97410]"
               >
-                <span>Continue to Face Scan</span>
+                <span>Continue to Selfie Scan</span>
                 <Sparkles className="h-4 w-4" />
               </button>
             </form>
           </div>
         )}
 
-        {/* STEP 2: Selfie Capture & Preview */}
+        {/* STEP 3: SELFIE CAPTURE */}
         {step === "selfie" && (
           <div className="space-y-6 text-center animate-in fade-in">
             <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-sm">
@@ -423,7 +569,6 @@ export default function GuestLiveEventPage() {
                 चेहरा स्पष्ट दिसेल असा सेल्फी घ्या किंवा गॅलरीतून निवडा
               </p>
 
-              {/* Hidden file inputs */}
               <input
                 ref={cameraInputRef}
                 type="file"
@@ -440,15 +585,10 @@ export default function GuestLiveEventPage() {
                 className="hidden"
               />
 
-              {/* Selfie Frame Preview */}
               <div className="my-8 flex justify-center">
                 {selfieDataUrl ? (
                   <div className="relative h-56 w-56 overflow-hidden rounded-full border-4 border-[#EF8619] shadow-2xl">
-                    <img
-                      src={selfieDataUrl}
-                      alt="Selfie"
-                      className="h-full w-full object-cover"
-                    />
+                    <img src={selfieDataUrl} alt="Selfie" className="h-full w-full object-cover" />
                   </div>
                 ) : (
                   <div
@@ -463,7 +603,6 @@ export default function GuestLiveEventPage() {
                 )}
               </div>
 
-              {/* Actions */}
               {selfieDataUrl ? (
                 <div className="space-y-3">
                   <button
@@ -488,7 +627,7 @@ export default function GuestLiveEventPage() {
                   <button
                     type="button"
                     onClick={() => cameraInputRef.current?.click()}
-                    className="flex flex-col items-center justify-center gap-2 rounded-2xl bg-[#0A3F61] p-4 text-xs font-bold text-white transition hover:bg-[#08334f]"
+                    className="flex flex-col items-center justify-center gap-2 rounded-2xl bg-[#0A3F61] p-4 text-xs font-bold text-white hover:bg-[#08334f]"
                   >
                     <Camera className="h-6 w-6 text-orange-400" />
                     <span>Open Camera</span>
@@ -497,7 +636,7 @@ export default function GuestLiveEventPage() {
                   <button
                     type="button"
                     onClick={() => galleryInputRef.current?.click()}
-                    className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 p-4 text-xs font-bold text-slate-200 transition hover:bg-white/10"
+                    className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 p-4 text-xs font-bold text-slate-200 hover:bg-white/10"
                   >
                     <Upload className="h-6 w-6 text-sky-400" />
                     <span>Upload Photo</span>
@@ -508,18 +647,14 @@ export default function GuestLiveEventPage() {
           </div>
         )}
 
-        {/* STEP 3: Matching Progress Animation */}
+        {/* STEP 4: MATCHING ANIMATION */}
         {step === "matching" && (
           <div className="flex min-h-[50vh] flex-col items-center justify-center space-y-6 text-center animate-in zoom-in-95">
             <div className="relative flex h-36 w-36 items-center justify-center">
               <div className="absolute inset-0 rounded-full border-4 border-white/10 border-t-[#EF8619] animate-spin" />
               {selfieDataUrl ? (
                 <div className="h-28 w-28 overflow-hidden rounded-full">
-                  <img
-                    src={selfieDataUrl}
-                    alt="Scanning"
-                    className="h-full w-full object-cover"
-                  />
+                  <img src={selfieDataUrl} alt="Scanning" className="h-full w-full object-cover" />
                 </div>
               ) : (
                 <Sparkles className="h-10 w-10 text-[#EF8619]" />
@@ -537,33 +672,92 @@ export default function GuestLiveEventPage() {
           </div>
         )}
 
-        {/* STEP 4: Results & Photo Gallery */}
+        {/* STEP 5: INTERACTIVE GALLERY */}
         {step === "gallery" && (
           <div className="space-y-4 animate-in fade-in">
-            {/* Gallery Tabs (Matched vs All Photos) */}
-            <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-1.5">
+            {/* VIP Bride & Groom Bar */}
+            {role === "bride_groom" && (
+              <div className="rounded-2xl border border-amber-400/40 bg-gradient-to-r from-amber-950/40 via-slate-900 to-amber-950/30 p-4 shadow-lg">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <Crown className="h-5 w-5 text-amber-400" />
+                    <div>
+                      <h3 className="text-sm font-bold text-amber-300">
+                        Wedding Album Selection Mode
+                      </h3>
+                      <p className="text-xs text-slate-300">
+                        ⭐ {selectedIds.size} Photos Selected for your Wedding Album
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedIds.size === 0) {
+                        alert("कृपया आधी काही फोटो सिलेक्ट करा.");
+                        return;
+                      }
+                      setSelectionNotice(`🎉 धन्यवाद! तुम्ही निवडलेले ${selectedIds.size} फोटो स्टुडिओकडे पाठवले आहेत.`);
+                      setTimeout(() => setSelectionNotice(null), 5000);
+                    }}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-amber-400 px-4 py-2 text-xs font-bold text-black shadow transition hover:bg-amber-300"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    Submit Album Selection
+                  </button>
+                </div>
+
+                {selectionNotice && (
+                  <div className="mt-3 rounded-xl bg-emerald-950/80 p-2.5 text-xs font-semibold text-emerald-300 border border-emerald-500/40">
+                    {selectionNotice}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Gallery Navigation Tabs */}
+            <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-white/10 bg-white/5 p-1.5">
               <button
                 type="button"
-                onClick={() => setViewMode("matched")}
-                className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${
-                  viewMode === "matched"
-                    ? "bg-[#EF8619] text-white shadow"
-                    : "text-slate-400 hover:text-white"
+                onClick={() => setGalleryTab("all")}
+                className={`flex-1 rounded-xl py-2 px-3 text-xs font-bold transition ${
+                  galleryTab === "all" ? "bg-[#0A3F61] text-white shadow" : "text-slate-400 hover:text-white"
                 }`}
               >
-                My Photos ({matchedPhotos.length})
+                All ({allPhotos.length})
+              </button>
+
+              {matchedPhotos.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setGalleryTab("matched")}
+                  className={`flex-1 rounded-xl py-2 px-3 text-xs font-bold transition ${
+                    galleryTab === "matched" ? "bg-[#EF8619] text-white shadow" : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  My Photos ({matchedPhotos.length})
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setGalleryTab("selected")}
+                className={`flex-1 rounded-xl py-2 px-3 text-xs font-bold transition ${
+                  galleryTab === "selected" ? "bg-amber-500 text-black shadow" : "text-slate-400 hover:text-white"
+                }`}
+              >
+                ⭐ Selected ({selectedIds.size})
               </button>
 
               <button
                 type="button"
-                onClick={() => setViewMode("all")}
-                className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${
-                  viewMode === "all"
-                    ? "bg-[#0A3F61] text-white shadow"
-                    : "text-slate-400 hover:text-white"
+                onClick={() => setGalleryTab("favorites")}
+                className={`flex-1 rounded-xl py-2 px-3 text-xs font-bold transition ${
+                  galleryTab === "favorites" ? "bg-red-600 text-white shadow" : "text-slate-400 hover:text-white"
                 }`}
               >
-                All Event Photos ({allPhotos.length})
+                ❤️ Liked ({favoriteIds.size})
               </button>
             </div>
 
@@ -572,16 +766,17 @@ export default function GuestLiveEventPage() {
               <div className="rounded-3xl border border-dashed border-white/15 p-12 text-center">
                 <ImageIcon className="mx-auto h-10 w-10 text-slate-500" />
                 <h3 className="mt-3 text-base font-bold text-white">
-                  No photos uploaded yet
+                  No photos in this section
                 </h3>
                 <p className="mt-1 text-xs text-slate-400">
-                  The photographer is currently shooting or uploading event photos. Please check back shortly!
+                  Switch to &quot;All Photos&quot; to browse all event pictures.
                 </p>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
                 {displayedPhotos.map((photo) => {
-                  const isLiked = likedPhotoIds.has(photo.id);
+                  const isFav = favoriteIds.has(photo.id);
+                  const isSel = selectedIds.has(photo.id);
                   const displayUrl = photo.thumbnailUrl || photo.originalUrl;
 
                   return (
@@ -597,24 +792,63 @@ export default function GuestLiveEventPage() {
                         className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                       />
 
-                      {/* Quick Action Overlay */}
-                      <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/80 via-black/30 to-transparent p-2.5">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleLike(photo.id);
-                          }}
-                          className="rounded-full bg-black/40 p-1.5 text-white backdrop-blur-sm"
-                        >
-                          <Heart
-                            className={`h-4 w-4 ${
-                              isLiked
-                                ? "fill-red-500 text-red-500"
-                                : "text-white"
+                      {/* Top Badges */}
+                      <div className="absolute left-2 top-2 flex items-center gap-1">
+                        {isSel && (
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-400 text-black shadow">
+                            <Star className="h-3.5 w-3.5 fill-black" />
+                          </span>
+                        )}
+                        {isFav && (
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white shadow">
+                            <Heart className="h-3.5 w-3.5 fill-white" />
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Bottom Actions */}
+                      <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/80 via-black/30 to-transparent p-2">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void handleToggleFavorite(photo.id);
+                            }}
+                            className={`rounded-full p-1.5 backdrop-blur-sm transition ${
+                              isFav ? "bg-red-600 text-white" : "bg-black/50 text-white hover:bg-black/70"
                             }`}
-                          />
-                        </button>
+                            title="Favorite"
+                          >
+                            <Heart className={`h-3.5 w-3.5 ${isFav ? "fill-white" : ""}`} />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void handleToggleSelection(photo.id);
+                            }}
+                            className={`rounded-full p-1.5 backdrop-blur-sm transition ${
+                              isSel ? "bg-amber-400 text-black" : "bg-black/50 text-white hover:bg-black/70"
+                            }`}
+                            title="Select for Album"
+                          >
+                            <Star className={`h-3.5 w-3.5 ${isSel ? "fill-black" : ""}`} />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCommentingPhoto(photo);
+                            }}
+                            className="rounded-full bg-black/50 p-1.5 text-white backdrop-blur-sm hover:bg-black/70"
+                            title="Comment"
+                          >
+                            <MessageCircle className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
 
                         <button
                           type="button"
@@ -622,9 +856,10 @@ export default function GuestLiveEventPage() {
                             e.stopPropagation();
                             handleDownload(photo);
                           }}
-                          className="rounded-full bg-black/40 p-1.5 text-white backdrop-blur-sm"
+                          className="rounded-full bg-black/50 p-1.5 text-white backdrop-blur-sm hover:bg-black/70"
+                          title="Download"
                         >
-                          <Download className="h-4 w-4" />
+                          <Download className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     </div>
@@ -636,10 +871,9 @@ export default function GuestLiveEventPage() {
         )}
       </main>
 
-      {/* Lightbox Modal for Photo Preview */}
+      {/* FULLSCREEN LIGHTBOX */}
       {previewPhoto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4 backdrop-blur-sm animate-in fade-in">
-          {/* Close Button */}
           <button
             type="button"
             onClick={() => setPreviewPhoto(null)}
@@ -648,31 +882,121 @@ export default function GuestLiveEventPage() {
             <X className="h-6 w-6" />
           </button>
 
-          <div className="max-h-[85vh] max-w-full overflow-hidden">
+          <div className="max-h-[90vh] max-w-full text-center">
             <img
               src={previewPhoto.originalUrl || previewPhoto.thumbnailUrl}
               alt={previewPhoto.fileName}
-              className="max-h-[75vh] w-auto max-w-full rounded-2xl object-contain shadow-2xl"
+              className="max-h-[72vh] w-auto max-w-full rounded-2xl object-contain shadow-2xl"
             />
 
-            {/* Bottom Actions */}
-            <div className="mt-4 flex items-center justify-center gap-3">
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => void handleToggleFavorite(previewPhoto.id)}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold shadow transition ${
+                  favoriteIds.has(previewPhoto.id) ? "bg-red-600 text-white" : "bg-white/10 text-white hover:bg-white/20"
+                }`}
+              >
+                <Heart className={`h-4 w-4 ${favoriteIds.has(previewPhoto.id) ? "fill-white" : ""}`} />
+                <span>{favoriteIds.has(previewPhoto.id) ? "Favorited" : "Favorite"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void handleToggleSelection(previewPhoto.id)}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold shadow transition ${
+                  selectedIds.has(previewPhoto.id) ? "bg-amber-400 text-black" : "bg-white/10 text-white hover:bg-white/20"
+                }`}
+              >
+                <Star className={`h-4 w-4 ${selectedIds.has(previewPhoto.id) ? "fill-black" : ""}`} />
+                <span>{selectedIds.has(previewPhoto.id) ? "Selected for Album" : "Select for Album"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCommentingPhoto(previewPhoto)}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-white/20"
+              >
+                <MessageSquare className="h-4 w-4" />
+                <span>Comments</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => handleDownload(previewPhoto)}
-                className="inline-flex items-center gap-2 rounded-xl bg-[#0A3F61] px-5 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-[#08334f]"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[#0A3F61] px-4 py-2 text-xs font-semibold text-white shadow hover:bg-[#08334f]"
               >
                 <Download className="h-4 w-4" />
-                Download HD
+                <span>Download HD</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleWhatsAppShare(previewPhoto)}
-                className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-5 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-[#20b858]"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[#25D366] px-4 py-2 text-xs font-semibold text-white shadow hover:bg-[#20b858]"
               >
                 <Share2 className="h-4 w-4" />
-                WhatsApp
+                <span>WhatsApp</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* COMMENTS DRAWER / MODAL */}
+      {commentingPhoto && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-md rounded-3xl border border-white/15 bg-slate-900 p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2">
+                <MessageCircle className="h-5 w-5 text-sky-400" />
+                <h3 className="text-base font-bold text-white">Photo Comments</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCommentingPhoto(null)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="my-4 max-h-48 space-y-2.5 overflow-y-auto pr-1">
+              {(commentsMap.get(commentingPhoto.id) || []).length === 0 ? (
+                <p className="text-center py-6 text-xs text-slate-500">
+                  No comments yet. Write a note or request changes!
+                </p>
+              ) : (
+                (commentsMap.get(commentingPhoto.id) || []).map((c) => (
+                  <div key={c.id} className="rounded-2xl border border-white/10 bg-white/5 p-3 text-xs">
+                    <div className="flex items-center justify-between text-[11px] text-slate-400">
+                      <span className="font-bold text-sky-300">{c.author}</span>
+                      <span>{new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    <p className="mt-1 text-slate-200">{c.comment}</p>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={newCommentText}
+                onChange={(e) => setNewCommentText(e.target.value)}
+                placeholder="Write a comment or request..."
+                className="flex-1 rounded-xl border border-white/15 bg-white/5 px-3.5 py-2.5 text-xs text-white placeholder:text-slate-500 focus:border-sky-400 focus:outline-none"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void handlePostComment();
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => void handlePostComment()}
+                disabled={submittingComment || !newCommentText.trim()}
+                className="rounded-xl bg-[#0A3F61] p-2.5 text-white hover:bg-[#08334f] disabled:opacity-50"
+              >
+                <Send className="h-4 w-4" />
               </button>
             </div>
           </div>
@@ -681,4 +1005,3 @@ export default function GuestLiveEventPage() {
     </div>
   );
 }
-

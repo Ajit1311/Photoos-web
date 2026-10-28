@@ -696,8 +696,10 @@ class GalleryService {
               status: "ready",
               visibility: "visible",
               rating: 0,
-              likes: 0,
-              comments: 0,
+              likes: getMetadataBoolean(ga.metadata, "is_favorite") ? 1 : 0,
+              comments: Array.isArray((ga.metadata as any)?.comments)
+                ? (ga.metadata as any).comments.length
+                : 0,
               isFavorite: getMetadataBoolean(ga.metadata, "is_favorite"),
               isSelected: getMetadataBoolean(ga.metadata, "is_selected"),
               aiProcessed: false,
