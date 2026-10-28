@@ -209,25 +209,20 @@ function OnboardingStudioPage() {
   }
 
   function skipInformation() {
-    if (planId && mode !== "trial") {
-      const params = new URLSearchParams({
-        planId,
-        planCode: planCode ?? "",
-        billingCycle: billingCycle ?? "monthly",
-        fullName: form.fullName,
-        phone: form.phone,
-        email: form.email,
-        studioName: form.studioName,
-        location: form.location,
-      });
+    const params = new URLSearchParams({
+      ...(planId ? { planId } : {}),
+      ...(planCode ? { planCode } : {}),
+      billingCycle: billingCycle ?? "monthly",
+      fullName: form.fullName,
+      phone: form.phone,
+      email: form.email,
+      studioName: form.studioName,
+      location: form.location,
+    });
 
-      router.push(
-        `/onboarding/studio/payment?${params.toString()}`,
-      );
-      return;
-    }
-
-    router.replace("/dashboard");
+    router.push(
+      `/onboarding/studio/payment?${params.toString()}`,
+    );
   }
 
 

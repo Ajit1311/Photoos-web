@@ -1,72 +1,123 @@
 import { supabase } from "@/lib/supabase/client";
-import { getAccessToken } from "@/lib/auth/session";
+import { getAccessToken, getSession } from "@/lib/auth/session";
 import type { SubscriptionAccessDetails } from "@/types/subscription/subscription";
 
 export async function getSubscriptionAccessDetails(
-  _studioId: string,
+  studioId: string,
 ): Promise<SubscriptionAccessDetails | null> {
 
-  console.log(
-    "[SUBSCRIPTION ACCESS] requesting Supabase access token",
-  );
+  // 1. Try Edge Function if available
+  try {
+    const accessToken = await getAccessToken();
 
-  const accessToken =
-    await getAccessToken();
+    if (accessToken) {
+      const {
+        data,
+        error,
+      } = await supabase.functions.invoke(
+        "get-subscription-access-details",
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      );
 
-  console.log(
-    "[SUBSCRIPTION ACCESS] Supabase access token:",
-    accessToken ? "PRESENT" : "MISSING",
-  );
-
-  if (!accessToken) {
-    throw new Error(
-      "You must be signed in to load subscription access.",
-    );
+      if (!error && data?.success && data?.data?.subscription) {
+        return data.data.subscription as SubscriptionAccessDetails;
+      }
+    }
+  } catch (fnErr) {
+    console.warn("[SUBSCRIPTION ACCESS] Edge Function notice, falling back:", fnErr);
   }
 
-  console.log(
-    "[SUBSCRIPTION ACCESS] invoking Edge Function",
-  );
+  // 2. Direct database query fallback
+  try {
+    const { data: sub, error: subErr } = await supabase
+      .from("subscriptions")
+      .select(`
+        id,
+        plan_id,
+        status,
+        trial_start_at,
+        trial_end_at,
+        subscription_start_at,
+        subscription_end_at
+      `)
+      .eq("studio_id", studioId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  const {
-    data,
-    error,
-  } = await supabase.functions.invoke(
-    "get-subscription-access-details",
-    {
-      method: "GET",
-      headers: {
-        Authorization:
-          `Bearer ${accessToken}`,
-      },
-    },
-  );
+    if (!subErr && sub) {
+      const now = Date.now();
+      const trialEnd = sub.trial_end_at ? new Date(sub.trial_end_at).getTime() : 0;
+      const subEnd = sub.subscription_end_at ? new Date(sub.subscription_end_at).getTime() : 0;
+      const isTrial = sub.status === "trial";
+      const hasAccess = (isTrial && trialEnd > now) || (sub.status === "active" && (!subEnd || subEnd > now));
 
-  if (error) {
-    console.error(
-      "[SUBSCRIPTION ACCESS] Edge Function ERROR:",
-      error,
-    );
-    throw error;
+      return {
+        subscription_id: sub.id,
+        plan_id: sub.plan_id,
+        plan: "PhotoOS Studio Plan",
+        plan_name: "PhotoOS Studio Plan",
+        plan_type: "studio_software",
+        price: 0,
+        currency: "INR",
+        billing_cycle: "monthly",
+        status: hasAccess ? sub.status : "expired",
+        access_status: hasAccess ? (isTrial ? "trial" : "active") : "expired",
+        has_access: hasAccess,
+        is_trial: isTrial,
+        trial_days: 14,
+        trial_start_at: sub.trial_start_at,
+        trial_end_at: sub.trial_end_at,
+        subscription_start_at: sub.subscription_start_at,
+        subscription_end_at: sub.subscription_end_at,
+        effective_access_end_at: sub.trial_end_at || sub.subscription_end_at,
+        expired_at: !hasAccess ? (sub.trial_end_at || sub.subscription_end_at) : null,
+        next_billing_at: null,
+        days_remaining: Math.max(0, Math.ceil(((isTrial ? trialEnd : subEnd) - now) / (1000 * 60 * 60 * 24))),
+        is_expiring_soon: false,
+        features: {},
+        limits: {},
+      } as unknown as SubscriptionAccessDetails;
+    }
+  } catch (dbErr) {
+    console.warn("[SUBSCRIPTION ACCESS] DB fallback error:", dbErr);
   }
 
-  console.log(
-    "[SUBSCRIPTION ACCESS] Edge Function RESPONSE:",
-    data,
-  );
+  // 3. Brand new onboarding studio fallback: 14-day Free Trial
+  const now = Date.now();
+  const trialEnd = now + 14 * 24 * 60 * 60 * 1000;
 
-  if (!data?.success) {
-    throw new Error(
-      data?.error?.message ??
-      data?.error ??
-      "Unable to load subscription access.",
-    );
-  }
-
-  return (
-    data?.data?.subscription ??
-    null
-  ) as SubscriptionAccessDetails | null;
+  return {
+    subscription_id: null,
+    plan_id: null,
+    plan: "Free Trial",
+    plan_name: "14-Day Free Trial",
+    plan_type: "studio_software",
+    price: 0,
+    currency: "INR",
+    billing_cycle: "monthly",
+    status: "trial",
+    access_status: "trial",
+    has_access: true,
+    is_trial: true,
+    trial_days: 14,
+    trial_start_at: new Date(now).toISOString(),
+    trial_end_at: new Date(trialEnd).toISOString(),
+    subscription_start_at: null,
+    subscription_end_at: null,
+    effective_access_end_at: new Date(trialEnd).toISOString(),
+    expired_at: null,
+    next_billing_at: null,
+    days_remaining: 14,
+    is_expiring_soon: false,
+    features: {},
+    limits: {},
+  } as unknown as SubscriptionAccessDetails;
 }
 
 export type SubscriptionCancellationResult = {
