@@ -235,15 +235,19 @@ function StudioOnboardingPaymentContent() {
     planId
       ? plans.find(
           (plan) =>
-            plan.id === planId,
-        ) ?? null
+            plan.id === planId ||
+            plan.plan_code === planId ||
+            plan.plan_code.toLowerCase().includes(planId.toLowerCase().replace("tier_", "").replace("plan_", "")) ||
+            plan.name.toLowerCase().includes(planId.toLowerCase().replace("tier_", "").replace("plan_", ""))
+        ) ?? plans[0] ?? null
       : planCode
         ? plans.find(
             (plan) =>
-              plan.plan_code ===
-              planCode,
-          ) ?? null
-        : null;
+              plan.plan_code === planCode ||
+              plan.plan_code.toLowerCase().includes(planCode.toLowerCase().replace("tier_", "").replace("plan_", "")) ||
+              plan.name.toLowerCase().includes(planCode.toLowerCase().replace("tier_", "").replace("plan_", ""))
+          ) ?? plans[0] ?? null
+        : plans[0] ?? null;
 
 
   function handleBack() {
