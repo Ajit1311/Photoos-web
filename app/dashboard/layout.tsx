@@ -251,15 +251,12 @@ export default function Layout({
 
 
           if (!cancelled) {
-
             setGuardState(
               "denied",
             );
-
             router.replace(
-              "/login",
+              "/onboarding/studio",
             );
-
           }
 
         }
