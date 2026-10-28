@@ -24,6 +24,7 @@ import { getSafeRedirectUrl } from "@/lib/security/safe-redirect";
 
 export function LoginForm() {
   const searchParams = useSearchParams();
+  const urlError = searchParams.get("error");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -32,7 +33,13 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
 
-  const [error, setError] = useState("");
+  const [error, setError] = useState(() => {
+    if (!urlError) return "";
+    if (urlError === "authentication_failed") {
+      return "Sign in could not be completed. Please try again or enter your email and password below.";
+    }
+    return decodeURIComponent(urlError);
+  });
   const [message, setMessage] = useState("");
 
   async function handleSubmit(

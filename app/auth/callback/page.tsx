@@ -3,19 +3,26 @@
 import {
   Suspense,
   useEffect,
+  useRef,
 } from "react";
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
+import type { Session } from "@supabase/supabase-js";
 
 function AuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const processedRef = useRef(false);
 
   useEffect(() => {
     let mounted = true;
 
     async function completeLogin() {
+      // Prevent double execution in React StrictMode
+      if (processedRef.current) return;
+      processedRef.current = true;
+
       try {
         const code = searchParams.get("code");
         const tokenHash = searchParams.get("token_hash");
@@ -27,59 +34,88 @@ function AuthCallbackContent() {
           throw new Error(errorDescription || callbackError);
         }
 
-        // 1. If PKCE authorization code is returned from Google / OAuth
-        if (code) {
-          const { error: exchangeError } =
-            await supabase.auth.exchangeCodeForSession(code);
+        let session: Session | null = null;
 
-          if (exchangeError) {
-            console.error("[AuthCallback] Code exchange error:", exchangeError);
-            throw exchangeError;
+        // Path 0: Check if client already established session in background (detectSessionInUrl)
+        const { data: initialData } = await supabase.auth.getSession();
+        if (initialData?.session) {
+          session = initialData.session;
+        }
+
+        // Path 1: PKCE Code exchange
+        if (!session && code) {
+          try {
+            const { data: exchangeData, error: exchangeError } =
+              await supabase.auth.exchangeCodeForSession(code);
+
+            if (exchangeError) {
+              console.warn("[AuthCallback] Code exchange warning:", exchangeError.message);
+            } else if (exchangeData?.session) {
+              session = exchangeData.session;
+            }
+          } catch (codeErr) {
+            console.warn("[AuthCallback] Exchange exception:", codeErr);
           }
-        } else if (tokenHash) {
-          // 2. If token hash (OTP or Magic Link)
+        }
+
+        // Path 2: Token hash (magiclink / OTP)
+        if (!session && tokenHash) {
           const type = (searchParams.get("type") as "email" | "magiclink" | null) || "email";
-          const { error: otpError } =
-            await supabase.auth.verifyOtp({
-              token_hash: tokenHash,
-              type,
-            });
+          try {
+            const { data: otpData, error: otpError } =
+              await supabase.auth.verifyOtp({
+                token_hash: tokenHash,
+                type,
+              });
 
-          if (otpError) {
-            console.error("[AuthCallback] OTP verification error:", otpError);
-            throw otpError;
+            if (otpError) {
+              console.warn("[AuthCallback] OTP warning:", otpError.message);
+            } else if (otpData?.session) {
+              session = otpData.session;
+            }
+          } catch (otpErr) {
+            console.warn("[AuthCallback] OTP exception:", otpErr);
           }
-        } else if (typeof window !== "undefined" && window.location.hash) {
-          // 3. If hash parameters (#access_token=...&refresh_token=...)
+        }
+
+        // Path 3: Hash parameters (#access_token=...&refresh_token=...)
+        if (!session && typeof window !== "undefined" && window.location.hash) {
           const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
           const accessToken = hashParams.get("access_token");
           const refreshToken = hashParams.get("refresh_token");
 
           if (accessToken && refreshToken) {
-            const { error: setSessionError } =
-              await supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken,
-              });
+            try {
+              const { data: hashData, error: hashError } =
+                await supabase.auth.setSession({
+                  access_token: accessToken,
+                  refresh_token: refreshToken,
+                });
 
-            if (setSessionError) {
-              console.error("[AuthCallback] Set session error:", setSessionError);
-              throw setSessionError;
+              if (hashError) {
+                console.warn("[AuthCallback] Hash session warning:", hashError.message);
+              } else if (hashData?.session) {
+                session = hashData.session;
+              }
+            } catch (hashErr) {
+              console.warn("[AuthCallback] Hash exception:", hashErr);
             }
           }
         }
 
-        // 4. Verify and establish session
-        const {
-          data,
-          error: sessionError,
-        } = await supabase.auth.getSession();
-
-        if (sessionError) {
-          throw sessionError;
+        // Path 4: Poll getSession() with backoff (up to 20 attempts x 150ms = 3.0s)
+        if (!session) {
+          for (let attempt = 0; attempt < 20; attempt++) {
+            const { data: pollData } = await supabase.auth.getSession();
+            if (pollData?.session) {
+              session = pollData.session;
+              break;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 150));
+          }
         }
 
-        if (!data.session) {
+        if (!session) {
           throw new Error("Authentication session could not be established.");
         }
 
@@ -102,7 +138,10 @@ function AuthCallbackContent() {
         );
 
         if (mounted) {
-          const errMessage = error instanceof Error ? encodeURIComponent(error.message) : "authentication_failed";
+          const errMessage =
+            error instanceof Error
+              ? encodeURIComponent(error.message)
+              : "authentication_failed";
           router.replace(`/login?error=${errMessage}`);
         }
       }
@@ -116,13 +155,13 @@ function AuthCallbackContent() {
   }, [router, searchParams]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center">
-      <div className="text-center">
+    <main className="flex min-h-screen items-center justify-center bg-background text-foreground">
+      <div className="text-center space-y-4">
+        <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-muted border-t-primary" />
         <h2 className="text-xl font-semibold">
           Signing you in...
         </h2>
-
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Preparing your PhotoOS workspace...
         </p>
       </div>
@@ -132,13 +171,13 @@ function AuthCallbackContent() {
 
 function AuthCallbackFallback() {
   return (
-    <main className="flex min-h-screen items-center justify-center">
-      <div className="text-center">
+    <main className="flex min-h-screen items-center justify-center bg-background text-foreground">
+      <div className="text-center space-y-4">
+        <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-muted border-t-primary" />
         <h2 className="text-xl font-semibold">
           Signing you in...
         </h2>
-
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Preparing your PhotoOS workspace...
         </p>
       </div>
