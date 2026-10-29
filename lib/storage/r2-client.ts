@@ -124,6 +124,7 @@ export async function createR2PresignedUploadUrl(
     Key: key,
     ContentType: options.contentType,
     ContentLength: options.sizeBytes,
+    ServerSideEncryption: "AES256",
     Metadata: {
       "studio-id": options.studioId,
       "uploaded-by": options.userId,

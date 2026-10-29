@@ -190,6 +190,12 @@ export async function GET(
 
           if (!photoUrl) continue;
 
+          // SECURITY: If downloads are locked/disabled, do not leak high-res original URLs in network payloads
+          const deliveryOriginalUrl =
+            allowDownloads && !lockDownloadsUntilPayment
+              ? originalSignedUrl || thumbUrl
+              : thumbUrl;
+
           const meta = (ga.metadata || {}) as any;
           const assetMeta = (asset.metadata || {}) as any;
 
@@ -198,7 +204,7 @@ export async function GET(
             eventId: resolvedEventId,
             fileName: asset.original_filename || "Photo",
             thumbnailUrl: thumbUrl,
-            originalUrl: photoUrl,
+            originalUrl: deliveryOriginalUrl,
             width: Number(assetMeta?.width || 0),
             height: Number(assetMeta?.height || 0),
             fileSize: Number(asset.file_size || 0),

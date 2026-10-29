@@ -17,6 +17,30 @@ export async function GET(req: NextRequest) {
       return new NextResponse("Invalid protocol", { status: 400 });
     }
 
+    const host = parsed.hostname.toLowerCase();
+
+    // Block cloud metadata & internal loopback attacks (SSRF Prevention)
+    if (
+      host === "169.254.169.254" ||
+      host === "metadata.google.internal" ||
+      (process.env.NODE_ENV === "production" && (host === "localhost" || host === "127.0.0.1" || host.startsWith("10.") || host.startsWith("192.168.") || host.startsWith("172.")))
+    ) {
+      return new NextResponse("Access to internal network destinations is forbidden", { status: 403 });
+    }
+
+    // Whitelist permitted image storage domains
+    const isAllowedHost =
+      host.endsWith(".supabase.co") ||
+      host.endsWith(".r2.cloudflarestorage.com") ||
+      host === "photoos-e7ae5.firebasestorage.app" ||
+      host.endsWith(".googleusercontent.com") ||
+      host === "images.unsplash.com" ||
+      (process.env.NODE_ENV !== "production" && (host === "localhost" || host === "127.0.0.1"));
+
+    if (!isAllowedHost) {
+      return new NextResponse("Forbidden: Hostname is not allowed for proxying", { status: 403 });
+    }
+
     const response = await fetch(targetUrl, {
       headers: {
         Accept: "image/*",
