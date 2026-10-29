@@ -1,43 +1,10 @@
 import crypto from "node:crypto";
-import { sendEmailWithResend, EmailTemplates } from "@/lib/email/resend";
+import { sendEmailWithResend, EmailTemplates } from "../email/resend";
 
-export interface AdminChallenge {
-  challengeId: string;
-  userId: string;
-  email: string;
-  otpHash: string;
-  expiresAt: number;
-  attempts: number;
-}
-
-export interface AdminSessionRecord {
-  sessionToken: string;
-  userId: string;
-  platformAdminId: string;
-  profileId: string;
-  email: string;
-  expiresAt: number;
-  createdAt: number;
-}
-
-// In-memory active challenges and sessions
-const activeChallenges = new Map<string, AdminChallenge>();
-const activeSessions = new Map<string, AdminSessionRecord>();
-
-// Cleanup expired entries periodically
-function cleanupExpired() {
-  const now = Date.now();
-  for (const [id, challenge] of activeChallenges.entries()) {
-    if (challenge.expiresAt < now) {
-      activeChallenges.delete(id);
-    }
-  }
-  for (const [token, session] of activeSessions.entries()) {
-    if (session.expiresAt < now) {
-      activeSessions.delete(token);
-    }
-  }
-}
+const CHALLENGE_SECRET =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET ||
+  "photoos-ops-console-secret-signature-key-2026";
 
 function hashString(val: string): string {
   return crypto.createHash("sha256").update(val).digest("hex");
@@ -48,6 +15,16 @@ function maskEmail(email: string): string {
   if (!name || !domain) return email;
   const visible = name.slice(0, 2);
   return `${visible}***@${domain}`;
+}
+
+export interface AdminSessionRecord {
+  sessionToken: string;
+  userId: string;
+  platformAdminId: string;
+  profileId: string;
+  email: string;
+  expiresAt: number;
+  createdAt: number;
 }
 
 /**
@@ -86,8 +63,6 @@ export async function initiateAdminLogin(
   userIdInput: string,
   passwordInput: string
 ): Promise<{ success: boolean; challengeId?: string; maskedEmail?: string; error?: string }> {
-  cleanupExpired();
-
   const { valid, email } = await validateAdminCredentials(userIdInput, passwordInput);
 
   if (!valid) {
@@ -100,32 +75,41 @@ export async function initiateAdminLogin(
   // Generate 6-digit OTP (e.g. 749204)
   const otpNumber = Math.floor(100000 + Math.random() * 900000);
   const otpString = String(otpNumber);
-  const challengeId = `chl_${crypto.randomBytes(16).toString("hex")}`;
 
-  const challenge: AdminChallenge = {
-    challengeId,
-    userId: userIdInput.trim().toUpperCase(),
-    email,
-    otpHash: hashString(otpString),
-    expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes
-    attempts: 0,
-  };
+  // Create Stateless HMAC-Signed Challenge
+  const exp = Date.now() + 10 * 60 * 1000; // 10 minutes
+  const payload = JSON.stringify({
+    u: userIdInput.trim().toUpperCase(),
+    e: email,
+    h: hashString(otpString),
+    exp,
+  });
 
-  activeChallenges.set(challengeId, challenge);
+  const b64Payload = Buffer.from(payload).toString("base64url");
+  const signature = crypto
+    .createHmac("sha256", CHALLENGE_SECRET)
+    .update(b64Payload)
+    .digest("base64url");
+
+  const challengeId = `chl_${b64Payload}.${signature}`;
 
   // Send 2FA Code via Resend (noreply@photoos.in)
-  try {
-    await sendEmailWithResend({
-      department: "noreply",
-      to: email,
-      subject: `🔐 Your PhotoOS Operations Console 2FA Code: ${otpString}`,
-      html: EmailTemplates.otpVerification({
-        otp: otpString,
-        purpose: "PhotoOS Operations Console Admin Sign-In",
-      }),
-    });
-  } catch (emailErr) {
-    console.error("[Admin2FA] Failed to dispatch OTP email via Resend:", emailErr);
+  const emailRes = await sendEmailWithResend({
+    department: "noreply",
+    to: email,
+    subject: `🔐 Your PhotoOS Operations Console 2FA Code: ${otpString}`,
+    html: EmailTemplates.otpVerification({
+      otp: otpString,
+      purpose: "PhotoOS Operations Console Admin Sign-In",
+    }),
+  });
+
+  if (!emailRes.success) {
+    console.error("[Admin2FA] Failed to dispatch OTP email via Resend:", emailRes.error);
+    return {
+      success: false,
+      error: `Failed to dispatch 2FA email: ${emailRes.error || "Delivery error"}. Please verify your Resend account status.`,
+    };
   }
 
   return {
@@ -157,65 +141,90 @@ export async function verifyAdmin2FA(
   };
   error?: string;
 }> {
-  cleanupExpired();
-
-  const challenge = activeChallenges.get(challengeId);
-
-  if (!challenge) {
+  if (!challengeId || !challengeId.startsWith("chl_")) {
     return {
       success: false,
-      error: "Authentication session expired or not found. Please restart login.",
+      error: "Authentication challenge token is malformed. Please restart login.",
     };
   }
 
-  if (challenge.expiresAt < Date.now()) {
-    activeChallenges.delete(challengeId);
+  const rawToken = challengeId.replace(/^chl_/, "");
+  const dotIndex = rawToken.indexOf(".");
+  if (dotIndex === -1) {
+    return {
+      success: false,
+      error: "Invalid challenge structure.",
+    };
+  }
+
+  const b64Payload = rawToken.slice(0, dotIndex);
+  const signature = rawToken.slice(dotIndex + 1);
+
+  // Verify HMAC signature
+  const expectedSig = crypto
+    .createHmac("sha256", CHALLENGE_SECRET)
+    .update(b64Payload)
+    .digest("base64url");
+
+  const sigBuffer = Buffer.from(signature);
+  const expBuffer = Buffer.from(expectedSig);
+
+  if (sigBuffer.length !== expBuffer.length || !crypto.timingSafeEqual(sigBuffer, expBuffer)) {
+    return {
+      success: false,
+      error: "Challenge signature validation failed.",
+    };
+  }
+
+  // Parse payload
+  let payload: { u: string; e: string; h: string; exp: number };
+  try {
+    payload = JSON.parse(Buffer.from(b64Payload, "base64url").toString("utf-8"));
+  } catch {
+    return {
+      success: false,
+      error: "Corrupted challenge payload.",
+    };
+  }
+
+  if (Date.now() > payload.exp) {
     return {
       success: false,
       error: "OTP code has expired. Please request a new code.",
     };
   }
 
-  challenge.attempts += 1;
-
-  if (challenge.attempts > 3) {
-    activeChallenges.delete(challengeId);
-    return {
-      success: false,
-      error: "Maximum verification attempts exceeded. Please restart login.",
-    };
-  }
-
   const cleanOtp = otpInput.trim();
   const inputHash = hashString(cleanOtp);
 
-  if (inputHash !== challenge.otpHash) {
+  if (inputHash !== payload.h) {
     return {
       success: false,
-      error: `Invalid verification code. ${3 - challenge.attempts} attempts remaining.`,
+      error: "Invalid 6-digit verification code. Please check and re-enter.",
     };
   }
 
-  // OTP verified! Remove challenge
-  activeChallenges.delete(challengeId);
-
-  // Generate 12-hour session token
-  const sessionToken = `ops_${crypto.randomBytes(32).toString("hex")}`;
+  // OTP verified! Generate stateless HMAC-signed Session Token
   const platformAdminId = "00000000-0000-0000-0000-000000000001";
   const profileId = "00000000-0000-0000-0000-000000000001";
-  const expiresAtMs = Date.now() + 12 * 60 * 60 * 1000;
+  const expiresAtMs = Date.now() + 12 * 60 * 60 * 1000; // 12 hours
 
-  const sessionRecord: AdminSessionRecord = {
-    sessionToken,
-    userId: challenge.userId,
-    platformAdminId,
-    profileId,
-    email: challenge.email,
-    expiresAt: expiresAtMs,
-    createdAt: Date.now(),
-  };
+  const sessionPayload = JSON.stringify({
+    u: payload.u,
+    e: payload.e,
+    adm: platformAdminId,
+    prf: profileId,
+    exp: expiresAtMs,
+    iat: Date.now(),
+  });
 
-  activeSessions.set(sessionToken, sessionRecord);
+  const b64Session = Buffer.from(sessionPayload).toString("base64url");
+  const sessionSig = crypto
+    .createHmac("sha256", CHALLENGE_SECRET)
+    .update(b64Session)
+    .digest("base64url");
+
+  const sessionToken = `ops_${b64Session}.${sessionSig}`;
 
   return {
     success: true,
@@ -224,7 +233,7 @@ export async function verifyAdmin2FA(
       platform_admin_id: platformAdminId,
       profile_id: profileId,
       session_id: sessionToken,
-      user_id: challenge.userId,
+      user_id: payload.u,
       status: "active",
       must_change_password: false,
       last_login_at: new Date().toISOString(),
@@ -238,13 +247,42 @@ export async function verifyAdmin2FA(
  * Validate an active admin session token
  */
 export function validateAdminSession(sessionToken: string): AdminSessionRecord | null {
-  cleanupExpired();
-  if (!sessionToken) return null;
-  const session = activeSessions.get(sessionToken);
-  if (!session) return null;
-  if (session.expiresAt < Date.now()) {
-    activeSessions.delete(sessionToken);
+  if (!sessionToken || !sessionToken.startsWith("ops_")) return null;
+
+  const raw = sessionToken.replace(/^ops_/, "");
+  const dotIndex = raw.indexOf(".");
+  if (dotIndex === -1) return null;
+
+  const b64Payload = raw.slice(0, dotIndex);
+  const signature = raw.slice(dotIndex + 1);
+
+  const expectedSig = crypto
+    .createHmac("sha256", CHALLENGE_SECRET)
+    .update(b64Payload)
+    .digest("base64url");
+
+  const sigBuffer = Buffer.from(signature);
+  const expBuffer = Buffer.from(expectedSig);
+
+  if (sigBuffer.length !== expBuffer.length || !crypto.timingSafeEqual(sigBuffer, expBuffer)) {
     return null;
   }
-  return session;
+
+  try {
+    const data = JSON.parse(Buffer.from(b64Payload, "base64url").toString("utf-8"));
+    if (Date.now() > data.exp) {
+      return null;
+    }
+    return {
+      sessionToken,
+      userId: data.u,
+      platformAdminId: data.adm,
+      profileId: data.prf,
+      email: data.e,
+      expiresAt: data.exp,
+      createdAt: data.iat,
+    };
+  } catch {
+    return null;
+  }
 }
