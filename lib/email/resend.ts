@@ -50,7 +50,10 @@ export interface EmailResponse {
  * Dispatch an email via Resend API
  */
 export async function sendEmailWithResend(payload: SendEmailPayload): Promise<EmailResponse> {
-  const apiKey = process.env.RESEND_API_KEY || process.env.NEXT_PUBLIC_RESEND_API_KEY;
+  const apiKey =
+    process.env.RESEND_API_KEY ||
+    process.env.NEXT_PUBLIC_RESEND_API_KEY ||
+    "";
 
   const sender = PHOTOOS_SENDERS[payload.department] || PHOTOOS_SENDERS.noreply;
 
@@ -220,6 +223,78 @@ export const EmailTemplates = {
           </div>
           <div class="footer">
             <p>PhotoOS Automated Reminder System &bull; <a href="https://photoos.in" style="color: #0A3F61; text-decoration: none;">photoos.in</a></p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  },
+
+  otpVerification(data: { otp: string; purpose?: string }) {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #1e293b; margin: 0; padding: 24px; }
+          .container { max-width: 500px; margin: 0 auto; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; text-align: center; }
+          .header { background: #0A3F61; color: #ffffff; padding: 28px; }
+          .content { padding: 32px 24px; }
+          .otp-code { font-size: 36px; font-weight: 800; letter-spacing: 6px; color: #0A3F61; background: #f0fdf4; border: 1px dashed #22c55e; padding: 16px 24px; border-radius: 12px; display: inline-block; margin: 20px 0; }
+          .footer { background: #f8fafc; padding: 16px; font-size: 12px; color: #94a3b8; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1 style="margin:0; font-size: 22px;">PhotoOS Verification</h1>
+          </div>
+          <div class="content">
+            <p style="font-size: 15px; color: #475569;">Use the one-time code below to verify your identity for ${data.purpose || "secure access"}:</p>
+            <div class="otp-code">${data.otp}</div>
+            <p style="font-size: 13px; color: #64748b;">This code is valid for 10 minutes. Please do not share it with anyone.</p>
+          </div>
+          <div class="footer">
+            Securely dispatched from noreply@photoos.in
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  },
+
+  newLeadAlert(data: { studioName: string; clientName: string; phone: string; eventType: string; eventDate?: string; notes?: string }) {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #1e293b; margin: 0; padding: 24px; }
+          .container { max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; }
+          .header { background: #0A3F61; color: #ffffff; padding: 24px; }
+          .content { padding: 24px; }
+          .card { background: #f1f5f9; border-radius: 12px; padding: 16px; margin: 16px 0; }
+          .row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h2 style="margin:0;">🎉 New Lead Received!</h2>
+            <p style="margin:4px 0 0; opacity:0.9; font-size: 14px;">PhotoOS Marketplace Lead for ${data.studioName}</p>
+          </div>
+          <div class="content">
+            <p>You have a new booking inquiry from a potential client:</p>
+            <div class="card">
+              <div class="row"><span><strong>Client Name:</strong></span><span>${data.clientName}</span></div>
+              <div class="row"><span><strong>Phone:</strong></span><span><a href="tel:${data.phone}">${data.phone}</a></span></div>
+              <div class="row"><span><strong>Event Type:</strong></span><span>${data.eventType}</span></div>
+              ${data.eventDate ? `<div class="row"><span><strong>Event Date:</strong></span><span>${data.eventDate}</span></div>` : ""}
+              ${data.notes ? `<div class="row"><span><strong>Notes:</strong></span><span>${data.notes}</span></div>` : ""}
+            </div>
+            <p style="font-size: 13px; color: #64748b;">Respond promptly to increase your conversion rate!</p>
           </div>
         </div>
       </body>

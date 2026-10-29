@@ -30,6 +30,10 @@ export async function POST(req: NextRequest) {
       finalHtml = EmailTemplates.paymentReceipt(templateData);
     } else if (template === "payment_reminder" && templateData) {
       finalHtml = EmailTemplates.paymentReminder(templateData);
+    } else if (template === "otp" && templateData) {
+      finalHtml = EmailTemplates.otpVerification(templateData);
+    } else if (template === "new_lead" && templateData) {
+      finalHtml = EmailTemplates.newLeadAlert(templateData);
     }
 
     if (!finalHtml) {

@@ -39,45 +39,43 @@ export async function markNotificationRead(
   );
 
 
-  const {
-    data,
-    error,
-  } =
-    await supabase.rpc(
-      "bulk_mark_notifications_read",
-      {
-        p_notification_ids:
-          [
-            notificationId,
-          ],
-      },
-    );
-
-
-  console.log(
-    "NOTIFICATION READ RPC RESULT:",
-    {
-      notificationId,
+  try {
+    const {
       data,
       error,
-    },
-  );
+    } =
+      await supabase.rpc(
+        "bulk_mark_notifications_read",
+        {
+          p_notification_ids:
+            [
+              notificationId,
+            ],
+        },
+      );
 
-
-  if (
-    error
-  ) {
-
-    throw error;
-
+    if (!error && typeof data === "number") {
+      return data;
+    }
+  } catch (rpcErr) {
+    console.warn("NOTIFICATION READ RPC failed, trying direct table update:", rpcErr);
   }
 
+  // Direct table update fallback
+  const { error: updateErr } = await supabase
+    .from("notifications")
+    .update({
+      status: "read",
+      read_at: new Date().toISOString(),
+    })
+    .eq("id", notificationId);
 
-  return (
-    typeof data === "number"
-      ? data
-      : 0
-  );
+  if (updateErr) {
+    console.warn("Direct notification update error:", updateErr);
+    return 0;
+  }
+
+  return 1;
 
 }
 

@@ -1008,6 +1008,7 @@ export default function ClientAccessGalleryPage() {
         {/* =================================================================== */}
         {activeAppTab === "chat" && (
           <StudioClientChat
+            studioId={studio?.id}
             studioName={studio?.brand_name || studio?.name || "PhotoOS Studio Team"}
             studioPhone={studio?.contact_phone || undefined}
             eventName={event?.name || "Your Wedding Event"}

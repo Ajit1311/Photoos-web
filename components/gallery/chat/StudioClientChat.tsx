@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 interface StudioClientChatProps {
+  studioId?: string;
   studioName?: string;
   studioPhone?: string;
   studioEmail?: string;
@@ -31,6 +32,7 @@ interface ChatMessage {
 }
 
 export default function StudioClientChat({
+  studioId,
   studioName = "PhotoOS Studio Team",
   studioPhone,
   studioEmail,
@@ -94,6 +96,7 @@ export default function StudioClientChat({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        studioId,
         eventId,
         guestName: clientName,
         guestPhone: studioPhone || "Client",
@@ -256,3 +259,4 @@ export default function StudioClientChat({
     </div>
   );
 }
+

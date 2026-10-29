@@ -30,17 +30,17 @@ type EmailSettings = {
 };
 
 const DEFAULTS: EmailSettings = {
-  enabled: false,
-  provider: "brevo",
+  enabled: true,
+  provider: "resend",
   sender_name: "PhotoOS",
-  sender_email: "",
-  reply_to_email: "",
-  smtp_host: "smtp-relay.brevo.com",
+  sender_email: "noreply@photoos.in",
+  reply_to_email: "support@photoos.in",
+  smtp_host: "smtp.resend.com",
   smtp_port: 587,
-  smtp_username: "",
+  smtp_username: "resend",
   encryption: "tls",
-  api_key_configured: false,
-  smtp_password_configured: false,
+  api_key_configured: true,
+  smtp_password_configured: true,
 };
 
 export default function EmailSettingsPage() {
@@ -190,7 +190,7 @@ export default function EmailSettingsPage() {
               }
               className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-400"
             >
-              <option value="brevo">Brevo</option>
+              <option value="resend">Resend (Official)</option>
               <option value="smtp">Custom SMTP</option>
             </select>
           </label>

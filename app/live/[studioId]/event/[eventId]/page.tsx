@@ -949,6 +949,7 @@ export default function GuestLiveEventPage() {
         {/* =================================================================== */}
         {activeAppTab === "chat" && (
           <StudioClientChat
+            studioId={studioId}
             studioName={studio?.brand_name || studio?.name || "PhotoOS Studio Team"}
             studioPhone={studio?.contact_phone || undefined}
             eventName={event?.name || "Your Wedding Event"}
