@@ -572,8 +572,13 @@ export default function AdminShell({
         const session =
           await getPlatformAdminSession();
 
-        if (!cancelled && session?.user_id) {
-          setAdminUserId(session.user_id);
+        if (!cancelled && session) {
+          if (session.user_id) {
+            setAdminUserId(session.user_id);
+          }
+          if (session.must_change_password && pathname !== "/admin/change-password") {
+            router.replace("/admin/change-password");
+          }
         }
       } catch {
         // Guard owns authorization.

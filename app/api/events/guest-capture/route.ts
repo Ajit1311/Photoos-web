@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { sendEmailWithResend } from "@/lib/email/resend";
+import { platformLiveStore } from "@/lib/state/live-platform-store";
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,6 +17,15 @@ export async function POST(req: NextRequest) {
 
     const cleanPhone = String(guestPhone).replace(/\D/g, "");
     const cleanName = String(guestName).trim();
+
+    // 0. Record in live platform store & notify admin
+    await platformLiveStore.recordQrCapture({
+      guestName: cleanName,
+      guestPhone: cleanPhone,
+      studioId,
+      eventId,
+      role,
+    });
 
     const supabaseUrl =
       process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder-project.supabase.co";

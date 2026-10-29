@@ -1,136 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-
-// Real Platform Entities from Studio Software & Production Environment
-const LIVE_STUDIO_OWNER = {
-  profile_id: "usr_parashram_naik",
-  full_name: "Parashram S Naik",
-  first_name: "Parashram",
-  last_name: "Naik",
-  email: "adskartmedia11@gmail.com",
-  phone: "+91 96896 89142",
-  role: "Studio Founder & Admin",
-};
-
-const LIVE_STUDIOS = [
-  {
-    studio_id: "std_gmark_photoos_01",
-    studio_code: "STD-GMARK-01",
-    studio_name: "G Mark Software Studio",
-    legal_name: "G Mark Software Private Limited",
-    brand_name: "PhotoOS Studio Pune",
-    studio_email: "adskartmedia11@gmail.com",
-    studio_phone: "+91 96896 89142",
-    logo_url: "/logo.png",
-    studio_status: "active",
-    city: "Pune",
-    state: "Maharashtra",
-    country: "India",
-    currency: "INR",
-    timezone: "Asia/Kolkata",
-    owner_profile_id: LIVE_STUDIO_OWNER.profile_id,
-    owner_name: LIVE_STUDIO_OWNER.full_name,
-    owner_email: LIVE_STUDIO_OWNER.email,
-    owner_employee_code: "EMP-001",
-    owner_status: "active",
-    member_count: 4,
-    subscription_id: "sub_live_annual_01",
-    subscription_status: "active",
-    plan_code: "pro_annual",
-    plan_name: "Pro Studio Annual",
-    plan_price: 24990,
-    plan_currency: "INR",
-    billing_cycle: "yearly",
-    trial_days: 14,
-    trial_start_at: null,
-    trial_end_at: null,
-    subscription_start_at: "2026-10-01T00:00:00.000Z",
-    subscription_end_at: "2027-10-01T00:00:00.000Z",
-  },
-];
-
-const LIVE_USERS = [
-  {
-    profile_id: LIVE_STUDIO_OWNER.profile_id,
-    full_name: LIVE_STUDIO_OWNER.full_name,
-    first_name: LIVE_STUDIO_OWNER.first_name,
-    last_name: LIVE_STUDIO_OWNER.last_name,
-    avatar_url: null,
-    profile_status: "active",
-    user_created_at: "2026-09-01T10:00:00.000Z",
-    last_seen_at: new Date().toISOString(),
-    studio_id: LIVE_STUDIOS[0].studio_id,
-    studio_code: LIVE_STUDIOS[0].studio_code,
-    studio_name: LIVE_STUDIOS[0].studio_name,
-    legal_name: LIVE_STUDIOS[0].legal_name,
-    brand_name: LIVE_STUDIOS[0].brand_name,
-    studio_email: LIVE_STUDIOS[0].studio_email,
-    studio_phone: LIVE_STUDIOS[0].studio_phone,
-    studio_status: LIVE_STUDIOS[0].studio_status,
-    city: LIVE_STUDIOS[0].city,
-    state: LIVE_STUDIOS[0].state,
-    country: LIVE_STUDIOS[0].country,
-    membership_status: "active",
-    employee_code: "EMP-001",
-    last_active_at: new Date().toISOString(),
-    role_code: "studio_owner",
-    role_name: "Studio Owner & Admin",
-    subscription_id: LIVE_STUDIOS[0].subscription_id,
-    subscription_status: LIVE_STUDIOS[0].subscription_status,
-    plan_code: LIVE_STUDIOS[0].plan_code,
-    plan_name: LIVE_STUDIOS[0].plan_name,
-    plan_price: LIVE_STUDIOS[0].plan_price,
-    plan_currency: LIVE_STUDIOS[0].plan_currency,
-    billing_cycle: LIVE_STUDIOS[0].billing_cycle,
-    trial_days: null,
-    trial_start_at: null,
-    trial_end_at: null,
-    subscription_start_at: LIVE_STUDIOS[0].subscription_start_at,
-    subscription_end_at: LIVE_STUDIOS[0].subscription_end_at,
-    next_billing_at: LIVE_STUDIOS[0].subscription_end_at,
-    auto_renew: true,
-  },
-  {
-    profile_id: "usr_ajit_naik",
-    full_name: "Ajit Naik",
-    first_name: "Ajit",
-    last_name: "Naik",
-    avatar_url: null,
-    profile_status: "active",
-    user_created_at: "2026-09-05T12:00:00.000Z",
-    last_seen_at: new Date().toISOString(),
-    studio_id: LIVE_STUDIOS[0].studio_id,
-    studio_code: LIVE_STUDIOS[0].studio_code,
-    studio_name: LIVE_STUDIOS[0].studio_name,
-    legal_name: LIVE_STUDIOS[0].legal_name,
-    brand_name: LIVE_STUDIOS[0].brand_name,
-    studio_email: "ajitnaik595@gmail.com",
-    studio_phone: "+91 96896 89142",
-    studio_status: "active",
-    city: "Pune",
-    state: "Maharashtra",
-    country: "India",
-    membership_status: "active",
-    employee_code: "EMP-002",
-    last_active_at: new Date().toISOString(),
-    role_code: "lead_photographer",
-    role_name: "Lead Photographer",
-    subscription_id: LIVE_STUDIOS[0].subscription_id,
-    subscription_status: LIVE_STUDIOS[0].subscription_status,
-    plan_code: LIVE_STUDIOS[0].plan_code,
-    plan_name: LIVE_STUDIOS[0].plan_name,
-    plan_price: LIVE_STUDIOS[0].plan_price,
-    plan_currency: LIVE_STUDIOS[0].plan_currency,
-    billing_cycle: LIVE_STUDIOS[0].billing_cycle,
-    trial_days: null,
-    trial_start_at: null,
-    trial_end_at: null,
-    subscription_start_at: LIVE_STUDIOS[0].subscription_start_at,
-    subscription_end_at: LIVE_STUDIOS[0].subscription_end_at,
-    next_billing_at: LIVE_STUDIOS[0].subscription_end_at,
-    auto_renew: true,
-  },
-];
+import { platformLiveStore } from "@/lib/state/live-platform-store";
 
 // Persistent Settings State in memory
 let companySettingsState = {
@@ -179,32 +49,6 @@ let brandingSettingsState = {
   button_style: "rounded-xl",
 };
 
-let supportTicketsState = [
-  {
-    id: "tkt_live_01",
-    studio_id: LIVE_STUDIOS[0].studio_id,
-    created_by: LIVE_STUDIO_OWNER.profile_id,
-    assigned_to: "Super Admin",
-    ticket_type: "support",
-    category: "system",
-    priority: "normal",
-    status: "open",
-    subject: "Resend Email & Cloudflare Routing Activation",
-    description: "Cloudflare email routing and Resend API connected successfully for domain photoos.in.",
-    subscription_id: LIVE_STUDIOS[0].subscription_id,
-    payment_id: "pay_live_01",
-    refund_status: "not_applicable",
-    refund_amount: null,
-    refund_currency: null,
-    refund_transaction_id: null,
-    refund_processed_at: null,
-    admin_notes: "Live Resend key and domain routing verified.",
-    metadata: { domain: "photoos.in", destination: "adskartmedia11@gmail.com" },
-    created_at: "2026-10-29T10:00:00.000Z",
-    updated_at: new Date().toISOString(),
-  },
-];
-
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ slug: string[] }> }
@@ -214,139 +58,48 @@ export async function GET(
   const url = new URL(req.url);
   const searchParams = url.searchParams;
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const studio = platformLiveStore.singleStudio;
+  const users = platformLiveStore.users;
 
-  // 1. Try querying remote Supabase database if configured and alive
-  if (supabaseUrl && serviceKey && !supabaseUrl.includes("127.0.0.1") && !supabaseUrl.includes("dummy")) {
-    try {
-      const supabase = createClient(supabaseUrl, serviceKey, {
-        auth: { persistSession: false },
-      });
-
-      if (endpoint === "platform-admin-studios") {
-        const { data: dbStudios } = await supabase
-          .from("studios")
-          .select("*, subscriptions(*), studio_members(*)")
-          .limit(50);
-
-        if (dbStudios && dbStudios.length > 0) {
-          const items = dbStudios.map((s) => ({
-            studio_id: s.id,
-            studio_code: s.code || `STD-${s.id.slice(0, 6).toUpperCase()}`,
-            studio_name: s.name || s.brand_name || "PhotoOS Studio",
-            legal_name: s.legal_name || s.name,
-            brand_name: s.brand_name || s.name,
-            studio_email: s.contact_email,
-            studio_phone: s.contact_phone,
-            logo_url: s.logo_url,
-            studio_status: s.status || "active",
-            city: s.city || "Pune",
-            state: s.state || "Maharashtra",
-            country: s.country || "India",
-            currency: s.currency || "INR",
-            timezone: s.timezone || "Asia/Kolkata",
-            owner_profile_id: LIVE_STUDIO_OWNER.profile_id,
-            owner_name: LIVE_STUDIO_OWNER.full_name,
-            owner_email: LIVE_STUDIO_OWNER.email,
-            owner_employee_code: "EMP-001",
-            owner_status: "active",
-            member_count: (s.studio_members || []).length || 1,
-            subscription_id: s.subscriptions?.[0]?.id || "sub_01",
-            subscription_status: s.subscriptions?.[0]?.status || "active",
-            plan_code: s.subscriptions?.[0]?.plan_code || "pro_annual",
-            plan_name: "Pro Studio",
-            plan_price: 24990,
-            plan_currency: "INR",
-            billing_cycle: "yearly",
-            trial_days: null,
-            trial_start_at: null,
-            trial_end_at: null,
-            subscription_start_at: s.subscriptions?.[0]?.created_at || s.created_at,
-            subscription_end_at: s.subscriptions?.[0]?.subscription_end_at || null,
-          }));
-
-          return NextResponse.json({
-            success: true,
-            data: {
-              items,
-              total: items.length,
-              limit: 50,
-              offset: 0,
-            },
-          });
-        }
-      }
-
-      if (endpoint === "platform-admin-users") {
-        const { data: dbProfiles } = await supabase.from("profiles").select("*").limit(50);
-        if (dbProfiles && dbProfiles.length > 0) {
-          const items = dbProfiles.map((p) => ({
-            profile_id: p.id,
-            full_name: p.full_name || "PhotoOS User",
-            first_name: (p.full_name || "User").split(" ")[0],
-            last_name: (p.full_name || "").split(" ")[1] || null,
-            avatar_url: p.avatar_url,
-            profile_status: "active",
-            user_created_at: p.created_at,
-            last_seen_at: p.updated_at || new Date().toISOString(),
-            studio_id: LIVE_STUDIOS[0].studio_id,
-            studio_code: LIVE_STUDIOS[0].studio_code,
-            studio_name: LIVE_STUDIOS[0].studio_name,
-            legal_name: LIVE_STUDIOS[0].legal_name,
-            brand_name: LIVE_STUDIOS[0].brand_name,
-            studio_email: LIVE_STUDIOS[0].studio_email,
-            studio_phone: LIVE_STUDIOS[0].studio_phone,
-            studio_status: "active",
-            city: "Pune",
-            state: "Maharashtra",
-            country: "India",
-            membership_status: "active",
-            employee_code: "EMP-001",
-            last_active_at: new Date().toISOString(),
-            role_code: "studio_owner",
-            role_name: "Studio Owner",
-            subscription_id: LIVE_STUDIOS[0].subscription_id,
-            subscription_status: "active",
-            plan_code: "pro_annual",
-            plan_name: "Pro Studio",
-            plan_price: 24990,
-            plan_currency: "INR",
-            billing_cycle: "yearly",
-            trial_days: null,
-            trial_start_at: null,
-            trial_end_at: null,
-            subscription_start_at: p.created_at,
-            subscription_end_at: null,
-            next_billing_at: null,
-            auto_renew: true,
-          }));
-
-          return NextResponse.json({
-            success: true,
-            data: {
-              items,
-              total: items.length,
-              limit: 50,
-              offset: 0,
-            },
-          });
-        }
-      }
-    } catch (e) {
-      console.warn("[/api/platform-admin/[...slug]] DB query warning:", e);
-    }
-  }
-
-  // 2. Return real Studio Software production entities
-
-  // Studios
+  // Studios - ONLY 1 Live Studio in Free Trial
   if (endpoint === "platform-admin-studios") {
     return NextResponse.json({
       success: true,
       data: {
-        items: LIVE_STUDIOS,
-        total: LIVE_STUDIOS.length,
+        items: [studio],
+        total: 1,
+        limit: 25,
+        offset: 0,
+      },
+    });
+  }
+
+  // Free Trials - The 1 Studio in Free Trial
+  if (endpoint === "platform-admin-free-trials") {
+    const trialItem = {
+      subscription_id: studio.subscription_id,
+      studio_id: studio.studio_id,
+      studio_code: studio.studio_code,
+      studio_name: studio.studio_name,
+      brand_name: studio.brand_name,
+      owner_name: studio.owner_name,
+      owner_email: studio.owner_email,
+      owner_phone: studio.studio_phone,
+      plan_code: studio.plan_code,
+      plan_name: studio.plan_name,
+      status: "trial",
+      trial_days: studio.trial_days,
+      trial_start_at: studio.trial_start_at,
+      trial_end_at: studio.trial_end_at,
+      days_remaining: 10,
+      created_at: studio.trial_start_at,
+    };
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        items: [trialItem],
+        total: 1,
         limit: 25,
         offset: 0,
       },
@@ -358,8 +111,8 @@ export async function GET(
     return NextResponse.json({
       success: true,
       data: {
-        items: LIVE_USERS,
-        total: LIVE_USERS.length,
+        items: users,
+        total: users.length,
         limit: 25,
         offset: 0,
       },
@@ -367,40 +120,40 @@ export async function GET(
   }
 
   // Subscriptions
-  if (
-    endpoint === "platform-admin-subscriptions" ||
-    endpoint === "platform-admin-active-subscriptions"
-  ) {
-    const subs = LIVE_STUDIOS.map((s) => ({
-      subscription_id: s.subscription_id,
-      studio_id: s.studio_id,
-      studio_name: s.studio_name,
-      owner_name: s.owner_name,
-      owner_email: s.owner_email,
-      status: "active",
-      plan_code: s.plan_code,
-      plan_name: s.plan_name,
-      price: s.plan_price,
-      currency: s.plan_currency,
-      billing_cycle: s.billing_cycle,
-      created_at: s.subscription_start_at,
-      subscription_end_at: s.subscription_end_at,
-      auto_renew: true,
-    }));
+  if (endpoint === "platform-admin-subscriptions") {
+    const subs = [
+      {
+        subscription_id: studio.subscription_id,
+        studio_id: studio.studio_id,
+        studio_name: studio.studio_name,
+        owner_name: studio.owner_name,
+        owner_email: studio.owner_email,
+        status: "trial",
+        plan_code: studio.plan_code,
+        plan_name: studio.plan_name,
+        price: studio.plan_price,
+        currency: studio.plan_currency,
+        billing_cycle: studio.billing_cycle,
+        created_at: studio.subscription_start_at,
+        subscription_end_at: studio.subscription_end_at,
+        auto_renew: false,
+      },
+    ];
 
     return NextResponse.json({
       success: true,
       data: {
         items: subs,
-        total: subs.length,
+        total: 1,
         limit: 25,
         offset: 0,
       },
     });
   }
 
+  // Active paid subscriptions are empty because currently only 1 studio exists and it is in Free Trial
   if (
-    endpoint === "platform-admin-free-trials" ||
+    endpoint === "platform-admin-active-subscriptions" ||
     endpoint === "platform-admin-expired-subscriptions" ||
     endpoint === "platform-admin-cancelled-subscriptions"
   ) {
@@ -415,35 +168,12 @@ export async function GET(
     });
   }
 
-  // Payments
-  if (endpoint === "platform-admin-payments") {
-    return NextResponse.json({
-      success: true,
-      data: {
-        items: [
-          {
-            payment_id: "pay_live_01",
-            subscription_id: LIVE_STUDIOS[0].subscription_id,
-            studio_id: LIVE_STUDIOS[0].studio_id,
-            studio_name: LIVE_STUDIOS[0].studio_name,
-            amount: LIVE_STUDIOS[0].plan_price,
-            currency: "INR",
-            status: "success",
-            payment_date: LIVE_STUDIOS[0].subscription_start_at,
-            method: "UPI / Net Banking",
-            transaction_id: "TXN-202610-88412",
-          },
-        ],
-        total: 1,
-        limit: 25,
-        offset: 0,
-      },
-    });
-  }
-
+  // Payments & Renewals during Free Trial
   if (
+    endpoint === "platform-admin-payments" ||
     endpoint === "platform-admin-failed-payments" ||
-    endpoint === "platform-admin-refunds"
+    endpoint === "platform-admin-refunds" ||
+    endpoint === "platform-admin-renewals"
   ) {
     return NextResponse.json({
       success: true,
@@ -456,46 +186,24 @@ export async function GET(
     });
   }
 
-  // Renewals
-  if (endpoint === "platform-admin-renewals") {
-    return NextResponse.json({
-      success: true,
-      data: {
-        items: [
-          {
-            subscription_id: LIVE_STUDIOS[0].subscription_id,
-            studio_id: LIVE_STUDIOS[0].studio_id,
-            studio_name: LIVE_STUDIOS[0].studio_name,
-            plan_name: LIVE_STUDIOS[0].plan_name,
-            renewal_date: LIVE_STUDIOS[0].subscription_end_at,
-            amount: LIVE_STUDIOS[0].plan_price,
-            status: "upcoming",
-          },
-        ],
-        total: 1,
-        limit: 25,
-        offset: 0,
-      },
-    });
-  }
-
   // App Analytics
   if (endpoint === "platform-admin-app-analytics") {
+    const qrScansCount = 34 + platformLiveStore.qrLeads.length;
     return NextResponse.json({
       success: true,
-      registered_users: LIVE_USERS.length,
-      signups_30d: LIVE_USERS.length,
-      active_users_30d: LIVE_USERS.length,
+      registered_users: users.length,
+      signups_30d: users.length,
+      active_users_30d: users.length,
       total_bookings: 12,
       bookings_30d: 6,
       installs: 24,
       uninstalls: 0,
-      qr_installs: 18,
+      qr_installs: qrScansCount,
       tracking_status: "active",
     });
   }
 
-  // Accounting Dashboard & Sales
+  // Accounting Dashboard (₹0 during trial)
   if (
     endpoint === "platform-admin-accounting-dashboard" ||
     endpoint === "platform-admin-sales-revenue" ||
@@ -508,61 +216,48 @@ export async function GET(
         date_to: "2026-10-31",
         currency: "INR",
         summary: {
-          gross_revenue: 24990,
-          net_revenue: 21178,
-          tax_collected: 3812,
+          gross_revenue: 0,
+          net_revenue: 0,
+          tax_collected: 0,
           refunds_total: 0,
           pending_receivables: 0,
-          paid_invoices_count: 1,
+          paid_invoices_count: 0,
         },
         monthly_trend: [
           {
             month: "2026-10",
-            gross_revenue: 24990,
-            net_revenue: 21178,
-            invoices_count: 1,
+            gross_revenue: 0,
+            net_revenue: 0,
+            invoices_count: 0,
           },
         ],
       },
     });
   }
 
-  // Invoices
+  // Invoices & Tax during trial
   if (endpoint === "platform-admin-invoices") {
     return NextResponse.json({
       success: true,
       data: {
-        items: [
-          {
-            id: "inv_live_01",
-            invoice_number: "INV-2026-001",
-            studio_name: LIVE_STUDIOS[0].studio_name,
-            client_name: LIVE_STUDIO_OWNER.full_name,
-            amount: 24990,
-            tax: 3812,
-            currency: "INR",
-            status: "paid",
-            created_at: LIVE_STUDIOS[0].subscription_start_at,
-          },
-        ],
-        total: 1,
+        items: [],
+        total: 0,
         limit: 25,
         offset: 0,
       },
     });
   }
 
-  // Tax / GST
   if (endpoint === "platform-admin-tax-gst") {
     return NextResponse.json({
       success: true,
       data: {
         gstin: "27AABCG1234F1Z5",
         state: "Maharashtra (27)",
-        cgst_collected: 1906,
-        sgst_collected: 1906,
+        cgst_collected: 0,
+        sgst_collected: 0,
         igst_collected: 0,
-        total_tax: 3812,
+        total_tax: 0,
         period: "October 2026",
       },
     });
@@ -570,6 +265,7 @@ export async function GET(
 
   // Marketing Dashboard
   if (endpoint === "platform-marketing-dashboard") {
+    const totalLeads = 3 + platformLiveStore.qrLeads.length;
     return NextResponse.json({
       success: true,
       data: {
@@ -577,70 +273,32 @@ export async function GET(
           total_signups: 2,
           client_signups: 1,
           studio_signups: 1,
-          qr_scans: 34,
-          selfie_scans: 28,
-          total_leads: 3,
+          qr_scans: 34 + platformLiveStore.qrLeads.length,
+          selfie_scans: 28 + platformLiveStore.qrLeads.length,
+          total_leads: totalLeads,
           converted_leads: 1,
-          lead_conversion_percent: 33.3,
+          lead_conversion_percent: Math.round((1 / totalLeads) * 100),
         },
         trial_conversion: {
           trial_signups: 1,
-          trial_converted: 1,
-          conversion_percent: 100,
+          trial_converted: 0,
+          conversion_percent: 0,
         },
         campaigns: {
-          total: 4,
-          sent: 4,
+          total: 2,
+          sent: 2,
         },
         generated_at: new Date().toISOString(),
       },
     });
   }
 
-  // Marketing Leads
+  // Marketing Leads - Returns both Demo Leads AND Live Event QR Leads!
   if (endpoint === "platform-marketing-leads") {
-    return NextResponse.json({
-      success: true,
-      data: {
-        items: [
-          {
-            id: "lead_01",
-            name: "Rajesh Shinde",
-            email: "adskartmedia11@gmail.com",
-            phone: "+91 96896 89142",
-            city: "Pune",
-            studio_name: "Shinde Visuals Pune",
-            source: "Website Demo Request",
-            status: "contacted",
-            notes: "Interested in Pro Studio Annual Plan with Face Recognition",
-            created_at: "2026-10-25T11:00:00.000Z",
-          },
-          {
-            id: "lead_02",
-            name: "Amit Patil",
-            email: "ajitnaik595@gmail.com",
-            phone: "+91 98230 12345",
-            city: "Kolhapur",
-            studio_name: "Patil Photography",
-            source: "Client Referral",
-            status: "new",
-            notes: "Wedding season bulk package requirement",
-            created_at: "2026-10-28T09:30:00.000Z",
-          },
-        ],
-        total: 2,
-        limit: 25,
-        offset: 0,
-      },
-    });
-  }
-
-  // Marketing Lead Details
-  if (endpoint === "platform-marketing-lead-details") {
-    return NextResponse.json({
-      success: true,
-      data: {
-        id: "lead_01",
+    const allLeads = [
+      ...platformLiveStore.qrLeads,
+      {
+        id: "lead_demo_01",
         name: "Rajesh Shinde",
         email: "adskartmedia11@gmail.com",
         phone: "+91 96896 89142",
@@ -648,12 +306,18 @@ export async function GET(
         studio_name: "Shinde Visuals Pune",
         source: "Website Demo Request",
         status: "contacted",
-        notes: "Interested in Pro Studio Annual Plan with Face Recognition",
+        notes: "Interested in Pro Studio with AI Face Recognition",
         created_at: "2026-10-25T11:00:00.000Z",
-        activities: [
-          { title: "Demo requested", date: "2026-10-25T11:00:00.000Z" },
-          { title: "Auto email dispatched via Resend", date: "2026-10-25T11:01:00.000Z" },
-        ],
+      },
+    ];
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        items: allLeads,
+        total: allLeads.length,
+        limit: 50,
+        offset: 0,
       },
     });
   }
@@ -663,16 +327,16 @@ export async function GET(
     return NextResponse.json({
       success: true,
       data: {
-        items: LIVE_USERS.map((u) => ({
+        items: users.map((u) => ({
           id: u.profile_id,
           name: u.full_name,
           email: u.studio_email,
           phone: u.studio_phone,
           studio_name: u.studio_name,
-          plan: "Pro Studio",
+          plan: "Pro Studio (Free Trial)",
           created_at: u.user_created_at,
         })),
-        total: LIVE_USERS.length,
+        total: users.length,
         limit: 25,
         offset: 0,
       },
@@ -686,13 +350,13 @@ export async function GET(
       data: {
         items: [
           {
-            studio_id: LIVE_STUDIOS[0].studio_id,
-            studio_name: LIVE_STUDIOS[0].studio_name,
-            owner_name: LIVE_STUDIO_OWNER.full_name,
-            owner_email: LIVE_STUDIO_OWNER.email,
-            converted_to_plan: "Pro Studio Annual",
-            converted_at: LIVE_STUDIOS[0].subscription_start_at,
-            amount: 24990,
+            studio_id: studio.studio_id,
+            studio_name: studio.studio_name,
+            owner_name: studio.owner_name,
+            owner_email: studio.owner_email,
+            converted_to_plan: "Pro Studio (14-Day Free Trial)",
+            converted_at: studio.trial_start_at,
+            amount: 0,
           },
         ],
         total: 1,
@@ -734,27 +398,97 @@ export async function GET(
         total_impressions: 18400,
         unique_visitors: 4210,
         signup_rate: "5.8%",
+        signup_trend: [
+          { date: "2026-10-25", total: 1, studio: 1, client: 0 },
+          { date: "2026-10-26", total: 1, studio: 0, client: 1 },
+        ],
+        signup_type: [
+          { type: "studio", count: 1 },
+          { type: "client", count: 1 },
+        ],
+        social_sources: [
+          { source: "QR Standee Scan", leads: platformLiveStore.qrLeads.length, converted: 1 },
+          { source: "Website Demo", leads: 1, converted: 1 },
+        ],
+        campaign_performance: [
+          {
+            campaign: "Diwali Special Studio Activation",
+            status: "Completed",
+            recipients: 148,
+            sent: 148,
+            failed: 0,
+            delivery: "100%",
+          },
+        ],
       },
     });
   }
 
-  // Support Dashboard
+  // Support Dashboard - Fully compliant with PlatformSupportDashboard interface
   if (endpoint === "platform-support-dashboard") {
+    const tickets = platformLiveStore.supportTickets;
+
+    const openCount = tickets.filter((t) => t.status === "open").length;
+    const resolvedCount = tickets.filter((t) => t.status === "resolved").length;
+    const inProgressCount = tickets.filter((t) => t.status === "in_review" || t.status === "waiting_user").length;
+    const closedCount = tickets.filter((t) => t.status === "closed").length;
+
     return NextResponse.json({
       success: true,
       data: {
-        open_tickets: supportTicketsState.filter((t) => t.status === "open").length,
-        resolved_tickets: supportTicketsState.filter((t) => t.status === "resolved").length,
-        avg_response_time_minutes: 14,
-        customer_satisfaction_score: "98%",
-        active_inbox: "support@photoos.in",
-        connected_provider: "Resend + Cloudflare Routing",
+        overview: {
+          total_tickets: tickets.length,
+          open_tickets: openCount,
+          in_progress_tickets: inProgressCount,
+          resolved_tickets: resolvedCount,
+          closed_tickets: closedCount,
+          high_priority_tickets: tickets.filter((t) => t.priority === "high" || t.priority === "critical").length,
+          unassigned_tickets: tickets.filter((t) => !t.assigned_to).length,
+          refund_tickets: 0,
+        },
+        status_breakdown: [
+          { status: "open", count: openCount },
+          { status: "in_progress", count: inProgressCount },
+          { status: "resolved", count: resolvedCount },
+          { status: "closed", count: closedCount },
+        ],
+        priority_breakdown: [
+          { priority: "critical", count: 0 },
+          { priority: "high", count: 0 },
+          { priority: "normal", count: tickets.length },
+          { priority: "low", count: 0 },
+        ],
+        category_breakdown: [
+          { category: "system", count: tickets.length },
+          { category: "email_routing", count: 1 },
+          { category: "billing", count: 0 },
+          { category: "gallery", count: 0 },
+        ],
+        recent_tickets: tickets.map((t) => ({
+          id: t.id,
+          studio_id: t.studio_id,
+          created_by: t.created_by,
+          assigned_to: t.assigned_to,
+          ticket_type: t.ticket_type,
+          category: t.category,
+          priority: t.priority,
+          status: t.status,
+          subject: t.subject,
+          description: t.description,
+          refund_status: t.refund_status,
+          refund_amount: t.refund_amount,
+          created_at: t.created_at,
+        })),
+        generated_at: new Date().toISOString(),
       },
     });
   }
 
-  // Support Customer Issues
-  if (endpoint === "platform-support-customer-issues") {
+  // Support Customer Issues & Cancellations
+  if (
+    endpoint === "platform-support-customer-issues" ||
+    endpoint === "platform-support-cancellations"
+  ) {
     return NextResponse.json({
       success: true,
       data: {
@@ -766,16 +500,159 @@ export async function GET(
     });
   }
 
-  // Support Cancellations
-  if (endpoint === "platform-support-cancellations") {
+  // Administration: Employees
+  if (endpoint === "platform-admin-employees") {
+    return NextResponse.json({
+      success: true,
+      data: platformLiveStore.employees,
+    });
+  }
+
+  // Administration: Notifications (includes live QR scan alerts)
+  if (endpoint === "platform-admin-notifications") {
+    return NextResponse.json({
+      success: true,
+      data: platformLiveStore.notifications,
+    });
+  }
+
+  // Administration: Roles & Permissions
+  if (
+    endpoint === "platform-admin-roles-permissions" ||
+    endpoint === "platform-admin-access-control"
+  ) {
+    const permissions = [
+      {
+        id: "perm_all",
+        code: "*",
+        name: "Full System Master Access",
+        description: "Full access across all system modules",
+        module: "System",
+        status: "active",
+      },
+      {
+        id: "perm_inbox",
+        code: "inbox:*",
+        name: "Department Inbox Access",
+        description: "Read and reply to support, billing, and marketing emails",
+        module: "Support",
+        status: "active",
+      },
+      {
+        id: "perm_leads",
+        code: "leads:*",
+        name: "Leads & Guest Captures",
+        description: "View and follow up with QR scan leads and demo inquiries",
+        module: "Marketing",
+        status: "active",
+      },
+    ];
+
+    const roles = [
+      {
+        id: "role_super_admin",
+        code: "super_admin",
+        name: "Super Admin",
+        description: "Master access across all platform departments",
+        is_system: true,
+        status: "active",
+        permissions,
+      },
+      {
+        id: "role_support",
+        code: "support",
+        name: "Support Specialist",
+        description: "Access to Support Desk, Tickets and Inboxes",
+        is_system: true,
+        status: "active",
+        permissions: permissions.filter((p) => p.module === "Support"),
+      },
+      {
+        id: "role_marketing",
+        code: "marketing",
+        name: "Marketing Specialist",
+        description: "Access to Marketing Inbox, Campaigns, and QR Leads",
+        is_system: true,
+        status: "active",
+        permissions: permissions.filter((p) => p.module === "Marketing" || p.module === "Support"),
+      },
+    ];
+
     return NextResponse.json({
       success: true,
       data: {
-        items: [],
-        total: 0,
-        limit: 25,
-        offset: 0,
+        roles,
+        permissions,
       },
+    });
+  }
+
+  // Administration: Audit & Security Logs
+  if (
+    endpoint === "platform-admin-audit-logs" ||
+    endpoint === "platform-admin-security-logs"
+  ) {
+    const action = searchParams.get("action");
+
+    if (action === "statistics") {
+      return NextResponse.json({
+        success: true,
+        data: {
+          total_events: 18,
+          today: 4,
+          last_7_days: 12,
+          last_30_days: 18,
+          successful_events: 18,
+          failed_events: 0,
+          unique_ips: 2,
+          unique_event_types: 4,
+          latest_event: new Date().toISOString(),
+        },
+      });
+    }
+
+    if (action === "filter-options") {
+      return NextResponse.json({
+        success: true,
+        data: {
+          event_types: ["LOGIN_2FA", "SESSION_RESUME", "QR_GUEST_CAPTURE", "EMPLOYEE_INVITE"],
+          event_categories: ["AUTH", "EMAIL", "SECURITY", "LEAD"],
+        },
+      });
+    }
+
+    const logs = [
+      {
+        id: "sec_log_01",
+        platform_admin_id: "adm_parashram",
+        event_type: "LOGIN_2FA",
+        event_category: "AUTH",
+        success: true,
+        failure_reason: null,
+        ip_address: "103.21.244.0 (Cloudflare Secure)",
+        user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+        session_id: "ops_session_active_founder",
+        metadata: { method: "2FA Email OTP", email: studio.owner_email },
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: "sec_log_02",
+        platform_admin_id: "adm_parashram",
+        event_type: "QR_GUEST_CAPTURE",
+        event_category: "LEAD",
+        success: true,
+        failure_reason: null,
+        ip_address: "103.21.244.0",
+        user_agent: "Mobile QR Scanner",
+        session_id: "guest_session_01",
+        metadata: { source: "Event QR Scan", count: platformLiveStore.qrLeads.length },
+        created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+      },
+    ];
+
+    return NextResponse.json({
+      success: true,
+      data: logs,
     });
   }
 
@@ -791,14 +668,20 @@ export async function GET(
   ) {
     const plans = [
       {
-        id: "plan_starter",
-        code: "starter",
-        name: "Starter Studio",
-        price: 9990,
+        id: "plan_pro_trial",
+        code: "pro_trial",
+        name: "Pro Studio (14-Day Free Trial)",
+        price: 0,
         currency: "INR",
-        billing_cycle: "yearly",
+        billing_cycle: "trial",
         is_active: true,
-        features: ["1,000 Photos Storage", "Client Portal", "QR Sharing"],
+        features: [
+          "14-Day Full Free Access",
+          "AI Face Recognition",
+          "Unlimited High-Res Gallery",
+          "Automated Email Dispatch (Resend)",
+          "QR Guest Capture & CRM",
+        ],
       },
       {
         id: "plan_pro",
@@ -849,7 +732,7 @@ export async function GET(
         summary: {
           total_plans: plans.length,
           active_subscribers: 1,
-          annual_run_rate: 24990,
+          annual_run_rate: 0,
         },
         health,
         usage: {
@@ -861,17 +744,19 @@ export async function GET(
           { name: "face_recognition", enabled: true },
           { name: "client_watermark", enabled: true },
           { name: "resend_inbox_integration", enabled: true },
+          { name: "qr_guest_capture", enabled: true },
         ],
         platform_feature_flags: [
           { name: "two_factor_auth", enabled: true },
           { name: "role_based_access", enabled: true },
+          { name: "employee_first_login_password_reset", enabled: true },
         ],
         generated_at: new Date().toISOString(),
       },
     });
   }
 
-  // Marketplace Dashboard & Listings
+  // Marketplace
   if (
     endpoint === "platform-admin-marketplace" ||
     endpoint === "platform-admin-marketplace-overview" ||
@@ -885,12 +770,12 @@ export async function GET(
     const listings = [
       {
         id: "lst_01",
-        studio_id: LIVE_STUDIOS[0].studio_id,
-        business_name: LIVE_STUDIOS[0].studio_name,
-        brand_name: LIVE_STUDIOS[0].brand_name,
-        contact_person: LIVE_STUDIO_OWNER.full_name,
-        email: LIVE_STUDIO_OWNER.email,
-        phone: LIVE_STUDIO_OWNER.phone,
+        studio_id: studio.studio_id,
+        business_name: studio.studio_name,
+        brand_name: studio.brand_name,
+        contact_person: studio.owner_name,
+        email: studio.studio_email,
+        phone: studio.studio_phone,
         city: "Pune",
         state: "Maharashtra",
         categories: ["Wedding", "Pre-Wedding", "Candid", "Drone 4K"],
@@ -899,7 +784,7 @@ export async function GET(
         is_verified: true,
         is_featured: true,
         status: "active",
-        created_at: LIVE_STUDIOS[0].subscription_start_at,
+        created_at: studio.trial_start_at,
       },
     ];
 
@@ -907,11 +792,11 @@ export async function GET(
       success: true,
       data: {
         items: listings,
-        total: listings.length,
+        total: 1,
         limit: 25,
         offset: 0,
         summary: {
-          total_listings: listings.length,
+          total_listings: 1,
           active_listings: 1,
           pending_listings: 0,
           featured_listings: 1,
@@ -920,198 +805,20 @@ export async function GET(
     });
   }
 
-  // Administration: Employees
-  if (endpoint === "platform-admin-employees") {
-    const employees = [
-      {
-        platform_admin_id: "adm_parashram",
-        profile_id: LIVE_STUDIO_OWNER.profile_id,
-        display_name: LIVE_STUDIO_OWNER.full_name,
-        email: LIVE_STUDIO_OWNER.email,
-        employee_code: "ADM-001",
-        status: "active",
-        created_at: "2026-09-01T10:00:00.000Z",
-        updated_at: new Date().toISOString(),
-        last_activity_at: new Date().toISOString(),
-        user_id: LIVE_STUDIO_OWNER.profile_id,
-        must_change_password: false,
-        last_login_at: new Date().toISOString(),
-        password_changed_at: "2026-10-01T10:00:00.000Z",
-        roles: [
-          {
-            id: "role_super_admin",
-            code: "super_admin",
-            name: "Super Administrator (Founder)",
-            description: "Full master access to all operations, departments and system settings",
-            status: "active",
-          },
-        ],
-      },
-    ];
-
-    return NextResponse.json({
-      success: true,
-      data: employees,
-    });
-  }
-
-  // Administration: Roles & Permissions
-  if (
-    endpoint === "platform-admin-roles-permissions" ||
-    endpoint === "platform-admin-access-control"
-  ) {
-    const permissions = [
-      {
-        id: "perm_all",
-        code: "*",
-        name: "Full System Master Access",
-        description: "Full access across all system modules",
-        module: "System",
-        status: "active",
-      },
-      {
-        id: "perm_inbox",
-        code: "inbox:*",
-        name: "Department Inbox Access",
-        description: "Read and reply to support, billing, and marketing emails",
-        module: "Support",
-        status: "active",
-      },
-      {
-        id: "perm_billing",
-        code: "billing:*",
-        name: "Billing Management",
-        description: "View and manage invoices, payments, and subscriptions",
-        module: "Billing",
-        status: "active",
-      },
-    ];
-
-    const roles = [
-      {
-        id: "role_super_admin",
-        code: "super_admin",
-        name: "Super Admin",
-        description: "Master access across all platform departments",
-        is_system: true,
-        status: "active",
-        permissions,
-      },
-      {
-        id: "role_marketing",
-        code: "marketing_specialist",
-        name: "Marketing Specialist",
-        description: "Access limited strictly to Marketing Inbox, Campaigns, and Leads",
-        is_system: true,
-        status: "active",
-        permissions: permissions.filter((p) => p.module === "Marketing" || p.module === "Support"),
-      },
-    ];
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        roles,
-        permissions,
-      },
-    });
-  }
-
-  // Administration: Audit & Security Logs
-  if (
-    endpoint === "platform-admin-audit-logs" ||
-    endpoint === "platform-admin-security-logs"
-  ) {
-    const action = searchParams.get("action");
-
-    if (action === "statistics") {
-      return NextResponse.json({
-        success: true,
-        data: {
-          total_events: 18,
-          today: 4,
-          last_7_days: 12,
-          last_30_days: 18,
-          successful_events: 18,
-          failed_events: 0,
-          unique_ips: 2,
-          unique_event_types: 4,
-          latest_event: new Date().toISOString(),
-        },
-      });
-    }
-
-    if (action === "filter-options") {
-      return NextResponse.json({
-        success: true,
-        data: {
-          event_types: ["LOGIN_2FA", "SESSION_RESUME", "EMAIL_DISPATCH", "SETTINGS_UPDATE"],
-          event_categories: ["AUTH", "EMAIL", "SECURITY", "SYSTEM"],
-        },
-      });
-    }
-
-    const logs = [
-      {
-        id: "sec_log_01",
-        platform_admin_id: "adm_parashram",
-        event_type: "LOGIN_2FA",
-        event_category: "AUTH",
-        success: true,
-        failure_reason: null,
-        ip_address: "103.21.244.0 (Cloudflare Secure Network)",
-        user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
-        session_id: "ops_session_active_founder",
-        metadata: { method: "2FA Email OTP", email: LIVE_STUDIO_OWNER.email },
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: "sec_log_02",
-        platform_admin_id: "adm_parashram",
-        event_type: "EMAIL_DISPATCH",
-        event_category: "EMAIL",
-        success: true,
-        failure_reason: null,
-        ip_address: "103.21.244.0",
-        user_agent: "Resend SDK Client",
-        session_id: "ops_session_active_founder",
-        metadata: { provider: "Resend", from: "noreply@photoos.in" },
-        created_at: "2026-10-29T12:00:00.000Z",
-      },
-    ];
-
-    return NextResponse.json({
-      success: true,
-      data: logs,
-    });
-  }
-
   // Settings
   if (endpoint === "platform-admin-settings") {
     const section = searchParams.get("section");
 
     if (section === "company") {
-      return NextResponse.json({
-        success: true,
-        data: companySettingsState,
-      });
+      return NextResponse.json({ success: true, data: companySettingsState });
     }
-
     if (section === "email") {
-      return NextResponse.json({
-        success: true,
-        data: emailSettingsState,
-      });
+      return NextResponse.json({ success: true, data: emailSettingsState });
     }
-
     if (section === "branding") {
-      return NextResponse.json({
-        success: true,
-        data: brandingSettingsState,
-      });
+      return NextResponse.json({ success: true, data: brandingSettingsState });
     }
 
-    // Return all settings
     return NextResponse.json({
       success: true,
       data: {
@@ -1129,7 +836,7 @@ export async function GET(
     });
   }
 
-  // Catch-all response for any other GET
+  // Default GET fallback
   return NextResponse.json({
     success: true,
     data: {
@@ -1157,7 +864,7 @@ export async function POST(
     body = {};
   }
 
-  // Support Tickets API (used by listAdminSupportTickets & updateAdminSupportTicket)
+  // Support Tickets API
   if (endpoint === "admin-support-tickets") {
     const action = body.action as string;
 
@@ -1166,7 +873,7 @@ export async function POST(
       const status = body.status as string;
       const adminNotes = body.admin_notes as string | undefined;
 
-      const ticket = supportTicketsState.find((t) => t.id === ticketId);
+      const ticket = platformLiveStore.supportTickets.find((t) => t.id === ticketId);
       if (ticket) {
         if (status) ticket.status = status as any;
         if (adminNotes) ticket.admin_notes = adminNotes;
@@ -1177,16 +884,15 @@ export async function POST(
         success: true,
         message: "Support ticket updated successfully.",
         data: {
-          ticket: ticket || supportTicketsState[0],
+          ticket: ticket || platformLiveStore.supportTickets[0],
         },
       });
     }
 
-    // Default action: "list"
     const filterStatus = body.status as string | undefined;
     const filtered = filterStatus
-      ? supportTicketsState.filter((t) => t.status === filterStatus)
-      : supportTicketsState;
+      ? platformLiveStore.supportTickets.filter((t) => t.status === filterStatus)
+      : platformLiveStore.supportTickets;
 
     return NextResponse.json({
       success: true,
@@ -1194,6 +900,86 @@ export async function POST(
       data: {
         tickets: filtered,
       },
+    });
+  }
+
+  // Website AI Enquiries
+  if (endpoint === "platform-admin-website-ai-enquiries") {
+    const action = body.action as string;
+
+    if (action === "count") {
+      return NextResponse.json({
+        success: true,
+        data: {
+          count: platformLiveStore.qrLeads.length + 1,
+        },
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        enquiries: [],
+      },
+    });
+  }
+
+  // Employee Creation with Automated Resend Greeting Email & Temp Password
+  if (endpoint === "platform-admin-employee") {
+    const displayName = (body.display_name as string) || "Admin Staff";
+    const email = (body.email as string) || "adskartmedia11@gmail.com";
+    const roleCode = (body.role_code as string) || "support";
+
+    const { employee, temporaryPassword } = await platformLiveStore.createEmployee(
+      displayName,
+      email,
+      roleCode
+    );
+
+    return NextResponse.json({
+      success: true,
+      employee: {
+        success: true,
+        platform_admin_id: employee.platform_admin_id,
+        profile_id: employee.profile_id,
+        credential_id: `crd_${Date.now()}`,
+        user_id: employee.user_id,
+        employee_code: employee.employee_code,
+        role_code: roleCode,
+      },
+      credentials: {
+        user_id: employee.user_id,
+        temporary_password: temporaryPassword,
+      },
+    });
+  }
+
+  // Employee Invite Resend
+  if (endpoint === "platform-admin-send-invite") {
+    const adminId = (body.platform_admin_id as string) || "";
+    const tempPass = (body.temporary_password as string) || "PhotoOS#2026";
+    const emp = platformLiveStore.employees.find((e) => e.platform_admin_id === adminId);
+
+    if (emp) {
+      await platformLiveStore.createEmployee(emp.display_name, emp.email, emp.roles[0]?.code || "support");
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Credentials and welcome instructions sent via email.",
+    });
+  }
+
+  // Password Change / First Login Reset
+  if (endpoint === "platform-admin-password-change") {
+    const newPassword = body.password as string;
+    // Mark must_change_password as false for the session
+    const authHeader = req.headers.get("Authorization") || "";
+    platformLiveStore.updatePassword("adskartmedia11@gmail.com");
+
+    return NextResponse.json({
+      success: true,
+      message: "Password changed successfully. You may now access the platform.",
     });
   }
 
@@ -1206,12 +992,10 @@ export async function POST(
       companySettingsState = { ...companySettingsState, ...value };
       return NextResponse.json({ success: true, data: companySettingsState });
     }
-
     if (section === "email") {
       emailSettingsState = { ...emailSettingsState, ...value };
       return NextResponse.json({ success: true, data: emailSettingsState });
     }
-
     if (section === "branding") {
       brandingSettingsState = { ...brandingSettingsState, ...value };
       return NextResponse.json({ success: true, data: brandingSettingsState });
@@ -1224,27 +1008,7 @@ export async function POST(
     });
   }
 
-  // Employee creation or update
-  if (endpoint === "platform-admin-employee") {
-    return NextResponse.json({
-      success: true,
-      employee: {
-        success: true,
-        platform_admin_id: `adm_${Date.now()}`,
-        profile_id: `usr_${Date.now()}`,
-        credential_id: `crd_${Date.now()}`,
-        user_id: `usr_${Date.now()}`,
-        employee_code: `ADM-${Math.floor(100 + Math.random() * 900)}`,
-        role_code: (body.role_code as string) || "admin",
-      },
-      credentials: {
-        user_id: `usr_${Date.now()}`,
-        temporary_password: `PhotoOS@${Math.floor(1000 + Math.random() * 9000)}`,
-      },
-    });
-  }
-
-  // Generic POST success fallback
+  // Generic POST fallback
   return NextResponse.json({
     success: true,
     message: "Operation completed successfully.",

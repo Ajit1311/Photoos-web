@@ -223,7 +223,7 @@ export default function MarketingGrowthPage() {
             <div className="p-5">
               {loading ? (
                 <EmptyState text="Loading signup trend..." />
-              ) : !data?.signup_trend.length ? (
+              ) : !data?.signup_trend?.length ? (
                 <EmptyState text="No signup data available." />
               ) : (
                 <div className="space-y-3">
@@ -318,7 +318,7 @@ export default function MarketingGrowthPage() {
             </div>
 
             <div className="space-y-3 p-5">
-              {data?.signup_type.length ? (
+              {data?.signup_type?.length ? (
                 data.signup_type.map((item) => (
                   <div
                     key={item.type}
@@ -349,7 +349,7 @@ export default function MarketingGrowthPage() {
             </div>
 
             <div className="space-y-3 p-5">
-              {data?.social_sources.length ? (
+              {data?.social_sources?.length ? (
                 data.social_sources.map((item) => (
                   <div
                     key={item.source}
@@ -390,7 +390,7 @@ export default function MarketingGrowthPage() {
           </div>
 
           <div className="overflow-x-auto">
-            {data?.campaign_performance.length ? (
+            {data?.campaign_performance?.length ? (
               <table className="min-w-[850px] w-full">
                 <thead className="bg-slate-50">
                   <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">

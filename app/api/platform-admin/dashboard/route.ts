@@ -11,13 +11,13 @@ function getResilientDashboardSnapshot() {
     overview: {
       total_studios: 1,
       total_users: 2,
-      trial_studios: 0,
-      active_studios: 1,
+      trial_studios: 1,
+      active_studios: 0,
       expired_studios: 0,
       cancelled_studios: 0,
     },
     alerts: {
-      trial_expiring: 0,
+      trial_expiring: 1,
       trial_expired: 0,
       renewal_due: 0,
       renewal_overdue: 0,
@@ -29,12 +29,12 @@ function getResilientDashboardSnapshot() {
       month_signups: 2,
     },
     revenue: {
-      monthly_recurring_revenue: 2499,
-      annual_recurring_revenue: 29988,
+      monthly_recurring_revenue: 0,
+      annual_recurring_revenue: 0,
     },
     quick_stats: {
-      trial_conversion_rate: 100,
-      active_subscription_rate: 100,
+      trial_conversion_rate: 0,
+      active_subscription_rate: 0,
     },
     app_analytics: {
       registered_users: 2,
@@ -50,29 +50,29 @@ function getResilientDashboardSnapshot() {
     latest_studios: [
       {
         studio_id: "std_gmark_photoos_01",
-        studio_name: "G Mark Software Studio (Pune)",
-        created_at: new Date(Date.now() - 48 * 3600000).toISOString(),
+        studio_name: "G Mark Software Studio (Free Trial)",
+        created_at: "2026-10-25T00:00:00.000Z",
       },
     ],
     latest_signups: [
       {
         profile_id: "usr_parashram_naik",
         full_name: "Parashram S Naik (Founder)",
-        created_at: new Date(Date.now() - 48 * 3600000).toISOString(),
+        created_at: "2026-10-25T00:00:00.000Z",
       },
       {
         profile_id: "usr_ajit_naik",
         full_name: "Ajit Naik (Lead Photographer)",
-        created_at: new Date(Date.now() - 24 * 3600000).toISOString(),
+        created_at: "2026-10-26T12:00:00.000Z",
       },
     ],
     latest_subscriptions: [
       {
-        subscription_id: "sub_live_annual_01",
+        subscription_id: "sub_trial_gmark_01",
         studio_id: "std_gmark_photoos_01",
-        status: "active",
-        created_at: new Date(Date.now() - 48 * 3600000).toISOString(),
-        subscription_end_at: new Date(Date.now() + 330 * 86400000).toISOString(),
+        status: "trial",
+        created_at: "2026-10-25T00:00:00.000Z",
+        subscription_end_at: "2026-11-08T00:00:00.000Z",
       },
     ],
   };

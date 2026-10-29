@@ -414,7 +414,7 @@ export default function PlatformAdminAccountingDashboardPage() {
                     )
                   })}
 
-                  {!data?.monthly_trend.length && (
+                  {!data?.monthly_trend?.length && (
                     <div className="py-12 text-center text-sm text-slate-400">
                       No accounting activity in this period.
                     </div>

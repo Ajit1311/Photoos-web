@@ -286,7 +286,7 @@ export default function SupportDashboardPage() {
                       Loading support tickets...
                     </td>
                   </tr>
-                ) : !data?.recent_tickets.length ? (
+                ) : !data?.recent_tickets?.length ? (
                   <tr>
                     <td
                       colSpan={6}
