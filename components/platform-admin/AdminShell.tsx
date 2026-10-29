@@ -457,6 +457,12 @@ const navSections: NavSection[] = [
         icon: Headphones,
       },
       {
+        label: "Department Inbox",
+        href: "/admin/inbox",
+        icon: Mail,
+        badge: "Live",
+      },
+      {
         label: "Tickets",
         href: "/admin/support-tickets",
         icon: FileText,
