@@ -119,6 +119,27 @@ export async function getPlatformAdminSession():
     );
   }
 
+  // 1. Try local/internal Ops session endpoint first
+  try {
+    const localRes = await fetch("/api/ops/session", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (localRes.ok) {
+      const localData = await localRes.json();
+      if (localData.success && localData.data) {
+        return localData.data as PlatformAdminSession;
+      }
+    }
+  } catch {
+    // Continue to edge function fallback
+  }
+
+  // 2. Fallback to Supabase Edge function
   const response =
     await fetch(
       getEndpoint("platform-admin-session"),

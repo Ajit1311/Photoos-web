@@ -13,7 +13,6 @@ export default function PlatformAdminLayout({ children }: Props) {
   const pathname = usePathname();
 
   const standalone =
-    pathname === "/admin/login" ||
     pathname === "/admin/change-password";
 
   if (standalone) {

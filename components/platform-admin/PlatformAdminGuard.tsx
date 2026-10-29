@@ -25,7 +25,7 @@ export default function PlatformAdminGuard({ children }: Props) {
         if (!mounted) return;
 
         if (!session) {
-          router.replace("/admin/login");
+          router.replace("/ops-console");
           return;
         }
 
@@ -40,7 +40,7 @@ export default function PlatformAdminGuard({ children }: Props) {
         setAuthorized(true);
       } catch {
         if (mounted) {
-          router.replace("/admin/login");
+          router.replace("/ops-console");
         }
       } finally {
         if (mounted) {
