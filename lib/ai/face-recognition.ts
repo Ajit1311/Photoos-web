@@ -173,7 +173,7 @@ export async function extractSelfieFaceDescriptor(
       return {
         success: false,
         faceCount: 0,
-        error: "चेहरा स्पष्ट दिसला नाही. कृपया चांगल्या प्रकाशात कॅमेऱ्यासमोर सरळ पाहून सेल्फी घ्या.",
+        error: "Face not clearly detected. Please face the camera directly in good lighting and take another selfie.",
       };
     }
 
@@ -202,7 +202,7 @@ export async function extractSelfieFaceDescriptor(
       return {
         success: false,
         faceCount: detections.length,
-        error: "सेल्फीमध्ये एकापेक्षा जास्त चेहरे आढळले आहेत. कृपया फक्त तुमचा एकट्याचा चेहरा असलेला सेल्फी घ्या.",
+        error: "Multiple faces detected. Please ensure only your single face is visible in the selfie.",
       };
     }
 
@@ -220,7 +220,7 @@ export async function extractSelfieFaceDescriptor(
     return {
       success: false,
       faceCount: 0,
-      error: "सेल्फी प्रोसेस करताना त्रुटी आली. कृपया पुन्हा सेल्फी घ्या.",
+      error: "Error processing selfie. Please take another selfie.",
     };
   }
 }

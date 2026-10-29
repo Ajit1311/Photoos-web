@@ -34,7 +34,7 @@ export interface EventFinancial {
 
 export interface Event {
   id: string;
-  projectId: string; // <-- इथे projectId ॲड केला आहे
+  projectId: string; // Associated project ID
   title: string;
   status: EventStatus;
   date: string;

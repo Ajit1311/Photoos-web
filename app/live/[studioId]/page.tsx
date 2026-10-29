@@ -112,7 +112,7 @@ export default function LiveStandeeResolverPage() {
             No Event Currently Active
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-slate-300">
-            हा QR कोड चालू आहे, परंतु सध्या कोणताही इव्हेंट या स्टँडीला जोडलेला नाही.
+            This QR code is active, but no event is currently linked to this standee.
           </p>
           <p className="mt-1.5 text-xs text-slate-400">
             If you are attending a live event, please ask the photography team to link this event, or click Refresh below.

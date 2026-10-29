@@ -72,7 +72,7 @@ export function ProjectHeader({ project }: ProjectHeaderProps) {
               {project.title}
             </h1>
 
-            {/* Title च्या खाली Status Badge */}
+            {/* Status Badge below Title */}
             <div className="pt-2">
               <ProjectStatusBadge status={project.status} />
             </div>

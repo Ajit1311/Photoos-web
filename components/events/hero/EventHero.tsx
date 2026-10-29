@@ -6,7 +6,7 @@ import { useCurrentEvent } from "@/hooks/useCurrentEvent";
 export default function EventHero() {
   const { event } = useCurrentEvent();
 
-  // जर इव्हेंटचा डेटा अजून लोड होत असेल, तर क्रॅश न होता डमी/फॉलबॅक डेटा दाखवून UI स्थिर ठेवणे
+  // Fallback UI state while loading
   const title = event?.title || "Loading Event Title...";
   const statusLabel = event?.status 
     ? event.status.charAt(0).toUpperCase() + event.status.slice(1) 
@@ -37,7 +37,7 @@ export default function EventHero() {
           </div>
         </div>
 
-        {/* Live Metrics: कधीही न लपणारे काउंटर कार्ड्स */}
+        {/* Live Metrics: Counter cards */}
         <div className="grid min-w-[300px] grid-cols-2 gap-3">
           <StatCard title="Total Photos" value={totalPhotos} className="bg-[#0A3F61] text-white" />
           <StatCard title="AI Faces" value={aiFaces} className="bg-emerald-600 text-white" />

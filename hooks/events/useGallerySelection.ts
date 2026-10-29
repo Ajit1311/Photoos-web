@@ -55,13 +55,13 @@ export function useGallerySelection() {
     [],
   );
 
-  // नवीन ॲड केलेले selectRange function
+  // Range selection function
   const selectRange = useCallback(
     (from: string, to: string, orderedIds: string[]) => {
       const start = orderedIds.indexOf(from);
       const end = orderedIds.indexOf(to);
 
-      // जर दोन्ही आयडी array मध्ये सापडले तरच रेंज सिलेक्ट करा
+      // Select range when both IDs are in the array
       if (start !== -1 && end !== -1) {
         const range = orderedIds.slice(
           Math.min(start, end),
@@ -69,8 +69,8 @@ export function useGallerySelection() {
         );
         setSelectedIds(range);
         
-        // रेंज सिलेक्ट केल्यावर शेवटच्या आयडीला ॲंकर (anchor) म्हणून सेट करणे 
-        // जेणेकरून Shift + Click लॉजिक नीट चालेल
+        // Set anchor to last selected ID 
+        // Ensures Shift + Click selection logic works
         anchorIdRef.current = to; 
       }
     },
@@ -86,7 +86,7 @@ export function useGallerySelection() {
     });
   }, []);
 
-  // सर्व आयटम्स सिलेक्ट करण्यासाठी (Select All)
+  // Select all items
   const selectAll = useCallback(
     (ids: string[]) => {
       setSelectedIds(ids);
@@ -94,7 +94,7 @@ export function useGallerySelection() {
     [],
   );
 
-  // सिलेक्ट नसलेले आयटम्स सिलेक्ट करण्यासाठी आणि आधीचे अनसिलेक्ट करण्यासाठी (Invert Selection)
+  // Invert Selection: Select unselected items and deselect active ones
   const invertSelection = useCallback(
     (ids: string[]) => {
       setSelectedIds(

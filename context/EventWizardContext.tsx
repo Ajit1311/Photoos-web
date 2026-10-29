@@ -191,13 +191,13 @@ export function EventWizardProvider({ children, initialProjectId }: Props) {
     setError(null);
 
     try {
-      // 1. Event तयार करा आणि ID मिळवा
+      // 1. Create event and retrieve ID
       const event = await eventRepository.create(studioId, data);
 
-      // 2. State reset करा
+      // 2. Reset wizard state
       reset();
 
-      // 3. नवीन तयार झालेल्या event च्या details पेजवर रीडायरेक्ट करा
+      // 3. Redirect to created event workspace
       if (event?.id) {
         router.replace(`/dashboard/events/${event.id}`);
       } else {

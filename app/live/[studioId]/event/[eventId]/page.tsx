@@ -42,6 +42,8 @@ import {
   MATCH_THRESHOLD,
 } from "@/lib/ai/face-recognition";
 import type { GalleryPhoto } from "@/types/events/gallery";
+import JustdialMarketplace from "@/components/gallery/marketplace/JustdialMarketplace";
+import StudioClientChat from "@/components/gallery/chat/StudioClientChat";
 
 type UserRole = "bride_groom" | "guest" | null;
 type GuestStep = "role_select" | "guest_consent" | "selfie" | "matching" | "gallery";
@@ -101,7 +103,7 @@ export default function GuestLiveEventPage() {
   // Selfie & Face Scan
   const [selfieDataUrl, setSelfieDataUrl] = useState<string | null>(null);
   const [matchedPhotos, setMatchedPhotos] = useState<GalleryPhoto[]>([]);
-  const [scanStatusMessage, setScanStatusMessage] = useState<string>("तुमचा चेहरा स्कॅन करत आहोत...");
+  const [scanStatusMessage, setScanStatusMessage] = useState<string>("Scanning your face...");
   const [faceScanNotice, setFaceScanNotice] = useState<string | null>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -213,15 +215,15 @@ export default function GuestLiveEventPage() {
     setFormError("");
 
     if (!guestName.trim()) {
-      setFormError("कृपया तुमचे नाव प्रविष्ट करा (Please enter your name)");
+      setFormError("Please enter your full name");
       return;
     }
     if (!guestPhone.trim() || guestPhone.length < 10) {
-      setFormError("कृपया वैध मोबाईल क्रमांक प्रविष्ट करा (Please enter mobile number)");
+      setFormError("Please enter a valid 10-digit mobile number");
       return;
     }
     if (!consentGiven) {
-      setFormError("DPDP कायद्यानुसार फेशिअल मॅचिंगसाठी संमती आवश्यक आहे (Consent required)");
+      setFormError("Facial recognition consent is required to match your photos");
       return;
     }
 
@@ -257,20 +259,20 @@ export default function GuestLiveEventPage() {
     if (!selfieDataUrl) return;
     setStep("matching");
     setFormError("");
-    setScanStatusMessage("AI फेस रेकग्निशन मॉडेल लोड करत आहोत...");
+    setScanStatusMessage("Loading AI face recognition model...");
 
     try {
-      setScanStatusMessage("चेहरा अचूक डिटेक्ट करत आहोत (99%+ Accuracy)...");
+      setScanStatusMessage("Detecting face with 99%+ accuracy...");
       const selfieResult = await extractSelfieFaceDescriptor(selfieDataUrl);
 
       if (!selfieResult.success || !selfieResult.descriptor) {
-        setFormError(selfieResult.error || "चेहरा स्पष्ट दिसला नाही. कृपया चांगल्या प्रकाशात सेल्फी घ्या.");
+        setFormError(selfieResult.error || "Face not clearly detected. Please take a selfie in good lighting.");
         setStep("selfie");
         return;
       }
 
       const selfieDescriptor = selfieResult.descriptor;
-      setScanStatusMessage("इव्हेंटमधील फोटोंसोबत मॅचिंग करत आहोत...");
+      setScanStatusMessage("Matching against event photos...");
 
       let matchedIds: string[] = [];
       const activeStudioId = studioId || event?.studio_id;
@@ -302,14 +304,14 @@ export default function GuestLiveEventPage() {
       }
 
       if (matchedIds.length === 0 && allPhotos.length > 0) {
-        setScanStatusMessage(`गॅलरीमधील फोटोंचे विश्लेषण करत आहोत (0/${allPhotos.length})...`);
+        setScanStatusMessage(`Analyzing gallery photos (0/${allPhotos.length})...`);
         const clientMatches: GalleryPhoto[] = [];
 
         const CHUNK_SIZE = 3;
         for (let i = 0; i < allPhotos.length; i += CHUNK_SIZE) {
           const chunk = allPhotos.slice(i, i + CHUNK_SIZE);
           const currentProgress = Math.min(i + chunk.length, allPhotos.length);
-          setScanStatusMessage(`फोटोंचे विश्लेषण करत आहोत (${currentProgress}/${allPhotos.length})...`);
+          setScanStatusMessage(`Analyzing gallery photos (${currentProgress}/${allPhotos.length})...`);
 
           await Promise.all(
             chunk.map(async (photo) => {
@@ -336,20 +338,20 @@ export default function GuestLiveEventPage() {
         setMatchedPhotos(clientMatches);
         if (clientMatches.length > 0) {
           setGalleryTab("matched");
-          setFaceScanNotice(`🎉 छान! तुमच्या चेहऱ्याशी जुळणारे ${clientMatches.length} फोटो सापडले आहेत.`);
+          setFaceScanNotice(`🎉 Great! Found ${clientMatches.length} photos matching your face.`);
         } else {
           setGalleryTab("all");
-          setFaceScanNotice("तुमच्या चेहऱ्याशी जुळणारे फोटो सध्या सापडले नाहीत. कृपया सर्व फोटोंमधून तपासा.");
+          setFaceScanNotice("No photos matched your face yet. You can browse all event photos above.");
         }
       } else {
         const matches = allPhotos.filter((p) => matchedIds.includes(p.id));
         setMatchedPhotos(matches);
         if (matches.length > 0) {
           setGalleryTab("matched");
-          setFaceScanNotice(`🎉 छान! तुमच्या चेहऱ्याशी जुळणारे ${matches.length} फोटो सापडले आहेत.`);
+          setFaceScanNotice(`🎉 Great! Found ${matches.length} photos matching your face.`);
         } else {
           setGalleryTab("all");
-          setFaceScanNotice("तुमच्या चेहऱ्याशी जुळणारे फोटो सध्या सापडले नाहीत. कृपया सर्व फोटोंमधून तपासा.");
+          setFaceScanNotice("No photos matched your face yet. You can browse all event photos above.");
         }
       }
 
@@ -357,7 +359,7 @@ export default function GuestLiveEventPage() {
       setActiveAppTab("camera");
     } catch (err) {
       console.error("[handleMatchPhotos] AI matching error:", err);
-      setFormError("मॅचिंग दरम्यान त्रुटी आली. कृपया पुन्हा प्रयत्न करा.");
+      setFormError("An error occurred during matching. Please try again.");
       setStep("selfie");
     }
   };
@@ -424,8 +426,8 @@ export default function GuestLiveEventPage() {
     if (lockDownloadsUntilPayment) {
       setDownloadLockNotice(
         role === "bride_groom"
-          ? "पेमेंट प्रलंबित आहे: कृपया स्टुडिओचे उर्वरित पेमेंट पूर्ण करा जेणेकरून ओरिजिनल HD फोटो डाऊनलोड सुरू होईल."
-          : "पाहुण्यांसाठी थेट डाऊनलोड सध्या लॉक आहे. कृपया वधू किंवा वराशी संपर्क साधा."
+          ? "Payment Pending: Please clear the remaining studio balance to unlock high-resolution HD downloads."
+          : "Direct downloads are currently restricted for guests. Please contact the bride or groom."
       );
       return;
     }
@@ -560,7 +562,7 @@ export default function GuestLiveEventPage() {
                   className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#EF8619] to-amber-500 py-3.5 text-sm font-extrabold text-black shadow-lg shadow-orange-500/20 transition hover:brightness-110 active:scale-[0.99]"
                 >
                   <Camera className="h-5 w-5" />
-                  चेहरा स्कॅन करून तुमचे फोटो शोधा (Face Scan)
+                  Scan Face to Find Your Photos (AI Face Scan)
                 </button>
               </div>
             </div>
@@ -577,16 +579,29 @@ export default function GuestLiveEventPage() {
                 <p className="mt-0.5 text-[11px] text-slate-400">{allPhotos.length} Photos</p>
               </div>
 
-              <div
-                onClick={() => setActiveAppTab("chat")}
-                className="cursor-pointer rounded-2xl border border-white/10 bg-white/5 p-4 transition hover:bg-white/10"
-              >
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10 text-orange-400">
-                  <MessageSquare className="h-5 w-5" />
+              {role === "bride_groom" ? (
+                <div
+                  onClick={() => setActiveAppTab("chat")}
+                  className="cursor-pointer rounded-2xl border border-white/10 bg-white/5 p-4 transition hover:bg-white/10"
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10 text-orange-400">
+                    <MessageSquare className="h-5 w-5" />
+                  </div>
+                  <h4 className="mt-3 text-sm font-bold text-white">Studio Desk</h4>
+                  <p className="mt-0.5 text-[11px] text-slate-400">Direct Studio Chat</p>
                 </div>
-                <h4 className="mt-3 text-sm font-bold text-white">Guest Wishes</h4>
-                <p className="mt-0.5 text-[11px] text-slate-400">{wishes.length} Wishes</p>
-              </div>
+              ) : (
+                <div
+                  onClick={() => setActiveAppTab("marketplace")}
+                  className="cursor-pointer rounded-2xl border border-white/10 bg-white/5 p-4 transition hover:bg-white/10"
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10 text-orange-400">
+                    <ShoppingBag className="h-5 w-5" />
+                  </div>
+                  <h4 className="mt-3 text-sm font-bold text-white">Marketplace</h4>
+                  <p className="mt-0.5 text-[11px] text-slate-400">Find & Book Studios</p>
+                </div>
+              )}
             </div>
 
             <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
@@ -611,57 +626,12 @@ export default function GuestLiveEventPage() {
         )}
 
         {/* =================================================================== */}
-        {/* TAB 2: MARKETPLACE */}
+        {/* TAB 2: MARKETPLACE (Justdial-style Area-Wise Directory) */}
         {/* =================================================================== */}
         {activeAppTab === "marketplace" && (
-          <div className="space-y-4 animate-in fade-in">
-            <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-[#0A3F61]/60 to-slate-900 p-6">
-              <div className="flex items-center gap-2 text-[#EF8619]">
-                <ShoppingBag className="h-5 w-5" />
-                <span className="text-xs font-bold uppercase tracking-wider">Studio Marketplace</span>
-              </div>
-              <h2 className="mt-2 text-xl font-bold text-white">
-                Book {studio?.brand_name || studio?.name || "Our Studio"}
-              </h2>
-              <p className="mt-1 text-xs text-slate-300">
-                Explore our wedding packages and cinematic services.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-white text-sm">Wedding Cinematic Film & 4K Shoot</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Teaser, Highlights Reel & Full 4K Video</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  const phone = studio?.contact_phone || "919876543210";
-                  window.open(`https://wa.me/${phone.replace(/\D/g, "")}?text=Hi%2C+I+want+to+inquire+about+Wedding+Photography`, "_blank");
-                }}
-                className="rounded-xl bg-[#0A3F61] px-3.5 py-2 text-xs font-bold text-white hover:bg-[#08344f]"
-              >
-                Inquire
-              </button>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-white text-sm">Luxury Canvera Photobook Album</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Velvet Matte, Metallic Gold & Waterproof Pages</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  const phone = studio?.contact_phone || "919876543210";
-                  window.open(`https://wa.me/${phone.replace(/\D/g, "")}?text=Hi%2C+I+want+to+inquire+about+Album+Printing`, "_blank");
-                }}
-                className="rounded-xl bg-[#0A3F61] px-3.5 py-2 text-xs font-bold text-white hover:bg-[#08344f]"
-              >
-                Inquire
-              </button>
-            </div>
-          </div>
+          <JustdialMarketplace
+            currentStudioName={studio?.brand_name || studio?.name}
+          />
         )}
 
         {/* =================================================================== */}
@@ -671,7 +641,7 @@ export default function GuestLiveEventPage() {
           <div className="space-y-4 animate-in fade-in">
             {step === "role_select" && (
               <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-center space-y-4">
-                <h3 className="text-lg font-bold text-white">गॅलरी ॲक्सेस निवडा</h3>
+                <h3 className="text-lg font-bold text-white">Select Gallery Access</h3>
                 <p className="text-xs text-slate-400">Select your profile to view photos</p>
                 <div className="mt-4 grid grid-cols-2 gap-3">
                   <button
@@ -710,7 +680,7 @@ export default function GuestLiveEventPage() {
                     <User className="h-6 w-6" />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-white">तुमचे तपशील प्रविष्ट करा</h3>
+                    <h3 className="text-base font-bold text-white">Enter Your Details</h3>
                     <p className="text-xs text-slate-400">Enter details to match your event photos</p>
                   </div>
                 </div>
@@ -724,12 +694,12 @@ export default function GuestLiveEventPage() {
 
                   <div>
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                      पूर्ण नाव (Full Name) *
+                      Full Name *
                     </label>
                     <input
                       type="text"
                       required
-                      placeholder="उदा. राहुल कदम"
+                      placeholder="e.g. Rahul Kadam"
                       value={guestName}
                       onChange={(e) => setGuestName(e.target.value)}
                       className="mt-1 w-full rounded-xl border border-white/15 bg-white/5 p-3 text-sm text-white outline-none focus:border-sky-400"
@@ -738,13 +708,13 @@ export default function GuestLiveEventPage() {
 
                   <div>
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                      मोबाईल क्रमांक (Mobile Number) *
+                      Mobile Number *
                     </label>
                     <input
                       type="tel"
                       required
                       maxLength={10}
-                      placeholder="उदा. 9876543210"
+                      placeholder="e.g. 9876543210"
                       value={guestPhone}
                       onChange={(e) => setGuestPhone(e.target.value.replace(/\D/g, ""))}
                       className="mt-1 w-full rounded-xl border border-white/15 bg-white/5 p-3 text-sm text-white outline-none focus:border-sky-400"
@@ -760,7 +730,7 @@ export default function GuestLiveEventPage() {
                       className="mt-1 h-4 w-4 rounded accent-[#0A3F61]"
                     />
                     <label htmlFor="consent-live-check" className="text-xs text-slate-300 leading-relaxed cursor-pointer">
-                      मी माझे फोटो शोधण्यासाठी फेशिअल रेकग्निशन तंत्रज्ञानाचा वापर करण्यास संमती देत आहे (DPDP Act 2023 Compliant).
+                      I consent to facial recognition processing strictly to find my photos in this gallery as per DPDP Act 2023.
                     </label>
                   </div>
 
@@ -768,7 +738,7 @@ export default function GuestLiveEventPage() {
                     type="submit"
                     className="w-full rounded-2xl bg-gradient-to-r from-[#0A3F61] to-[#08344f] py-3 text-xs font-bold text-white shadow hover:brightness-110"
                   >
-                    पुढे जा आणि सेल्फी घ्या (Proceed to Selfie)
+                    Proceed to Selfie
                   </button>
                 </form>
               </div>
@@ -779,7 +749,7 @@ export default function GuestLiveEventPage() {
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#EF8619]/20 text-[#EF8619]">
                   <Camera className="h-8 w-8" />
                 </div>
-                <h3 className="mt-4 text-lg font-bold text-white">सेल्फी घ्या किंवा फोटो अपलोड करा</h3>
+                <h3 className="mt-4 text-lg font-bold text-white">Take a Selfie or Upload Photo</h3>
                 <p className="mt-1 text-xs text-slate-400">
                   Take a clear selfie to instantly match your photos (99%+ Accuracy)
                 </p>
@@ -801,14 +771,14 @@ export default function GuestLiveEventPage() {
                       onClick={handleMatchPhotos}
                       className="w-full rounded-2xl bg-[#EF8619] py-3.5 text-xs font-extrabold text-black shadow-lg shadow-orange-500/20 hover:brightness-110"
                     >
-                      फोटो मॅच करा (Match My Photos)
+                      Match My Photos
                     </button>
                     <button
                       type="button"
                       onClick={() => setSelfieDataUrl(null)}
                       className="text-xs text-slate-400 hover:text-white"
                     >
-                      दुसरा सेल्फी घ्या
+                      Take Another Selfie
                     </button>
                   </div>
                 ) : (
@@ -827,7 +797,7 @@ export default function GuestLiveEventPage() {
                       className="flex items-center justify-center gap-2 rounded-2xl bg-[#0A3F61] py-3.5 text-xs font-bold text-white shadow hover:bg-[#08344f]"
                     >
                       <Camera className="h-4 w-4" />
-                      कॅमेरा सुरू करा (Take Selfie)
+                      Take Selfie (Camera)
                     </button>
 
                     <input
@@ -842,7 +812,7 @@ export default function GuestLiveEventPage() {
                       onClick={() => galleryInputRef.current?.click()}
                       className="rounded-2xl border border-white/20 bg-white/5 py-3 text-xs font-bold text-white hover:bg-white/10"
                     >
-                      गॅलरीतून फोटो निवडा (Upload from Gallery)
+                      Upload from Gallery
                     </button>
                   </div>
                 )}
@@ -906,7 +876,7 @@ export default function GuestLiveEventPage() {
                 {displayedPhotos.length === 0 ? (
                   <div className="rounded-3xl border border-white/10 bg-white/5 p-8 text-center">
                     <ImageIcon className="mx-auto h-8 w-8 text-slate-500" />
-                    <p className="mt-3 text-xs text-slate-400">या कॅटेगरीमध्ये फोटो नाहीत.</p>
+                    <p className="mt-3 text-xs text-slate-400">No photos available in this category.</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
@@ -975,50 +945,17 @@ export default function GuestLiveEventPage() {
         )}
 
         {/* =================================================================== */}
-        {/* TAB 4: CHAT */}
+        {/* TAB 4: CHAT (1-on-1 Studio & Client Desk — Bride & Groom Only) */}
         {/* =================================================================== */}
         {activeAppTab === "chat" && (
-          <div className="space-y-4 animate-in fade-in">
-            <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-[#0A3F61]/60 to-slate-900 p-5">
-              <div className="flex items-center gap-2 text-sky-400">
-                <MessageSquare className="h-5 w-5" />
-                <span className="text-xs font-bold uppercase tracking-wider">Live Event Wishes</span>
-              </div>
-              <h2 className="mt-1 text-lg font-bold text-white">Guestbook & Congratulations</h2>
-              <p className="text-xs text-slate-300">Leave warm wishes for the couple & the family!</p>
-            </div>
-
-            <form onSubmit={handleSendWish} className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  required
-                  placeholder="तुमच्या शुभेच्छा लिहा (Write your wishes)..."
-                  value={newWishMessage}
-                  onChange={(e) => setNewWishMessage(e.target.value)}
-                  className="flex-1 rounded-xl border border-white/15 bg-slate-900 px-3.5 py-2.5 text-xs text-white outline-none focus:border-sky-400"
-                />
-                <button
-                  type="submit"
-                  className="rounded-xl bg-[#0A3F61] p-2.5 text-white hover:bg-[#08344f]"
-                >
-                  <Send className="h-4 w-4" />
-                </button>
-              </div>
-            </form>
-
-            <div className="space-y-2.5">
-              {wishes.map((w) => (
-                <div key={w.id} className="rounded-2xl border border-white/10 bg-white/5 p-3.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-sky-300">{w.sender}</span>
-                    <span className="text-[10px] text-slate-500">{w.timestamp}</span>
-                  </div>
-                  <p className="mt-1.5 text-xs text-slate-200 leading-relaxed">{w.message}</p>
-                </div>
-              ))}
-            </div>
-          </div>
+          <StudioClientChat
+            studioName={studio?.brand_name || studio?.name || "PhotoOS Studio Team"}
+            studioPhone={studio?.contact_phone || undefined}
+            eventName={event?.name || "Your Wedding Event"}
+            clientName={guestName || "Bride & Groom"}
+            isBrideOrGroom={role === "bride_groom"}
+            eventId={eventId}
+          />
         )}
 
         {/* =================================================================== */}
@@ -1068,7 +1005,7 @@ export default function GuestLiveEventPage() {
               className="w-full flex items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white/5 py-3 text-xs font-bold text-white hover:bg-white/10"
             >
               <RefreshCw className="h-4 w-4" />
-              नवीन सेल्फी घ्या / पुन्हा स्कॅन करा (Rescan Face)
+              Rescan Face / Take New Selfie
             </button>
           </div>
         )}
@@ -1111,16 +1048,19 @@ export default function GuestLiveEventPage() {
             <span className="text-[9px] font-black uppercase">Scan</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveAppTab("chat")}
-            className={`flex flex-col items-center gap-1 transition ${
-              activeAppTab === "chat" ? "text-[#EF8619]" : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <MessageCircle className="h-5 w-5" />
-            <span className="text-[10px] font-bold">Chat</span>
-          </button>
+          {/* Chat (Restricted Strictly to Bride & Groom) */}
+          {role === "bride_groom" && (
+            <button
+              type="button"
+              onClick={() => setActiveAppTab("chat")}
+              className={`flex flex-col items-center gap-1 transition ${
+                activeAppTab === "chat" ? "text-[#EF8619]" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <MessageCircle className="h-5 w-5" />
+              <span className="text-[10px] font-bold">Chat</span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -1230,7 +1170,7 @@ export default function GuestLiveEventPage() {
 
             <div className="my-4 max-h-48 space-y-2 overflow-y-auto">
               {(photoCommentsMap.get(commentingPhoto.id) || []).length === 0 ? (
-                <p className="text-center py-6 text-xs text-slate-500">पहिला मेसेज किंवा कमेंट लिहा!</p>
+                <p className="text-center py-6 text-xs text-slate-500">Be the first to leave a comment or note!</p>
               ) : (
                 (photoCommentsMap.get(commentingPhoto.id) || []).map((c) => (
                   <div key={c.id} className="rounded-2xl border border-white/10 bg-white/5 p-3 text-xs">
@@ -1246,7 +1186,7 @@ export default function GuestLiveEventPage() {
                 type="text"
                 value={newCommentText}
                 onChange={(e) => setNewCommentText(e.target.value)}
-                placeholder="कमेंट किंवा रिक्वेस्ट लिहा..."
+                placeholder="Write a comment or photo edit note..."
                 className="flex-1 rounded-xl border border-white/15 bg-white/5 px-3.5 py-2.5 text-xs text-white outline-none"
               />
               <button
@@ -1274,7 +1214,7 @@ export default function GuestLiveEventPage() {
               onClick={() => setDownloadLockNotice(null)}
               className="mt-5 w-full rounded-xl bg-[#0A3F61] py-2.5 text-xs font-bold text-white"
             >
-              समजले
+              Understood
             </button>
           </div>
         </div>

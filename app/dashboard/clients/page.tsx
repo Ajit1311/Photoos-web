@@ -88,7 +88,7 @@ export default function ClientsPage() {
                     value={search}
                     onChange={(e) => {
                         setSearch(e.target.value);
-                        setPage(1); // Search केल्यावर परत पहिल्या पेजवर जाण्यासाठी
+                        setPage(1); // Reset to page 1 on search
                     }}
                     className="w-full rounded-xl border px-4 py-3"
                 />

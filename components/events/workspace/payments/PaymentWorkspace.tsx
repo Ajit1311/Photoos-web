@@ -226,8 +226,8 @@ function isAdvancePayment(payment: EventPayment) {
   return (
     type === "advance" ||
     notes.includes("advance") ||
-    notes.includes("ॲडव्हान्स") ||
-    notes.includes("adv")
+    notes.includes("adv") ||
+    notes.includes("token")
   );
 }
 
@@ -264,7 +264,7 @@ function getMethodLabel(method?: string | null) {
     case "net_banking":
       return "Net Banking";
     case "cash":
-      return "Cash (रोख)";
+      return "Cash";
     default:
       return method.charAt(0).toUpperCase() + method.slice(1);
   }
@@ -524,17 +524,12 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
       }
     });
 
-    // Match with project budget if available
     const projectBudget = projectData?.budget || 0;
     const projectAdvance = projectData?.advance_amount || 0;
 
-    // The real total quotation
     const totalQuote = projectBudget > 0 ? projectBudget : (completedSum + pendingSum || advanceSum || 0);
-
-    // The real advance paid
     const finalAdvancePaid = advanceSum > 0 ? advanceSum : (projectAdvance > 0 ? projectAdvance : completedSum);
 
-    // The real pending balance
     let finalPendingBalance = totalQuote > completedSum ? (totalQuote - completedSum) : 0;
     if (finalPendingBalance === 0 && projectData?.balance_amount && projectData.balance_amount > 0) {
       finalPendingBalance = projectData.balance_amount;
@@ -550,16 +545,12 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
     };
   }, [payments, projectData]);
 
-  // Invoice Number
   const invoiceNumber = useMemo(() => {
     const code = eventData?.code || eventId.slice(0, 8).toUpperCase();
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
     return `INV-${code}-${dateStr}`;
   }, [eventData?.code, eventId]);
 
-  // ---------------------------------------------------------------------------
-  // Create Payment Handler
-  // ---------------------------------------------------------------------------
   function openPaymentModal() {
     setForm({
       ...initialForm,
@@ -587,7 +578,7 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
 
     const amount = Number(form.amount);
     if (!Number.isFinite(amount) || amount <= 0) {
-      setError("कृपया वैध रक्कम टाका.");
+      setError("Please enter a valid payment amount.");
       return;
     }
 
@@ -630,7 +621,6 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
 
       if (insertErr) {
         console.warn("[CreatePayment] DB insert notice, trying RPC:", insertErr);
-        // Fallback to RPC
         const { createEventPayment } = await import("@/lib/api/event-payments");
         await createEventPayment({
           eventId,
@@ -644,7 +634,6 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
           metadata: { payment_type: form.paymentType },
         });
       } else if (newPayment?.id && form.transactionId) {
-        // Also insert transaction record
         await supabase.from("payment_transactions").insert({
           payment_id: newPayment.id,
           transaction_id: form.transactionId.trim(),
@@ -670,7 +659,7 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
           .eq("id", projectId);
       }
 
-      // 3. Dispatch automated receipt email via Resend if client email is available
+      // 3. Dispatch automated receipt email via Resend
       if (clientData?.email) {
         try {
           await fetch("/api/email/send", {
@@ -700,21 +689,18 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
         }
       }
 
-      toast.success("पेमेंट यशस्वीरीत्या नोंदवले गेले आहे!", { position: "top-center" });
+      toast.success("Payment recorded successfully!", { position: "top-center" });
       setIsModalOpen(false);
       setForm(initialForm);
       await loadPayments(true);
     } catch (createErr: any) {
       console.error("[CreatePayment] Error:", createErr);
-      setError(createErr.message || "पेमेंट जोडताना त्रुटी आली.");
+      setError(createErr.message || "Failed to record payment.");
     } finally {
       setSaving(false);
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Premium Invoice Generation (Popup & Print)
-  // ---------------------------------------------------------------------------
   function handleOpenInvoice() {
     setPreviewInvoiceOpen(true);
   }
@@ -737,7 +723,7 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
             </span>
           </div>
           <p className="mt-1 text-sm text-slate-500">
-            ॲडव्हान्स, शिल्लक बाकी आणि ट्रॅन्झॅक्शन ट्रॅक करा &bull; Official Dual-Branded Invoice जनरेट करा.
+            Track advance deposits, pending balance, and live transactions &bull; Generate official dual-branded invoices.
           </p>
         </div>
 
@@ -767,7 +753,7 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
             className="inline-flex items-center gap-2 rounded-xl bg-[#0A3F61] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#08344f]"
           >
             <Plus className="h-4 w-4" />
-            Add Payment (पेमेंट नोंदवा)
+            Add Payment
           </button>
         </div>
       </div>
@@ -785,7 +771,7 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
         <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Total Event Budget (एकूण बजेट)
+              Total Event Budget
             </span>
             <div className="rounded-2xl bg-blue-50 p-2.5 text-blue-600">
               <IndianRupee className="h-5 w-5" />
@@ -800,11 +786,11 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
           </div>
         </div>
 
-        {/* Card 2: Advance Paid (ॲडव्हान्स जमा) */}
+        {/* Card 2: Advance Paid */}
         <div className="relative overflow-hidden rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50/60 to-white p-5 shadow-sm transition hover:shadow-md">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-emerald-800">
-              Advance Paid (ॲडव्हान्स जमा)
+              Advance Paid
             </span>
             <div className="rounded-2xl bg-emerald-100 p-2.5 text-emerald-700">
               <CheckCircle2 className="h-5 w-5" />
@@ -816,14 +802,14 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
           <div className="mt-2 flex items-center gap-2">
             <span className="inline-block rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800">
               {summary.totalQuote > 0
-                ? `${Math.round((summary.advancePaid / summary.totalQuote) * 100)}% जमा`
+                ? `${Math.round((summary.advancePaid / summary.totalQuote) * 100)}% Settled`
                 : "Advance Settled"}
             </span>
             <span className="text-xs text-slate-500">Received advance</span>
           </div>
         </div>
 
-        {/* Card 3: Pending Balance (शिल्लक बाकी) */}
+        {/* Card 3: Pending Balance */}
         <div className={`relative overflow-hidden rounded-3xl border p-5 shadow-sm transition hover:shadow-md ${
           summary.pendingBalance > 0
             ? "border-amber-200 bg-gradient-to-br from-amber-50/70 to-white"
@@ -831,7 +817,7 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
         }`}>
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-amber-800">
-              Pending Balance (शिल्लक बाकी)
+              Pending Balance
             </span>
             <div className={`rounded-2xl p-2.5 ${summary.pendingBalance > 0 ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-500"}`}>
               <Clock className="h-5 w-5" />
@@ -842,18 +828,18 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
           </p>
           <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
             {summary.pendingBalance > 0 ? (
-              <span className="font-semibold text-amber-700">&bull; Settlement due before album delivery</span>
+              <span className="font-semibold text-amber-700">&bull; Balance settlement due before album delivery</span>
             ) : (
-              <span className="font-semibold text-emerald-600">&bull; No balance due (पूर्ण जमा)</span>
+              <span className="font-semibold text-emerald-600">&bull; No balance due (Fully Settled)</span>
             )}
           </div>
         </div>
 
-        {/* Card 4: Total Received & Transactions */}
+        {/* Card 4: Total Received */}
         <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Total Received (एकूण जमा)
+              Total Received
             </span>
             <div className="rounded-2xl bg-[#0A3F61]/10 p-2.5 text-[#0A3F61]">
               <Banknote className="h-5 w-5" />
@@ -873,10 +859,10 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
         <div className="flex flex-col gap-2 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="text-base font-bold text-slate-900">
-              Transaction History (व्यवहार तपशील)
+              Transaction History
             </h3>
             <p className="text-xs text-slate-500">
-              सर्व रेकॉर्ड केलेले ॲडव्हान्स आणि पूर्ण पेमेंट व्यवहार
+              All recorded advance deposits, installments, and settlement transactions
             </p>
           </div>
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
@@ -890,10 +876,10 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
               <CreditCard className="h-7 w-7" />
             </div>
             <h4 className="mt-4 text-base font-bold text-slate-800">
-              कोणताही पेमेंट व्यवहार नोंदवलेला नाही
+              No payment transactions recorded yet
             </h4>
             <p className="mt-1 text-sm text-slate-500">
-              या इव्हेंटसाठी पहिला ॲडव्हान्स किंवा पेमेंट व्यवहार नोंदवण्यासाठी &apos;Add Payment&apos; बटनावर क्लिक करा.
+              Click &apos;Add Payment&apos; to record the first advance or settlement transaction for this event.
             </p>
             <button
               type="button"
@@ -949,7 +935,7 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
 
                       <td className="px-6 py-4 font-mono text-xs text-slate-600">
                         {p.transaction_id || p.transaction?.transaction_id || (
-                          <span className="text-slate-400">Cash / Manual</span>
+                          <span className="text-slate-400">Cash / Direct</span>
                         )}
                       </td>
 
@@ -988,10 +974,10 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div>
                 <h3 className="text-lg font-bold text-slate-900">
-                  नवीन पेमेंट नोंदवा (Add Payment)
+                  Record New Payment
                 </h3>
                 <p className="text-xs text-slate-500">
-                  {eventData?.name || "Event"} साठी ॲडव्हान्स किंवा पेमेंट नोंदवा
+                  Record an advance deposit or settlement payment for {eventData?.name || "this event"}
                 </p>
               </div>
               <button
@@ -1008,7 +994,7 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
               {/* Payment Type Selection */}
               <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  पेमेंट प्रकार (Payment Type) *
+                  Payment Type *
                 </label>
                 <div className="mt-2 grid grid-cols-3 gap-2">
                   <button
@@ -1020,7 +1006,7 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
                         : "border-slate-200 text-slate-600 hover:bg-slate-50"
                     }`}
                   >
-                    ॲडव्हान्स (Advance)
+                    Advance
                   </button>
                   <button
                     type="button"
@@ -1031,7 +1017,7 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
                         : "border-slate-200 text-slate-600 hover:bg-slate-50"
                     }`}
                   >
-                    हप्ता (Part Pay)
+                    Installment
                   </button>
                   <button
                     type="button"
@@ -1042,7 +1028,7 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
                         : "border-slate-200 text-slate-600 hover:bg-slate-50"
                     }`}
                   >
-                    पूर्ण (Full Pay)
+                    Full Settlement
                   </button>
                 </div>
               </div>
@@ -1050,7 +1036,7 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
               {/* Amount */}
               <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  रक्कम (Amount in ₹) *
+                  Amount (₹) *
                 </label>
                 <div className="relative mt-1">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400">
@@ -1061,7 +1047,7 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
                     step="0.01"
                     min="1"
                     required
-                    placeholder="उदा. 25000"
+                    placeholder="e.g. 25000"
                     value={form.amount}
                     onChange={(e) => updateForm("amount", e.target.value)}
                     className="w-full rounded-2xl border border-slate-200 py-3 pl-9 pr-4 text-lg font-bold text-slate-900 outline-none focus:border-[#0A3F61] focus:ring-2 focus:ring-[#0A3F61]/10"
@@ -1072,7 +1058,7 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
               {/* Payment Method */}
               <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  पेमेंट पद्धत (Payment Method) *
+                  Payment Method *
                 </label>
                 <select
                   value={form.method}
@@ -1080,23 +1066,23 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
                   className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm font-medium text-slate-800 outline-none focus:border-[#0A3F61]"
                 >
                   <option value="upi">UPI / PhonePe / GPay / Paytm</option>
-                  <option value="cash">Cash (रोख रक्कम)</option>
+                  <option value="cash">Cash</option>
                   <option value="bank_transfer">Bank Transfer / NEFT / IMPS</option>
                   <option value="credit_card">Credit Card</option>
                   <option value="debit_card">Debit Card</option>
                   <option value="net_banking">Net Banking</option>
-                  <option value="cheque">Cheque (धनादेश)</option>
+                  <option value="cheque">Cheque</option>
                 </select>
               </div>
 
               {/* Transaction ID */}
               <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Transaction ID / UTR No. (पर्यायी)
+                  Transaction ID / UTR No. (Optional)
                 </label>
                 <input
                   type="text"
-                  placeholder="उदा. UPI1234567890"
+                  placeholder="e.g. UPI1234567890"
                   value={form.transactionId}
                   onChange={(e) => updateForm("transactionId", e.target.value)}
                   className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-sm text-slate-800 outline-none focus:border-[#0A3F61]"
@@ -1106,11 +1092,11 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
               {/* Notes */}
               <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  टिप्पणी (Notes / Remarks)
+                  Notes / Remarks
                 </label>
                 <input
                   type="text"
-                  placeholder="उदा. स्टेज डेकोरेशन ॲडव्हान्स किंवा बुकिंग टोकन"
+                  placeholder="e.g. Booking token or advance deposit"
                   value={form.notes}
                   onChange={(e) => updateForm("notes", e.target.value)}
                   className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-sm text-slate-800 outline-none focus:border-[#0A3F61]"
@@ -1125,7 +1111,7 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
                   disabled={saving}
                   className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
                 >
-                  रद्द करा
+                  Cancel
                 </button>
                 <button
                   type="submit"
@@ -1133,7 +1119,7 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
                   className="inline-flex items-center gap-2 rounded-xl bg-[#0A3F61] px-5 py-2.5 text-sm font-bold text-white shadow-md hover:bg-[#08344f] disabled:opacity-50"
                 >
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                  पेमेंट सेव्ह करा
+                  Save Payment
                 </button>
               </div>
             </form>
@@ -1207,7 +1193,6 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
 
               {/* 2. Studio Branding & Event Meta */}
               <div className="mt-6 grid grid-cols-2 gap-8 border-b border-slate-200 pb-6">
-                {/* Studio Information */}
                 <div>
                   <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                     ISSUED BY (STUDIO)
@@ -1238,7 +1223,6 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
                   )}
                 </div>
 
-                {/* Client & Event Meta */}
                 <div className="text-right">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                     BILLED TO (CLIENT)
@@ -1315,17 +1299,15 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
                     </span>
                   </div>
 
-                  {/* Advance Paid Line */}
                   <div className="flex justify-between border-t border-slate-200 py-2 text-xs font-semibold text-emerald-700">
-                    <span>Less: Advance Paid (ॲडव्हान्स):</span>
+                    <span>Less: Advance Paid:</span>
                     <span>
                       - {formatCurrency(summary.advancePaid, studio?.currency || "INR")}
                     </span>
                   </div>
 
-                  {/* Remaining Balance Line */}
                   <div className="flex justify-between border-t-2 border-slate-900 pt-2.5 text-sm font-extrabold text-slate-900">
-                    <span>Balance Due (शिल्लक बाकी):</span>
+                    <span>Balance Due:</span>
                     <span className={summary.pendingBalance > 0 ? "text-red-600" : "text-emerald-700"}>
                       {formatCurrency(summary.pendingBalance, studio?.currency || "INR")}
                     </span>
@@ -1342,7 +1324,7 @@ export default function PaymentWorkspace({ eventId }: PaymentWorkspaceProps) {
                 <div className="mt-2 grid grid-cols-2 gap-4 text-slate-600">
                   <div>
                     <p><strong>Studio UPI ID:</strong> {studio?.upi_id || "photoos@upi"}</p>
-                    <p><strong>Payment Mode:</strong> UPI, Bank Transfer (NEFT/IMPS), Cash</p>
+                    <p><strong>Payment Modes:</strong> UPI, Bank Transfer (NEFT/IMPS), Cash</p>
                   </div>
                   <div>
                     <p><strong>Support Email:</strong> {studio?.contact_email || "billing@photoos.in"}</p>

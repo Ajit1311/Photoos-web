@@ -3,7 +3,7 @@
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-// बाकीचे existing imports तसेच ठेव
+// Keep remaining imports intact
 
 export default function WorkspaceHeader({
   workspace,
@@ -28,7 +28,7 @@ export default function WorkspaceHeader({
           <ArrowLeft className="h-4 w-4" />
         </button>
 
-        {/* बाकीचा existing event header content */}
+        {/* Event header content */}
       </div>
     </div>
   );

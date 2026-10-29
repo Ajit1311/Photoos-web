@@ -307,7 +307,7 @@ export default function GalleryQRCodeModal({
             </button>
 
             <p className="text-center text-[11px] text-slate-400">
-              🛡️ ७ दिवसांनंतर हा QR आपोआप एक्स्पायर होईल. गरज भासल्यास तुम्ही वरून &apos;Renew&apos; करू शकता.
+              🛡️ This gallery QR code expires in 7 days for security. You can renew it anytime using the Renew button above.
             </p>
           </div>
         </div>

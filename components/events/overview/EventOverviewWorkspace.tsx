@@ -8,7 +8,7 @@ import {
   Calendar, MapPin, RefreshCw, PlusCircle, FileText, Printer, CheckCircle, MessageSquare
 } from "lucide-react";
 
-// लक्षात ठेवा: जर तुम्ही तुमचा स्वतःचा Mock Router वापरत असाल, तर वरील import हटवून जुने डमी फंक्शन्स ठेवा.
+// Router navigation hooks
 
 interface ToastState {
   show: boolean;
@@ -17,7 +17,7 @@ interface ToastState {
 }
 
 export default function EventWorkspacePage() {
-  // 1. सर्व Hooks सुरुवातीलाच ठेवा (Rules of Hooks)
+  // 1. Rules of Hooks: Place all hooks at top level
   const params = useParams();
   const router = useRouter();
   const eventId = params?.eventId as string;
@@ -84,7 +84,7 @@ export default function EventWorkspacePage() {
       showToast("Invalid event id.", "error");
       return;
     }
-    // इथे तुमची डेटा लोड करण्याची Logic (supabase calls) लिहा
+    // Data fetching logic
     setLoading(false);
   };
 
@@ -102,7 +102,7 @@ export default function EventWorkspacePage() {
     try {
       for (let i = 0; i < files.length; i++) {
         // [Upload Logic Here]
-        const insertError = false; // सिम्युलेशनसाठी
+        const insertError = false; // For simulation
         
         if (insertError) {
           console.error("Database Insert Error:", insertError);

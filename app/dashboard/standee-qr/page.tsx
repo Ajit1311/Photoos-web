@@ -553,22 +553,22 @@ export default function StandeeQRPage() {
             )}
           </div>
 
-          {/* Educational Marathi & English Explainer */}
+          {/* Educational Explainer */}
           <div className="rounded-3xl border border-blue-200 bg-blue-50/60 p-6 dark:border-blue-900/40 dark:bg-blue-950/20">
             <div className="flex items-start gap-3">
               <Info className="h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
               <div className="space-y-2 text-xs leading-relaxed text-blue-900 dark:text-blue-200">
                 <p className="font-bold text-sm">
-                  🎯 डायनॅमिक स्टँडी QR कशी काम करते? (How it works)
+                  🎯 Dynamic Standee QR — How It Works
                 </p>
                 <p>
-                  <strong>१. एकच QR कायमस्वरूपी प्रिंट करा:</strong> तुम्ही वरील स्टँडी पोस्टर एकदाच प्रिंट करून तुमच्या मेटल किंवा लाकडी स्टँडीवर लावू शकता. हा QR कधीही बदलत नाही.
+                  <strong>1. Print One Standee Forever:</strong> Print this dynamic QR poster once and place it on your physical standee at the venue or studio entrance. The physical QR never needs reprinting.
                 </p>
                 <p>
-                  <strong>२. दररोज इव्हेंट बदला:</strong> आज जर &apos;राहुल वेडींग&apos; असेल तर वरील यादीतून ते निवडून &apos;Activate Event&apos; दाबा. उद्या &apos;पूजा वाढदिवस&apos; असेल तर फक्त तो इव्हेंट निवडा. जुनी लिंक आपोआप काढली जाईल!
+                  <strong>2. Switch Events Instantly:</strong> Hosting a wedding today? Select it from the list above and click &apos;Activate Event&apos;. Hosting a birthday party tomorrow? Select that event and the link updates automatically.
                 </p>
                 <p>
-                  <strong>३. थेट मोबाईल वेब ॲक्सेस (No App Required):</strong> पाहुण्यांना ॲप डाऊनलोड करण्याची गरज नाही. QR स्कॅन करताच ते थेट ब्राउझरमध्ये येतील, सेल्फी काढून त्यांचे फोटो शोधू शकतील.
+                  <strong>3. Instant Mobile Web Access (No App Required):</strong> Guests scan the QR code to open the web portal instantly, verify access, take a selfie, and view their matched photos without downloading any app.
                 </p>
               </div>
             </div>

@@ -1,7 +1,7 @@
 import { supabase } from '../supabase/client';
 
 /**
- * १. क्लायंट गॅलरीमध्ये फोटो सिलेक्ट/अनसिलेक्ट करणे (२०० फोटो लिमिट व्हॅलिडेशनसह)
+ * 1. Toggle photo selection in client gallery)
  */
 export async function toggleGalleryPhotoFavorite(
   assetId: string, 
@@ -17,12 +17,12 @@ export async function toggleGalleryPhotoFavorite(
     return { success: false, message: error.message };
   }
 
-  // डेटाबेसमधून जो रिस्पॉन्स येईल (उदा. 'Photo marked as favorite' किंवा 'Selection limit of 200 photos reached')
+  // Database response messageon limit of 200 photos reached')
   return { success: true, message: data as string };
 }
 
 /**
- * २. AI फेस रेकग्निशनद्वारे सर्च करण्यासाठी सेल्फीचा युनिक टोकन रजिस्टर करणे
+ * 2. Register selfie vector token for AI face search
  */
 export async function registerAiDetectedFace(params: {
   galleryId: string;
@@ -42,5 +42,5 @@ export async function registerAiDetectedFace(params: {
     return null;
   }
 
-  return data as string; // रिटर्नमध्ये फेस प्रोफाइल आयडी (UUID) मिळेल
+  return data as string; // Returns face profile UUID
 }

@@ -46,7 +46,7 @@ export class UploadTransport {
         return undefined;
       }
 
-      // upload() ला आता 'signal' पास केला आहे
+      // Pass abort signal to upload
       const result = await request.upload(signal);
 
       if (this.cancelled) {
@@ -64,13 +64,13 @@ export class UploadTransport {
 
       return result;
     } catch (error) {
-      // AbortError साठी स्पेशल हँडलिंग
+      // Handle abort error
       if (error instanceof DOMException && error.name === "AbortError") {
         callbacks?.onCancelled?.();
-        return undefined; // return सोबत undefined दिला आहे जेणेकरून Promise return टाईप मॅच होईल
+        return undefined; // Match Promise return type
       }
 
-      // जनरल एरर हँडलिंग
+      // General error handling
       callbacks?.onError?.(
         error instanceof Error
           ? error

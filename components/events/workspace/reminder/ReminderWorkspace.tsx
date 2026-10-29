@@ -83,19 +83,19 @@ export default function ReminderWorkspace({ eventId }: ReminderWorkspaceProps) {
   const [reminders, setReminders] = useState<CustomReminder[]>([
     {
       id: "rem-1",
-      title: "शिल्लक बाकी पेमेंट फॉलोअप (Balance Settlement Follow-up)",
+      title: "Balance Settlement Follow-up",
       dueDate: new Date(Date.now() + 86400000 * 3).toISOString().slice(0, 10),
       priority: "high",
       completed: false,
-      notes: "अल्बम डिलिव्हरी आधी पूर्ण पेमेंट जमा करून घेणे.",
+      notes: "Collect full balance payment prior to final album delivery.",
     },
     {
       id: "rem-2",
-      title: "क्लायंट कडून सिलेक्टेड फोटो लिस्ट घेणे (Raw Photos Selection)",
+      title: "Raw Photos Selection Follow-up",
       dueDate: new Date(Date.now() + 86400000 * 7).toISOString().slice(0, 10),
       priority: "medium",
       completed: false,
-      notes: "क्लायंटने ॲक्सेस गॅलरी मधून सिलेक्ट केलेले फोटो तपासणे.",
+      notes: "Verify client photo selections from the access gallery.",
     },
   ]);
 
@@ -130,7 +130,7 @@ export default function ReminderWorkspace({ eventId }: ReminderWorkspaceProps) {
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="text-lg font-semibold text-red-900">
-              रिमाइंडर लोड करताना त्रुटी आली
+              Unable to load reminders
             </h2>
             <p className="mt-1 text-sm text-red-700">{error.message}</p>
             <button
@@ -138,7 +138,7 @@ export default function ReminderWorkspace({ eventId }: ReminderWorkspaceProps) {
               onClick={() => void refresh()}
               className="mt-4 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
             >
-              पुन्हा प्रयत्न करा
+              Retry
             </button>
           </div>
         </div>
@@ -224,15 +224,15 @@ export default function ReminderWorkspace({ eventId }: ReminderWorkspaceProps) {
         const cleanPhone = clientPhone.replace(/\D/g, "");
         const formattedPhone = cleanPhone.startsWith("91") ? cleanPhone : `91${cleanPhone}`;
         const message = encodeURIComponent(
-          `नमस्कार ${clientDisplayName},\n\n` +
-          `तुमच्या "${event.name || "Event"}" साठी शिल्लक रक्कम ₹${balanceAmount.toLocaleString("en-IN")} बाकी आहे. ` +
-          `कृपया दिलेल्या मुदतीत (${formatDate(paymentDueDate)}) ही रक्कम जमा करावी.\n\n` +
-          `धन्यवाद!\nPhotoOS Studio`
+          `Hello ${clientDisplayName},\n\n` +
+          `An outstanding balance of ₹${balanceAmount.toLocaleString("en-IN")} is pending for "${event.name || "Event"}". ` +
+          `Kindly arrange payment by ${formatDate(paymentDueDate)}.\n\n` +
+          `Thank you,\nPhotoOS Studio`
         );
         window.open(`https://wa.me/${formattedPhone}?text=${message}`, "_blank");
       }
 
-      toast.success("पेमेंट रिमाइंडर ईमेल आणि व्हॉट्सॲप मेसेज पाठवला गेला आहे!", {
+      toast.success("Payment reminder sent successfully via Email and WhatsApp!", {
         position: "top-center",
       });
 
@@ -244,7 +244,7 @@ export default function ReminderWorkspace({ eventId }: ReminderWorkspaceProps) {
       }
     } catch (err: any) {
       console.error("[ReminderWorkspace] Error sending reminder:", err);
-      toast.error("रिमाइंडर पाठवताना त्रुटी आली.");
+      toast.error("Failed to send payment reminder.");
     } finally {
       setSendingReminder(false);
     }
@@ -267,7 +267,7 @@ export default function ReminderWorkspace({ eventId }: ReminderWorkspaceProps) {
     };
 
     setReminders((prev) => [newRem, ...prev]);
-    toast.success("नवीन रिमाइंडर जोडला गेला आहे!");
+    toast.success("New reminder added successfully!");
     setIsModalOpen(false);
     setNewTitle("");
     setNewNotes("");
@@ -281,7 +281,7 @@ export default function ReminderWorkspace({ eventId }: ReminderWorkspaceProps) {
 
   function handleDeleteReminder(id: string) {
     setReminders((prev) => prev.filter((r) => r.id !== id));
-    toast.info("रिमाइंडर काढला गेला.");
+    toast.info("Reminder removed.");
   }
 
   return (
@@ -303,7 +303,7 @@ export default function ReminderWorkspace({ eventId }: ReminderWorkspaceProps) {
                 </span>
               </div>
               <p className="mt-1 text-sm text-slate-500">
-                पेमेंट ड्यु रिमाइंडर, टास्क नोटिफिकेशन्स आणि क्लायंट फॉलोअप मॅनेज करा.
+                Manage payment due reminders, task notifications, and client follow-ups.
               </p>
             </div>
           </div>
@@ -321,7 +321,7 @@ export default function ReminderWorkspace({ eventId }: ReminderWorkspaceProps) {
                 ) : (
                   <Send className="h-4 w-4" />
                 )}
-                Send Payment Reminder (रिमाइंडर पाठवा)
+                Send Payment Reminder
               </button>
             )}
 
@@ -331,7 +331,7 @@ export default function ReminderWorkspace({ eventId }: ReminderWorkspaceProps) {
               className="inline-flex items-center gap-2 rounded-xl bg-[#0A3F61] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#08344f]"
             >
               <Plus className="h-4 w-4" />
-              Add Reminder (नवीन रिमाइंडर)
+              Add Reminder
             </button>
           </div>
         </div>
@@ -347,7 +347,7 @@ export default function ReminderWorkspace({ eventId }: ReminderWorkspaceProps) {
             <div>
               <h2 className="text-lg font-bold text-slate-900">Client Details</h2>
               <p className="mt-1 text-sm text-slate-500">
-                या इव्हेंटशी संबंधित क्लायंट संपर्क
+                Associated client details for this event
               </p>
             </div>
           </div>
@@ -402,7 +402,7 @@ export default function ReminderWorkspace({ eventId }: ReminderWorkspaceProps) {
               <IndianRupee className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="font-bold text-slate-900">Amount Due (शिल्लक बाकी)</h2>
+              <h2 className="font-bold text-slate-900">Amount Due</h2>
               <p className="mt-1 text-xs text-slate-500">Outstanding balance</p>
             </div>
           </div>
@@ -435,10 +435,10 @@ export default function ReminderWorkspace({ eventId }: ReminderWorkspaceProps) {
         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
           <div>
             <h3 className="text-base font-bold text-slate-900">
-              Active Tasks & Reminders (सक्रिय रिमाइंडर्स)
+              Active Tasks & Reminders
             </h3>
             <p className="text-xs text-slate-500">
-              या इव्हेंटसाठी सेट केलेले महत्त्वाचे टास्क आणि क्लायंट फॉलोअप
+              Key milestones, deadlines, and client follow-up tasks
             </p>
           </div>
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
@@ -519,7 +519,7 @@ export default function ReminderWorkspace({ eventId }: ReminderWorkspaceProps) {
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl sm:p-8">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <h3 className="text-lg font-bold text-slate-900">
-                नवीन रिमाइंडर जोडा (Add Reminder)
+                Add New Reminder
               </h3>
               <button
                 type="button"
@@ -533,12 +533,12 @@ export default function ReminderWorkspace({ eventId }: ReminderWorkspaceProps) {
             <form onSubmit={handleAddReminder} className="mt-5 space-y-4">
               <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  रिमाइंडर शीर्षक (Title) *
+                  Reminder Title *
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="उदा. फायनल पेमेंट कलेक्शन किंवा अल्बम डिलिव्हरी"
+                  placeholder="e.g. Final payment collection or album delivery"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-sm text-slate-800 outline-none focus:border-[#0A3F61]"
@@ -547,7 +547,7 @@ export default function ReminderWorkspace({ eventId }: ReminderWorkspaceProps) {
 
               <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  मुदत तारीख (Due Date) *
+                  Due Date *
                 </label>
                 <input
                   type="date"
@@ -560,7 +560,7 @@ export default function ReminderWorkspace({ eventId }: ReminderWorkspaceProps) {
 
               <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  प्राधान्य (Priority)
+                  Priority
                 </label>
                 <select
                   value={newPriority}
@@ -569,19 +569,19 @@ export default function ReminderWorkspace({ eventId }: ReminderWorkspaceProps) {
                   }
                   className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-sm font-medium text-slate-800 outline-none focus:border-[#0A3F61]"
                 >
-                  <option value="high">High Priority (उच्च)</option>
-                  <option value="medium">Medium Priority (मध्यम)</option>
-                  <option value="low">Low Priority (कमी)</option>
+                  <option value="high">High Priority</option>
+                  <option value="medium">Medium Priority</option>
+                  <option value="low">Low Priority</option>
                 </select>
               </div>
 
               <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  टिप्पणी (Notes)
+                  Notes
                 </label>
                 <input
                   type="text"
-                  placeholder="अतिरिक्त माहिती"
+                  placeholder="Additional details or instructions"
                   value={newNotes}
                   onChange={(e) => setNewNotes(e.target.value)}
                   className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-sm text-slate-800 outline-none focus:border-[#0A3F61]"
@@ -594,13 +594,13 @@ export default function ReminderWorkspace({ eventId }: ReminderWorkspaceProps) {
                   onClick={() => setIsModalOpen(false)}
                   className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
                 >
-                  रद्द करा
+                  Cancel
                 </button>
                 <button
                   type="submit"
                   className="rounded-xl bg-[#0A3F61] px-5 py-2 text-sm font-bold text-white shadow-sm hover:bg-[#08344f]"
                 >
-                  सेव्ह करा
+                  Save Reminder
                 </button>
               </div>
             </form>

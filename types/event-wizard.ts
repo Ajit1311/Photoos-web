@@ -9,7 +9,7 @@ export interface EventWizardData {
   // ===========================================================================
   // Basic Details
   // ===========================================================================
-  projectId: string; // <-- नवीन field add केले
+  projectId: string; // Associated project ID
   title: string;
   eventType: string;
   eventDate: string;
@@ -68,7 +68,7 @@ export interface EventWizardData {
 }
 
 export const defaultEventWizardData: EventWizardData = {
-  projectId: "", // <-- Default value set केली
+  projectId: "", // Default value
   title: "",
   eventType: "Wedding",
   eventDate: "",

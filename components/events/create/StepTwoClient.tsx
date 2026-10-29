@@ -21,7 +21,7 @@ export default function StepTwoClient() {
         Link an existing client or create a new client for this event.
       </p>
 
-      {/* मूळ फॉर्म विभाग */}
+      {/* Form section */}
       <div className="mt-8 grid gap-6 md:grid-cols-2">
         <div>
           <label className="mb-2 block text-sm font-medium">Client Type</label>

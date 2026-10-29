@@ -3,7 +3,7 @@
 interface GalleryBulkActionsProps {
     selectedCount: number;
     totalCount: number;
-    failedCount: number; // नवीन प्रोप इथे ऍड केला आहे
+    failedCount: number; // Added failedCount prop
     onSelectAll: () => void;
     onInvertSelection: () => void;
     onClearSelection: () => void;
@@ -15,7 +15,7 @@ interface GalleryBulkActionsProps {
 export default function GalleryBulkActions({
     selectedCount,
     totalCount,
-    failedCount, // इथे डीस्ट्रक्चर केला
+    failedCount, // Destructured prop
     onSelectAll,
     onInvertSelection,
     onClearSelection,
@@ -61,7 +61,7 @@ export default function GalleryBulkActions({
                     Download
                 </button>
 
-                {/* फक्त Retry बटण सिलेक्टेड काउंट ० असताना किंवा फेल्ड काउंट ० असताना डिसेबल होईल */}
+                {/* Retry button disabled if selection is 0 or failed count is 0 */}
                 <button
                     type="button"
                     onClick={onRetry}

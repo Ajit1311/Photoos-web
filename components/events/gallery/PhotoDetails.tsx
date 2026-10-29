@@ -1,6 +1,6 @@
 "use client";
 
-// १. Next.js ची Image component इथे योग्य प्रकारे इम्पोर्ट केली आहे
+// Next.js Image component import
 import NextImage from "next/image";
 
 import {
@@ -52,7 +52,7 @@ export default function PhotoDetails() {
         {/* Preview */}
 
         <div className="relative aspect-square overflow-hidden rounded-2xl bg-slate-100">
-          {/* जुना NextImage टॅग काढून हा साधा img टॅग टाका */}
+          {/* Standard image tag */}
 <img
   src="https://picsum.photos/700"
   alt="Photo preview"

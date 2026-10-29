@@ -20,7 +20,7 @@ export default function ProjectsPage() {
 
   const debouncedSearch = useDebounce(search, 500);
 
-  // Search बदल्ल्यावर Page 1 वर रिसेट करण्यासाठी
+  // Reset to page 1 on search filter change
   useEffect(() => {
     setPage(1);
   }, [debouncedSearch]);

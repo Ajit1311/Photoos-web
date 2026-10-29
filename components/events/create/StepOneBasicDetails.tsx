@@ -6,7 +6,7 @@ import { useEventWizard } from "@/context/EventWizardContext";
 import { useProjects } from "@/hooks/useProjects";
 
 export default function StepOneBasicDetails() {
-  // Component च्या स्टार्टिंगला context डेटा आणि setField मेथड ॲड केली आहे
+  // Context state and updater
   const { data, setField } = useEventWizard();
 
   const {

@@ -8,7 +8,7 @@ interface PhotoCardProps {
   selected: boolean;
   faces: number;
   label: "Blue" | "Green" | "Yellow" | "Purple" | "Red";
-  onToggleFavorite: (id: string) => void; // पॅरेंटकडून येणारे फंक्शन
+  onToggleFavorite: (id: string) => void; // Parent callback
 }
 
 export default function PhotoCard({
