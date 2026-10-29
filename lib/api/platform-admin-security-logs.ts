@@ -1,7 +1,6 @@
 import { getPlatformAdminSessionToken } from "@/lib/api/platform-admin-auth";
 
-const EDGE_FUNCTION_URL =
-  `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/platform-admin-security-logs`;
+const EDGE_FUNCTION_URL = "/api/platform-admin/platform-admin-security-logs";
 
 export type SecurityLog = {
   id: string;

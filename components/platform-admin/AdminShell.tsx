@@ -105,39 +105,9 @@ const navSections: NavSection[] = [
         icon: Smartphone,
       },
       {
-        label: "Registered Users",
-        href: "/admin/app-analytics/registered-users",
-        icon: Users,
-      },
-      {
-        label: "Sign-ups",
-        href: "/admin/app-analytics/signups",
-        icon: UserCog,
-      },
-      {
-        label: "Active Users",
-        href: "/admin/app-analytics/active-users",
-        icon: Activity,
-      },
-      {
         label: "Bookings",
         href: "/admin/app-analytics/bookings",
         icon: CalendarCheck2,
-      },
-      {
-        label: "App Installs",
-        href: "/admin/app-analytics/installs",
-        icon: Download,
-      },
-      {
-        label: "Uninstalls",
-        href: "/admin/app-analytics/uninstalls",
-        icon: Smartphone,
-      },
-      {
-        label: "QR Installs",
-        href: "/admin/app-analytics/qr-installs",
-        icon: QrCode,
       },
     ],
   },
@@ -225,48 +195,8 @@ const navSections: NavSection[] = [
             icon: BarChart3,
           },
           {
-            label: "Purchase / Expenses",
-            href: "/admin/accounting/expenses",
-            icon: CreditCard,
-          },
-          {
-            label: "Income Ledger",
-            href: "/admin/accounting/income-ledger",
-            icon: FileText,
-          },
-          {
-            label: "Expense Ledger",
-            href: "/admin/accounting/expense-ledger",
-            icon: FileText,
-          },
-          {
             label: "Invoices",
             href: "/admin/accounting/invoices",
-            icon: FileText,
-          },
-          {
-            label: "Receivables",
-            href: "/admin/accounting/receivables",
-            icon: CircleDollarSign,
-          },
-          {
-            label: "Payables",
-            href: "/admin/accounting/payables",
-            icon: CircleDollarSign,
-          },
-          {
-            label: "Reconciliation",
-            href: "/admin/accounting/reconciliation",
-            icon: Activity,
-          },
-          {
-            label: "Credit Notes",
-            href: "/admin/accounting/credit-notes",
-            icon: FileText,
-          },
-          {
-            label: "Debit Notes",
-            href: "/admin/accounting/debit-notes",
             icon: FileText,
           },
           {
@@ -275,19 +205,9 @@ const navSections: NavSection[] = [
             icon: Globe2,
           },
           {
-            label: "TDS",
-            href: "/admin/accounting/tds",
-            icon: ShieldCheck,
-          },
-          {
             label: "Financial Reports",
             href: "/admin/accounting/reports",
             icon: BarChart3,
-          },
-          {
-            label: "CA / ITR Export",
-            href: "/admin/accounting/ca-itr-export",
-            icon: FileText,
           },
         ],
       },
@@ -357,54 +277,9 @@ const navSections: NavSection[] = [
         icon: Star,
       },
       {
-        label: "Paid Listings",
-        href: "/admin/marketplace/paid",
-        icon: CircleDollarSign,
-      },
-      {
-        label: "Free / Trial Listings",
-        href: "/admin/marketplace/free",
-        icon: BadgeCheck,
-      },
-      {
-        label: "Expired Listings",
-        href: "/admin/marketplace/expired",
-        icon: XCircle,
-      },
-      {
-        label: "Categories",
-        href: "/admin/marketplace/categories",
-        icon: FileText,
-      },
-      {
-        label: "Locations",
-        href: "/admin/marketplace/locations",
-        icon: MapPin,
-      },
-      {
         label: "Leads / Enquiries",
         href: "/admin/marketplace/leads",
         icon: Users,
-      },
-      {
-        label: "Reviews",
-        href: "/admin/marketplace/reviews",
-        icon: Star,
-      },
-      {
-        label: "Packages",
-        href: "/admin/marketplace/packages",
-        icon: Boxes,
-      },
-      {
-        label: "Portfolio",
-        href: "/admin/marketplace/portfolio",
-        icon: ImageIcon,
-      },
-      {
-        label: "Featured / Promotions",
-        href: "/admin/marketplace/promotions",
-        icon: Megaphone,
       },
       {
         label: "Marketplace Analytics",
@@ -475,11 +350,6 @@ const navSections: NavSection[] = [
       {
         label: "Customer Issues",
         href: "/admin/support/issues",
-        icon: MessageSquare,
-      },
-      {
-        label: "Chatbot Enquiries",
-        href: "/admin/support/chatbot-enquiries",
         icon: MessageSquare,
       },
     ],

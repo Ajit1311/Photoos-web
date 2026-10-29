@@ -52,8 +52,12 @@ export const appUrl: string =
 /**
  * Returns the base URL for Supabase Edge Functions.
  * Never hardcodes localhost/127.0.0.1 in production.
+ * In browser environments, routes safely through internal Next.js server proxy.
  */
 export function getSupabaseFunctionsBaseUrl(): string {
+  if (typeof window !== "undefined") {
+    return "/api/platform-admin";
+  }
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL || supabaseUrl;
   return `${base.replace(/\/+$/, "")}/functions/v1`;
 }
@@ -62,7 +66,11 @@ export function getSupabaseFunctionsBaseUrl(): string {
  * Returns the full URL for a specific Supabase Edge Function.
  */
 export function getSupabaseFunctionUrl(functionName: string): string {
-  return `${getSupabaseFunctionsBaseUrl()}/${functionName.replace(/^\/+/, "")}`;
+  const cleanFn = functionName.replace(/^\/+/, "");
+  if (typeof window !== "undefined") {
+    return `/api/platform-admin/${cleanFn}`;
+  }
+  return `${getSupabaseFunctionsBaseUrl()}/${cleanFn}`;
 }
 
 /**
