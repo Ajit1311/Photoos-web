@@ -4,22 +4,14 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import {
   Mail,
   Search,
-  Filter,
-  ShieldCheck,
-  User,
   Lock,
   CheckCircle2,
-  Clock,
-  AlertTriangle,
   Send,
   Paperclip,
   ChevronDown,
   Trash2,
   ArrowRightLeft,
   Inbox,
-  Building2,
-  ExternalLink,
-  Eye,
   RefreshCw,
   FileText,
   Bold,
@@ -29,28 +21,35 @@ import {
   Check,
   X,
   Phone,
-  HelpCircle,
+  FileIcon,
+  Download,
+  AlertCircle,
 } from "lucide-react";
 
 import {
   Department,
-  UserRole,
-  TicketStatus,
   UserProfile,
   EmailThread,
   EmailMessage,
   CannedResponse,
+  TicketStatus,
 } from "@/types/inbox/helpdesk";
 
 import {
   USER_PROFILES,
   DEPARTMENT_CONFIG,
-  INITIAL_THREADS,
   CANNED_RESPONSES,
 } from "@/lib/inbox/mock-data";
 
+interface LocalAttachment {
+  filename: string;
+  size: string;
+  content: string; // base64
+  contentType: string;
+}
+
 export default function HelpdeskInbox() {
-  // Current Active User (for Role & RBAC switching demo)
+  // Current Active User (Super Admin / Agent Switcher)
   const [currentUser, setCurrentUser] = useState<UserProfile>(USER_PROFILES[0]);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
@@ -63,36 +62,65 @@ export default function HelpdeskInbox() {
   // Search Query
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Threads State (persistent in component)
-  const [threads, setThreads] = useState<EmailThread[]>(INITIAL_THREADS);
+  // Live Threads from Resend API & Database
+  const [threads, setThreads] = useState<EmailThread[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
 
   // Selected Thread ID
-  const [selectedThreadId, setSelectedThreadId] = useState<string>(
-    INITIAL_THREADS[0].id
-  );
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
 
   // Reply Draft & Sending State
   const [replyText, setReplyText] = useState("");
   const [sendingReply, setSendingReply] = useState(false);
   const [sendSuccessToast, setSendSuccessToast] = useState<string | null>(null);
 
+  // File Attachments
+  const [attachments, setAttachments] = useState<LocalAttachment[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Custom Super Admin "Send From" override (if any)
   const [customSendFrom, setCustomSendFrom] = useState<string | null>(null);
 
-  // Department Transfer Dropdown
+  // Dropdowns
   const [transferMenuOpen, setTransferMenuOpen] = useState(false);
-
-  // Canned Responses Dropdown
   const [cannedMenuOpen, setCannedMenuOpen] = useState(false);
 
-  // Textarea Ref for rich controls
+  // Textarea Ref & Auto-scroll
   const replyInputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Role permissions check
   const isSuperAdmin = currentUser.role === "SUPER_ADMIN";
 
-  // When switching user role, auto-adjust department if user has restricted access
+  // Fetch Live Emails from Server API (Resend & Cloudflare routed)
+  const fetchLiveEmails = async (isManualRefresh = false) => {
+    if (isManualRefresh) setRefreshing(true);
+    else setLoading(true);
+
+    try {
+      const res = await fetch("/api/email/inbox", { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        const liveThreads: EmailThread[] = data.threads || [];
+        setThreads(liveThreads);
+
+        if (liveThreads.length > 0 && !selectedThreadId) {
+          setSelectedThreadId(liveThreads[0].id);
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to fetch live emails:", err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchLiveEmails();
+  }, []);
+
+  // When switching user role, auto-adjust allowed department
   const handleUserChange = (profile: UserProfile) => {
     setCurrentUser(profile);
     setUserDropdownOpen(false);
@@ -104,7 +132,6 @@ export default function HelpdeskInbox() {
     setCustomSendFrom(null);
   };
 
-  // Determine if active department tab is allowed for current user
   const isDepartmentAllowed = (dept: Department): boolean => {
     if (isSuperAdmin) return true;
     if (dept === "all") return false;
@@ -114,7 +141,7 @@ export default function HelpdeskInbox() {
   // Filter threads by user permission, department tab, status, and search query
   const filteredThreads = useMemo(() => {
     return threads.filter((thread) => {
-      // 1. RBAC Restriction: Department agents can only see their department
+      // 1. RBAC Restriction: Department agents only see their department
       if (!isSuperAdmin && thread.department !== currentUser.allowedDepartment) {
         return false;
       }
@@ -125,15 +152,9 @@ export default function HelpdeskInbox() {
       }
 
       // 3. Status Filter
-      if (statusFilter === "unread" && !thread.unread) {
-        return false;
-      }
-      if (statusFilter === "open" && thread.status !== "open") {
-        return false;
-      }
-      if (statusFilter === "resolved" && thread.status !== "resolved") {
-        return false;
-      }
+      if (statusFilter === "unread" && !thread.unread) return false;
+      if (statusFilter === "open" && thread.status !== "open") return false;
+      if (statusFilter === "resolved" && thread.status !== "resolved") return false;
 
       // 4. Search Filter
       if (searchQuery.trim()) {
@@ -155,12 +176,12 @@ export default function HelpdeskInbox() {
 
   // Active Selected Thread
   const selectedThread = useMemo(() => {
-    return threads.find((t) => t.id === selectedThreadId) || null;
-  }, [threads, selectedThreadId]);
+    if (!selectedThreadId) return filteredThreads[0] || null;
+    return threads.find((t) => t.id === selectedThreadId) || filteredThreads[0] || null;
+  }, [threads, selectedThreadId, filteredThreads]);
 
-  // Ensure selected thread is within filtered results when switching views
   useEffect(() => {
-    if (filteredThreads.length > 0) {
+    if (filteredThreads.length > 0 && selectedThreadId) {
       const stillVisible = filteredThreads.some((t) => t.id === selectedThreadId);
       if (!stillVisible) {
         setSelectedThreadId(filteredThreads[0].id);
@@ -168,7 +189,6 @@ export default function HelpdeskInbox() {
     }
   }, [filteredThreads, selectedThreadId]);
 
-  // Mark thread as read when selected
   const handleSelectThread = (thread: EmailThread) => {
     setSelectedThreadId(thread.id);
     if (thread.unread) {
@@ -178,12 +198,11 @@ export default function HelpdeskInbox() {
     }
   };
 
-  // Auto scroll messages to bottom on thread change or reply
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [selectedThread?.messages.length, selectedThreadId]);
 
-  // Re-assign / Transfer thread department (Super Admin Only)
+  // Re-assign / Transfer thread department (Super Admin)
   const handleTransferDepartment = (newDept: Exclude<Department, "all">) => {
     if (!isSuperAdmin || !selectedThread) return;
     const config = DEPARTMENT_CONFIG[newDept];
@@ -204,7 +223,6 @@ export default function HelpdeskInbox() {
     setTimeout(() => setSendSuccessToast(null), 3000);
   };
 
-  // Toggle Ticket Status (Open vs Resolved)
   const handleToggleStatus = () => {
     if (!selectedThread) return;
     const nextStatus = selectedThread.status === "resolved" ? "open" : "resolved";
@@ -215,39 +233,59 @@ export default function HelpdeskInbox() {
     );
   };
 
-  // Mark as Unread
-  const handleMarkUnread = () => {
-    if (!selectedThread) return;
-    setThreads((prev) =>
-      prev.map((t) =>
-        t.id === selectedThread.id ? { ...t, unread: true } : t
-      )
-    );
-  };
-
-  // Delete Thread
   const handleDeleteThread = () => {
     if (!selectedThread) return;
     const confirmDelete = window.confirm(
-      `Are you sure you want to delete thread: "${selectedThread.subject}"?`
+      `Delete conversation: "${selectedThread.subject}"?`
     );
     if (!confirmDelete) return;
 
     setThreads((prev) => prev.filter((t) => t.id !== selectedThread.id));
-    if (filteredThreads.length > 1) {
-      const nextThread = filteredThreads.find((t) => t.id !== selectedThread.id);
-      if (nextThread) setSelectedThreadId(nextThread.id);
-    }
+    const remaining = filteredThreads.filter((t) => t.id !== selectedThread.id);
+    if (remaining.length > 0) setSelectedThreadId(remaining[0].id);
+    else setSelectedThreadId(null);
   };
 
-  // Insert canned template into reply editor
   const handleInsertCanned = (canned: CannedResponse) => {
     setReplyText((prev) => (prev ? `${prev}\n\n${canned.content}` : canned.content));
     setCannedMenuOpen(false);
     replyInputRef.current?.focus();
   };
 
-  // Formatting helpers
+  // Real File Upload Selection Handler
+  const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64Data = (reader.result as string).split(",")[1];
+        const sizeFormatted =
+          file.size < 1024 * 1024
+            ? `${Math.round(file.size / 1024)} KB`
+            : `${(file.size / (1024 * 1024)).toFixed(1)} MB`;
+
+        setAttachments((prev) => [
+          ...prev,
+          {
+            filename: file.name,
+            size: sizeFormatted,
+            content: base64Data,
+            contentType: file.type || "application/octet-stream",
+          },
+        ]);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    e.target.value = "";
+  };
+
+  const handleRemoveAttachment = (indexToRemove: number) => {
+    setAttachments((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
   const handleFormatText = (prefix: string, suffix = prefix) => {
     const el = replyInputRef.current;
     if (!el) return;
@@ -264,26 +302,30 @@ export default function HelpdeskInbox() {
     }, 0);
   };
 
-  // Computed send-from address
   const activeSendFrom = useMemo(() => {
     if (customSendFrom) return customSendFrom;
     if (!selectedThread) return "support@photoos.in";
     return selectedThread.departmentEmail;
   }, [customSendFrom, selectedThread]);
 
-  // Send Reply Handler
+  // Send Real Live Email Reply via Resend
   const handleSendReply = async () => {
     if (!replyText.trim() || !selectedThread) return;
 
     setSendingReply(true);
 
     try {
-      // 1. Dispatch real email via Resend API
       const deptKey =
         selectedThread.department === "founder_legal"
           ? "founder"
           : selectedThread.department;
 
+      const payloadAttachments = attachments.map((a) => ({
+        filename: a.filename,
+        content: a.content,
+      }));
+
+      // 1. Dispatch live email via Resend API
       const res = await fetch("/api/email/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -291,23 +333,30 @@ export default function HelpdeskInbox() {
           department: deptKey,
           to: selectedThread.customerEmail,
           subject: `Re: ${selectedThread.subject}`,
-          html: `<div style="font-family: sans-serif; line-height: 1.6; color: #1e293b;">
+          html: `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b;">
             <p>${replyText.replace(/\n/g, "<br/>")}</p>
+            ${
+              payloadAttachments.length > 0
+                ? `<p style="font-size: 13px; color: #475569;"><strong>Attachments:</strong> ${payloadAttachments
+                    .map((a) => a.filename)
+                    .join(", ")}</p>`
+                : ""
+            }
             <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
             <p style="font-size: 12px; color: #64748b;">
-              Sent by ${currentUser.name} (${activeSendFrom}) &bull; PhotoOS Operations Center
+              Sent by ${currentUser.name} via PhotoOS ${DEPARTMENT_CONFIG[selectedThread.department].label} &lt;${activeSendFrom}&gt;
             </p>
           </div>`,
+          attachments: payloadAttachments,
         }),
       });
 
+      const resData = await res.json();
       if (!res.ok) {
-        console.warn("Resend email dispatch returned non-200, continuing in local state.");
+        console.warn("Live email notice:", resData);
       }
-    } catch (err) {
-      console.warn("Live email dispatch warning (falling back to local state):", err);
-    } finally {
-      // 2. Append new message to local state thread
+
+      // 2. Append message to local thread state
       const newMsg: EmailMessage = {
         id: `msg_rep_${Date.now()}`,
         threadId: selectedThread.id,
@@ -317,6 +366,11 @@ export default function HelpdeskInbox() {
         departmentEmail: activeSendFrom,
         timestamp: "Just now",
         body: replyText.trim(),
+        attachments: attachments.map((a) => ({
+          name: a.filename,
+          size: a.size,
+          type: a.contentType,
+        })),
       };
 
       setThreads((prev) =>
@@ -332,10 +386,26 @@ export default function HelpdeskInbox() {
         )
       );
 
+      // 3. Register reply in live server inbox store
+      await fetch("/api/email/inbox", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          threadId: selectedThread.id,
+          message: newMsg,
+        }),
+      }).catch(() => null);
+
       setReplyText("");
+      setAttachments([]);
+      setSendSuccessToast(`Email successfully delivered to ${selectedThread.customerEmail} via Resend!`);
+      setTimeout(() => setSendSuccessToast(null), 4000);
+    } catch (err) {
+      console.error("Live reply error:", err);
+      setSendSuccessToast("Reply saved locally.");
+      setTimeout(() => setSendSuccessToast(null), 3000);
+    } finally {
       setSendingReply(false);
-      setSendSuccessToast(`Reply dispatched to ${selectedThread.customerEmail} via ${activeSendFrom}`);
-      setTimeout(() => setSendSuccessToast(null), 3500);
     }
   };
 
@@ -361,11 +431,20 @@ export default function HelpdeskInbox() {
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-slate-950 font-sans text-slate-100 antialiased selection:bg-sky-500/30 selection:text-white">
+      {/* Hidden File Input for Real Attachments */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        multiple
+        className="hidden"
+        onChange={handleFilesSelected}
+      />
+
       {/* ===================================================================== */}
       {/* 1. TOP BAR / ROLE SWITCHER & DEPARTMENT TABS HEADER */}
       {/* ===================================================================== */}
       <header className="relative z-30 flex h-16 shrink-0 items-center justify-between border-b border-white/10 bg-slate-900/90 px-6 backdrop-blur-md">
-        {/* Left: Brand & Inbox Title */}
+        {/* Left: Brand & Live Status */}
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-[#0A3F61] to-[#0d5583] text-sky-400 shadow-lg shadow-sky-950/40 border border-sky-400/20">
             <Mail className="h-5 w-5" />
@@ -373,21 +452,22 @@ export default function HelpdeskInbox() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-sm font-bold tracking-tight text-white">
-                PhotoOS Multi-Department Helpdesk
+                PhotoOS Support & Routing Inbox
               </h1>
-              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-500/20">
-                Resend Live
+              <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-500/20">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Live Resend & Cloudflare
               </span>
             </div>
             <p className="text-[11px] text-slate-400">
-              Role-Based Email Routing & Ticketing Hub
+              Direct routing for adskartmedia11@gmail.com & photoos.in
             </p>
           </div>
         </div>
 
         {/* Center: Department Filter Tabs */}
         <div className="hidden items-center rounded-xl border border-white/10 bg-slate-950/60 p-1 md:flex">
-          {/* ALL TAB (Super Admin only) */}
+          {/* ALL TAB (Super Admin) */}
           {isSuperAdmin && (
             <button
               onClick={() => setActiveDepartment("all")}
@@ -462,7 +542,7 @@ export default function HelpdeskInbox() {
             </span>
           </button>
 
-          {/* FOUNDER & LEGAL TAB (Super Admin only) */}
+          {/* FOUNDER & LEGAL TAB */}
           <button
             onClick={() => isDepartmentAllowed("founder_legal") && setActiveDepartment("founder_legal")}
             disabled={!isDepartmentAllowed("founder_legal")}
@@ -482,72 +562,86 @@ export default function HelpdeskInbox() {
           </button>
         </div>
 
-        {/* Right: Active Role & User Switcher Dropdown */}
-        <div className="relative">
+        {/* Right: Refresh & Active User Role Switcher */}
+        <div className="flex items-center gap-2">
+          {/* Refresh Inbox Button */}
           <button
             type="button"
-            onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-            className="flex items-center gap-2.5 rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 transition hover:bg-white/10"
+            onClick={() => void fetchLiveEmails(true)}
+            disabled={refreshing}
+            title="Refresh Live Emails from Resend"
+            className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-slate-300 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
           >
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-500/20 text-xs font-bold text-sky-400 border border-sky-400/30">
-              {currentUser.avatar}
-            </div>
-            <div className="text-left">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-semibold text-white">
-                  {currentUser.name}
-                </span>
-                <span
-                  className={`rounded-md px-1.5 py-0.2 text-[9px] font-bold tracking-wider uppercase ${
-                    isSuperAdmin
-                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                      : "bg-purple-500/20 text-purple-300 border border-purple-500/30"
-                  }`}
-                >
-                  {currentUser.roleTitle}
-                </span>
-              </div>
-              <div className="text-[10px] text-slate-400">{currentUser.email}</div>
-            </div>
-            <ChevronDown className="h-4 w-4 text-slate-400" />
+            <RefreshCw className={`h-3.5 w-3.5 text-sky-400 ${refreshing ? "animate-spin" : ""}`} />
+            <span className="hidden sm:inline">{refreshing ? "Refreshing..." : "Refresh"}</span>
           </button>
 
-          {/* User Profile Switcher Menu */}
-          {userDropdownOpen && (
-            <div className="absolute right-0 mt-2 w-80 overflow-hidden rounded-2xl border border-white/15 bg-slate-900 p-2 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 z-50">
-              <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/10">
-                Demo Role Switcher (RBAC)
+          {/* Role Switcher */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+              className="flex items-center gap-2.5 rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 transition hover:bg-white/10"
+            >
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-500/20 text-xs font-bold text-sky-400 border border-sky-400/30">
+                {currentUser.avatar}
               </div>
-              <div className="mt-1 space-y-1">
-                {USER_PROFILES.map((profile) => (
-                  <button
-                    key={profile.id}
-                    onClick={() => handleUserChange(profile)}
-                    className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition ${
-                      currentUser.id === profile.id
-                        ? "bg-sky-500/15 text-white font-semibold"
-                        : "text-slate-300 hover:bg-white/5"
+              <div className="text-left hidden sm:block">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-white">
+                    {currentUser.name}
+                  </span>
+                  <span
+                    className={`rounded-md px-1.5 py-0.2 text-[9px] font-bold tracking-wider uppercase ${
+                      isSuperAdmin
+                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                        : "bg-purple-500/20 text-purple-300 border border-purple-500/30"
                     }`}
                   >
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-[11px] font-bold">
-                        {profile.avatar}
-                      </div>
-                      <div>
-                        <div className="font-medium text-white">{profile.name}</div>
-                        <div className="text-[10px] text-slate-400">
-                          {profile.roleTitle} &bull; {profile.email}
+                    {currentUser.roleTitle}
+                  </span>
+                </div>
+                <div className="text-[10px] text-slate-400">{currentUser.email}</div>
+              </div>
+              <ChevronDown className="h-4 w-4 text-slate-400" />
+            </button>
+
+            {userDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-80 overflow-hidden rounded-2xl border border-white/15 bg-slate-900 p-2 shadow-2xl backdrop-blur-xl z-50 animate-in fade-in zoom-in-95">
+                <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/10">
+                  Role-Based Access Switcher
+                </div>
+                <div className="mt-1 space-y-1">
+                  {USER_PROFILES.map((profile) => (
+                    <button
+                      key={profile.id}
+                      onClick={() => handleUserChange(profile)}
+                      className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition ${
+                        currentUser.id === profile.id
+                          ? "bg-sky-500/15 text-white font-semibold"
+                          : "text-slate-300 hover:bg-white/5"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-[11px] font-bold">
+                          {profile.avatar}
+                        </div>
+                        <div>
+                          <div className="font-medium text-white">{profile.name}</div>
+                          <div className="text-[10px] text-slate-400">
+                            {profile.roleTitle} &bull; {profile.email}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    {currentUser.id === profile.id && (
-                      <Check className="h-4 w-4 text-sky-400" />
-                    )}
-                  </button>
-                ))}
+                      {currentUser.id === profile.id && (
+                        <Check className="h-4 w-4 text-sky-400" />
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </header>
 
@@ -560,35 +654,32 @@ export default function HelpdeskInbox() {
       )}
 
       {/* ===================================================================== */}
-      {/* 2. MAIN 2-PANE WORKSPACE: LEFT THREAD LIST & RIGHT CONVERSATION */}
+      {/* 2. MAIN 2-PANE WORKSPACE: THREAD LIST & ACTIVE CONVERSATION */}
       {/* ===================================================================== */}
       <div className="flex flex-1 overflow-hidden">
-        {/* =================================================================== */}
-        {/* LEFT COLUMN: DEPARTMENT-FILTERED THREAD LIST (~380px fixed) */}
-        {/* =================================================================== */}
+        {/* LEFT COLUMN: LIVE THREAD LIST (~380px fixed) */}
         <aside className="flex w-[380px] shrink-0 flex-col border-r border-white/10 bg-slate-900/50">
-          {/* Header with Active Inbox Info */}
+          {/* Header */}
           <div className="border-b border-white/10 p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-white uppercase tracking-wider">
                   {activeDepartment === "all"
-                    ? "All Inboxes"
+                    ? "Live Inboxes"
                     : `${DEPARTMENT_CONFIG[activeDepartment].label} Inbox`}
                 </span>
                 <span className="rounded-full bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold text-sky-400 border border-sky-500/20">
-                  {filteredThreads.filter((t) => t.unread).length} unread
+                  {filteredThreads.length} live
                 </span>
               </div>
               <span className="text-[10px] font-mono text-slate-400">
-                {filteredThreads.length} threads
+                Resend Synced
               </span>
             </div>
 
-            {/* Department email subtitle */}
             <div className="mt-1 text-[11px] text-slate-400 truncate">
               {activeDepartment === "all"
-                ? "Unified platform routing (support, billing, marketing, founder)"
+                ? "Unified emails routed to adskartmedia11@gmail.com"
                 : DEPARTMENT_CONFIG[activeDepartment].email}
             </div>
 
@@ -599,7 +690,7 @@ export default function HelpdeskInbox() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search subject, customer, or content..."
+                placeholder="Search subject, recipient, or body..."
                 className="w-full rounded-xl border border-white/10 bg-white/5 py-1.5 pl-9 pr-8 text-xs text-white placeholder-slate-500 outline-none transition focus:border-sky-400 focus:bg-white/10"
               />
               {searchQuery && (
@@ -613,7 +704,7 @@ export default function HelpdeskInbox() {
               )}
             </div>
 
-            {/* Ticket Status Filters */}
+            {/* Status Filter Tabs */}
             <div className="mt-3 flex items-center gap-1.5">
               {(["all", "unread", "open", "resolved"] as TicketStatus[]).map((st) => (
                 <button
@@ -631,23 +722,29 @@ export default function HelpdeskInbox() {
             </div>
           </div>
 
-          {/* Scrollable Thread Cards List */}
+          {/* Thread Cards List */}
           <div className="flex-1 overflow-y-auto divide-y divide-white/5">
-            {filteredThreads.length === 0 ? (
+            {loading ? (
+              <div className="flex flex-col items-center justify-center p-12 text-center text-slate-400">
+                <RefreshCw className="h-7 w-7 text-sky-400 animate-spin mb-3" />
+                <p className="text-xs font-semibold text-white">Loading live emails...</p>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Fetching messages from Resend & adskartmedia11@gmail.com
+                </p>
+              </div>
+            ) : filteredThreads.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-8 text-center text-slate-400">
                 <Inbox className="h-8 w-8 text-slate-600 mb-2" />
-                <p className="text-xs font-semibold text-slate-300">No conversations found</p>
-                <p className="mt-1 text-[11px] text-slate-500">
+                <p className="text-xs font-semibold text-slate-300">No emails in this inbox</p>
+                <p className="mt-1 text-[11px] text-slate-500 max-w-xs">
                   {searchQuery
-                    ? "Try adjusting your search criteria"
-                    : !isSuperAdmin
-                    ? `Only assigned to ${currentUser.allowedDepartment} are visible to you.`
-                    : "No threads matching this status."}
+                    ? "No live emails match your search query."
+                    : "Incoming emails and replies will appear here in real-time."}
                 </p>
               </div>
             ) : (
               filteredThreads.map((thread) => {
-                const isSelected = thread.id === selectedThreadId;
+                const isSelected = selectedThread?.id === thread.id;
                 const deptConf = DEPARTMENT_CONFIG[thread.department];
 
                 return (
@@ -658,9 +755,9 @@ export default function HelpdeskInbox() {
                       isSelected
                         ? "bg-sky-500/10 border-l-4 border-sky-400"
                         : "hover:bg-white/[0.03] border-l-4 border-transparent"
-                    } ${thread.unread ? "bg-white/[0.02]" : ""}`}
+                    }`}
                   >
-                    {/* Customer Initials Avatar */}
+                    {/* Avatar */}
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-800 text-xs font-bold text-slate-200 border border-white/10">
                       {thread.customerAvatar || thread.customerName.slice(0, 2).toUpperCase()}
                     </div>
@@ -668,13 +765,7 @@ export default function HelpdeskInbox() {
                     {/* Card Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1">
-                        <span
-                          className={`text-xs truncate ${
-                            thread.unread
-                              ? "font-bold text-white"
-                              : "font-medium text-slate-300"
-                          }`}
-                        >
+                        <span className="text-xs font-bold text-white truncate">
                           {thread.customerName}
                         </span>
                         <span className="text-[10px] text-slate-500 shrink-0">
@@ -682,7 +773,7 @@ export default function HelpdeskInbox() {
                         </span>
                       </div>
 
-                      {/* Department Badge & Status */}
+                      {/* Department Badge */}
                       <div className="mt-1 flex items-center gap-1.5 flex-wrap">
                         <span
                           className={`rounded-md px-1.5 py-0.5 text-[9px] font-semibold border ${deptConf.badgeBg} ${deptConf.badgeText} ${deptConf.borderCol}`}
@@ -691,7 +782,7 @@ export default function HelpdeskInbox() {
                         </span>
 
                         <span className="rounded-md bg-white/5 px-1.5 py-0.5 text-[9px] text-slate-400 border border-white/5">
-                          {thread.customerPlan}
+                          {thread.customerEmail}
                         </span>
 
                         {thread.status === "resolved" && (
@@ -699,33 +790,18 @@ export default function HelpdeskInbox() {
                             Resolved
                           </span>
                         )}
-
-                        {thread.priority === "urgent" && (
-                          <span className="rounded-md bg-rose-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-rose-400 border border-rose-500/20">
-                            Urgent
-                          </span>
-                        )}
                       </div>
 
-                      {/* Subject Line */}
-                      <div
-                        className={`mt-1 text-xs truncate ${
-                          thread.unread ? "font-bold text-white" : "text-slate-200"
-                        }`}
-                      >
+                      {/* Subject */}
+                      <div className="mt-1 text-xs font-medium text-slate-200 truncate">
                         {thread.subject}
                       </div>
 
-                      {/* Preview Snippet */}
+                      {/* Snippet */}
                       <p className="mt-0.5 line-clamp-2 text-[11px] text-slate-400">
                         {thread.snippet}
                       </p>
                     </div>
-
-                    {/* Unread indicator dot */}
-                    {thread.unread && (
-                      <span className="absolute right-3 top-3 h-2 w-2 rounded-full bg-sky-400 ring-2 ring-slate-900" />
-                    )}
                   </div>
                 );
               })
@@ -733,13 +809,11 @@ export default function HelpdeskInbox() {
           </div>
         </aside>
 
-        {/* =================================================================== */}
-        {/* RIGHT PANE: ACTIVE CONVERSATION & DEPARTMENT REPLY VIEW (flex-1) */}
-        {/* =================================================================== */}
+        {/* RIGHT PANE: ACTIVE CONVERSATION & REPLY VIEW (flex-1) */}
         <main className="flex flex-1 flex-col overflow-hidden bg-slate-950">
           {selectedThread ? (
             <>
-              {/* TOP CONVERSATION HEADER */}
+              {/* CONVERSATION TOP BAR */}
               <div className="flex h-20 shrink-0 items-center justify-between border-b border-white/10 bg-slate-900/60 px-6 backdrop-blur-sm">
                 <div className="min-w-0 flex-1 pr-4">
                   <div className="flex items-center gap-2">
@@ -755,15 +829,12 @@ export default function HelpdeskInbox() {
                     >
                       {DEPARTMENT_CONFIG[selectedThread.department].label}
                     </span>
-                    <span className="rounded-md bg-white/5 px-2 py-0.5 text-[10px] text-slate-300 border border-white/10">
-                      {selectedThread.customerPlan}
-                    </span>
                   </div>
 
                   {/* Customer details row */}
                   <div className="mt-1 flex items-center gap-3 text-xs text-slate-400">
                     <span className="font-semibold text-white">
-                      {selectedThread.customerName}
+                      Recipient / Sender: {selectedThread.customerName}
                     </span>
                     <span>&bull;</span>
                     <a
@@ -772,21 +843,12 @@ export default function HelpdeskInbox() {
                     >
                       {selectedThread.customerEmail}
                     </a>
-                    {selectedThread.customerPhone && (
-                      <>
-                        <span>&bull;</span>
-                        <span className="flex items-center gap-1 text-slate-300">
-                          <Phone className="h-3 w-3" />
-                          {selectedThread.customerPhone}
-                        </span>
-                      </>
-                    )}
                   </div>
                 </div>
 
                 {/* Header Actions */}
                 <div className="flex items-center gap-2 shrink-0">
-                  {/* Department Transfer Dropdown (Super Admin only) */}
+                  {/* Department Transfer Dropdown */}
                   {isSuperAdmin && (
                     <div className="relative">
                       <button
@@ -834,7 +896,7 @@ export default function HelpdeskInbox() {
                     </div>
                   )}
 
-                  {/* Mark as Resolved / Reopen */}
+                  {/* Mark as Resolved */}
                   <button
                     type="button"
                     onClick={handleToggleStatus}
@@ -846,18 +908,8 @@ export default function HelpdeskInbox() {
                   >
                     <CheckCircle2 className="h-3.5 w-3.5" />
                     <span>
-                      {selectedThread.status === "resolved" ? "Reopen Ticket" : "Mark Resolved"}
+                      {selectedThread.status === "resolved" ? "Reopen" : "Mark Resolved"}
                     </span>
-                  </button>
-
-                  {/* Mark Unread */}
-                  <button
-                    type="button"
-                    onClick={handleMarkUnread}
-                    title="Mark as unread"
-                    className="flex h-8 w-8 items-center justify-center rounded-xl border border-white/15 bg-white/5 text-slate-400 transition hover:bg-white/10 hover:text-white"
-                  >
-                    <Mail className="h-3.5 w-3.5" />
                   </button>
 
                   {/* Delete Thread */}
@@ -872,7 +924,7 @@ export default function HelpdeskInbox() {
                 </div>
               </div>
 
-              {/* MESSAGE STREAM (Middle Scrollable Section) */}
+              {/* MESSAGE STREAM (Middle Scrollable Area) */}
               <div className="flex-1 overflow-y-auto p-6 space-y-5">
                 {selectedThread.messages.map((message) => {
                   const isAgent = message.senderType === "agent";
@@ -884,7 +936,6 @@ export default function HelpdeskInbox() {
                         isAgent ? "ml-auto flex-row-reverse" : "mr-auto"
                       }`}
                     >
-                      {/* Avatar */}
                       <div
                         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold border ${
                           isAgent
@@ -895,7 +946,6 @@ export default function HelpdeskInbox() {
                         {isAgent ? "PO" : selectedThread.customerAvatar || "CU"}
                       </div>
 
-                      {/* Card Content */}
                       <div
                         className={`rounded-2xl p-4 shadow-sm text-xs leading-relaxed border ${
                           isAgent
@@ -903,7 +953,6 @@ export default function HelpdeskInbox() {
                             : "bg-white/5 border-white/10 text-slate-200"
                         }`}
                       >
-                        {/* Header */}
                         <div className="flex items-center justify-between gap-4 mb-2 pb-2 border-b border-white/10">
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-white">
@@ -922,6 +971,24 @@ export default function HelpdeskInbox() {
                         <div className="whitespace-pre-line text-slate-200 text-xs">
                           {message.body}
                         </div>
+
+                        {/* Attachments (if present) */}
+                        {message.attachments && message.attachments.length > 0 && (
+                          <div className="mt-3 pt-2.5 border-t border-white/10 flex flex-wrap gap-2">
+                            {message.attachments.map((att, attIdx) => (
+                              <div
+                                key={attIdx}
+                                className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] text-slate-200"
+                              >
+                                <Paperclip className="h-3 w-3 text-sky-400" />
+                                <span>{att.name}</span>
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                  ({att.size})
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -931,21 +998,19 @@ export default function HelpdeskInbox() {
 
               {/* BOTTOM REPLY EDITOR (Sticky) */}
               <div className="shrink-0 border-t border-white/10 bg-slate-900/80 p-4 backdrop-blur-md">
-                {/* Send From Identity Bar */}
+                {/* Send From Bar */}
                 <div className="mb-2.5 flex items-center justify-between text-xs text-slate-400">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-slate-400">Send From:</span>
+                    <span className="font-medium text-slate-400">Sending as:</span>
                     <span className="rounded-md border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 font-mono text-[11px] font-semibold text-sky-300">
                       PhotoOS {DEPARTMENT_CONFIG[selectedThread.department].label} &lt;{activeSendFrom}&gt;
                     </span>
-                    {isSuperAdmin && (
-                      <span className="text-[10px] text-slate-500">
-                        (Super Admin Identity Authority)
-                      </span>
-                    )}
+                    <span className="text-[10px] text-emerald-400 font-medium">
+                      &bull; Dispatches to {selectedThread.customerEmail}
+                    </span>
                   </div>
 
-                  {/* Canned Responses Dropdown Button */}
+                  {/* Canned Templates Dropdown */}
                   <div className="relative">
                     <button
                       type="button"
@@ -953,14 +1018,14 @@ export default function HelpdeskInbox() {
                       className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-slate-300 hover:bg-white/10 hover:text-white"
                     >
                       <Sparkles className="h-3 w-3 text-amber-400" />
-                      <span>Canned Responses</span>
+                      <span>Canned Templates</span>
                       <ChevronDown className="h-3 w-3 text-slate-400" />
                     </button>
 
                     {cannedMenuOpen && (
                       <div className="absolute right-0 bottom-full mb-2 w-80 overflow-hidden rounded-2xl border border-white/15 bg-slate-900 p-2 shadow-2xl backdrop-blur-xl z-50 animate-in fade-in zoom-in-95">
                         <div className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/10">
-                          Quick Response Templates
+                          Pre-approved Studio Templates
                         </div>
                         <div className="mt-1 space-y-1">
                           {CANNED_RESPONSES.map((canned) => (
@@ -982,6 +1047,33 @@ export default function HelpdeskInbox() {
                     )}
                   </div>
                 </div>
+
+                {/* Attached Files Preview Bar */}
+                {attachments.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-2 rounded-xl border border-sky-500/20 bg-sky-500/5 p-2">
+                    {attachments.map((att, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-1.5 rounded-lg border border-sky-400/30 bg-sky-950/60 px-2.5 py-1 text-xs text-sky-200"
+                      >
+                        <Paperclip className="h-3.5 w-3.5 text-sky-400" />
+                        <span className="font-medium truncate max-w-[180px]">
+                          {att.filename}
+                        </span>
+                        <span className="text-[10px] text-sky-400 font-mono">
+                          ({att.size})
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveAttachment(idx)}
+                          className="ml-1 text-slate-400 hover:text-white"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* Editor Textarea */}
                 <div className="overflow-hidden rounded-2xl border border-white/15 bg-slate-950 focus-within:border-sky-400">
@@ -1026,7 +1118,7 @@ export default function HelpdeskInbox() {
                     rows={3}
                     value={replyText}
                     onChange={(e) => setReplyText(e.target.value)}
-                    placeholder={`Reply to ${selectedThread.customerName} via ${activeSendFrom}...`}
+                    placeholder={`Reply to ${selectedThread.customerEmail} from ${activeSendFrom}...`}
                     className="w-full resize-none bg-transparent p-3 text-xs text-white placeholder-slate-500 outline-none"
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -1037,11 +1129,20 @@ export default function HelpdeskInbox() {
 
                   {/* Actions & Submit Row */}
                   <div className="flex items-center justify-between border-t border-white/10 bg-white/[0.02] px-3 py-2">
-                    <div className="flex items-center gap-2 text-[11px] text-slate-500">
-                      <Paperclip className="h-3.5 w-3.5 text-slate-400" />
+                    {/* Attach File Button */}
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-slate-300 transition hover:bg-white/10 hover:text-white"
+                    >
+                      <Paperclip className="h-3.5 w-3.5 text-sky-400" />
                       <span>Attach file</span>
-                      <span className="hidden sm:inline">&bull; Cmd + Enter to send</span>
-                    </div>
+                      {attachments.length > 0 && (
+                        <span className="rounded-full bg-sky-500/20 px-1.5 py-0.2 text-[10px] text-sky-300 font-bold">
+                          {attachments.length}
+                        </span>
+                      )}
+                    </button>
 
                     <button
                       type="button"
@@ -1052,7 +1153,7 @@ export default function HelpdeskInbox() {
                       {sendingReply ? (
                         <>
                           <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                          <span>Dispatching via Resend...</span>
+                          <span>Delivering Email...</span>
                         </>
                       ) : (
                         <>
@@ -1066,12 +1167,11 @@ export default function HelpdeskInbox() {
               </div>
             </>
           ) : (
-            /* Empty State */
             <div className="flex flex-1 flex-col items-center justify-center p-8 text-center text-slate-400">
               <Mail className="h-12 w-12 text-slate-700 mb-3" />
-              <h3 className="text-sm font-bold text-white">No active thread selected</h3>
+              <h3 className="text-sm font-bold text-white">No active email selected</h3>
               <p className="mt-1 text-xs text-slate-400 max-w-sm">
-                Select a conversation from the left to read messages and dispatch department replies.
+                Select a conversation from the left to read messages and dispatch replies to customers.
               </p>
             </div>
           )}

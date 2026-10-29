@@ -15,6 +15,7 @@ export async function POST(req: NextRequest) {
       html,
       template,
       templateData,
+      attachments,
     } = body;
 
     if (!to) {
@@ -48,6 +49,7 @@ export async function POST(req: NextRequest) {
       to,
       subject: subject || "Notification from PhotoOS",
       html: finalHtml,
+      attachments,
     });
 
     return NextResponse.json(result);

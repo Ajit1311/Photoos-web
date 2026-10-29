@@ -30,6 +30,12 @@ export const PHOTOOS_SENDERS: Record<EmailDepartment, string> = {
   support: "PhotoOS Support <support@photoos.in>",
 };
 
+export interface EmailAttachmentPayload {
+  filename: string;
+  content: string; // base64 or string
+  content_type?: string;
+}
+
 export interface SendEmailPayload {
   department: EmailDepartment;
   to: string | string[];
@@ -38,6 +44,7 @@ export interface SendEmailPayload {
   replyTo?: string;
   cc?: string | string[];
   bcc?: string | string[];
+  attachments?: EmailAttachmentPayload[];
 }
 
 export interface EmailResponse {
@@ -84,6 +91,7 @@ export async function sendEmailWithResend(payload: SendEmailPayload): Promise<Em
         reply_to: payload.replyTo,
         cc: payload.cc ? (Array.isArray(payload.cc) ? payload.cc : [payload.cc]) : undefined,
         bcc: payload.bcc ? (Array.isArray(payload.bcc) ? payload.bcc : [payload.bcc]) : undefined,
+        attachments: payload.attachments,
       }),
     });
 
