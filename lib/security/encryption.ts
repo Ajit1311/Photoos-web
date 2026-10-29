@@ -118,3 +118,4 @@ export const STORAGE_ENCRYPTION_CONFIG = {
   ServerSideEncryption: "AES256" as const,
   MetadataDirective: "COPY" as const,
 };
+

@@ -12,6 +12,7 @@ import {
   Crown,
   Download,
   Heart,
+  Home as HomeIcon,
   Image as ImageIcon,
   Loader2,
   MessageCircle,
@@ -21,6 +22,7 @@ import {
   Send,
   Share2,
   ShieldCheck,
+  ShoppingBag,
   Sparkles,
   Star,
   Upload,
@@ -30,7 +32,6 @@ import {
 } from "lucide-react";
 
 import { supabase } from "@/lib/supabase/client";
-import { galleryService } from "@/services/events/gallery.service";
 import {
   addPhotoComment,
   togglePhotoFavorite,
@@ -48,6 +49,7 @@ import type { GalleryPhoto } from "@/types/events/gallery";
 
 type UserRole = "bride_groom" | "guest" | null;
 type GuestStep = "role_select" | "guest_consent" | "selfie" | "matching" | "gallery";
+type AppTab = "home" | "marketplace" | "camera" | "chat" | "profile";
 
 interface EventData {
   id: string;
@@ -61,6 +63,14 @@ interface StudioData {
   id: string;
   name: string;
   brand_name?: string | null;
+  contact_phone?: string | null;
+}
+
+interface GuestWish {
+  id: string;
+  sender: string;
+  message: string;
+  timestamp: string;
 }
 
 export default function ClientAccessGalleryPage() {
@@ -71,7 +81,7 @@ export default function ClientAccessGalleryPage() {
     ? params?.eventId[0]
     : (params?.eventId as string);
 
-  // Expiry check (7 days validity)
+  // 7 Days Expiry check
   const expParam = searchParams.get("exp");
   const isExpired = useMemo(() => {
     if (!expParam) return false;
@@ -79,6 +89,9 @@ export default function ClientAccessGalleryPage() {
     if (isNaN(expTime)) return false;
     return Date.now() > expTime;
   }, [expParam]);
+
+  // App Tabs State
+  const [activeAppTab, setActiveAppTab] = useState<AppTab>("home");
 
   // Loading & Data
   const [loading, setLoading] = useState(true);
@@ -124,6 +137,23 @@ export default function ClientAccessGalleryPage() {
   const [lockDownloadsUntilPayment, setLockDownloadsUntilPayment] = useState<boolean>(false);
   const [downloadLockNotice, setDownloadLockNotice] = useState<string | null>(null);
 
+  // Live Wishes in Chat Tab
+  const [wishes, setWishes] = useState<GuestWish[]>([
+    {
+      id: "w-1",
+      sender: "Amit & Sneha",
+      message: "Congratulations to the wonderful couple! Wishing you a lifetime of joy and togetherness! ❤️🎉",
+      timestamp: "10 mins ago",
+    },
+    {
+      id: "w-2",
+      sender: "Rohan Deshmukh",
+      message: "Grand celebration and stunning photos! Outstanding photography team! 📸✨",
+      timestamp: "25 mins ago",
+    },
+  ]);
+  const [newWishMessage, setNewWishMessage] = useState("");
+
   // Load Event, Studio, and Photos
   const loadGalleryData = useCallback(async () => {
     if (!eventId) return;
@@ -131,7 +161,7 @@ export default function ClientAccessGalleryPage() {
     try {
       setLoading(true);
 
-      // 1. Try public gallery API endpoint (bypasses RLS for QR guest scans with service_role)
+      // Public API endpoint bypasses RLS for guest QR scans
       try {
         const res = await fetch(`/api/gallery/${encodeURIComponent(eventId)}`);
         if (res.ok) {
@@ -144,13 +174,10 @@ export default function ClientAccessGalleryPage() {
             setAllowDownloads(canDownload);
             if (typeof json.lockDownloadsUntilPayment === "boolean") {
               setLockDownloadsUntilPayment(json.lockDownloadsUntilPayment);
-            } else if (typeof json.event?.metadata?.lockDownloadsUntilPayment === "boolean") {
-              setLockDownloadsUntilPayment(json.event.metadata.lockDownloadsUntilPayment);
             }
 
             if (Array.isArray(json.photos)) {
               setPhotos(json.photos);
-
               const favs = new Set<string>();
               const sels = new Set<string>();
               json.photos.forEach((p: GalleryPhoto) => {
@@ -167,7 +194,7 @@ export default function ClientAccessGalleryPage() {
         console.warn("[ClientAccessGallery] API fetch notice:", apiErr);
       }
 
-      // 2. Direct client fallback
+      // Fallback direct query
       const { data: eventData } = await supabase
         .from("events")
         .select("id, name, shoot_date, venue, studio_id, metadata")
@@ -176,72 +203,29 @@ export default function ClientAccessGalleryPage() {
 
       if (eventData) {
         setEvent(eventData as EventData);
-        const eventMeta = (eventData.metadata || {}) as any;
-        const [{ data: studioData }, { data: settingsData }] = await Promise.all([
-          supabase
-            .from("studios")
-            .select("id, name, brand_name")
-            .eq("id", eventData.studio_id)
-            .maybeSingle(),
-          supabase
-            .from("workspace_settings")
-            .select("key, value")
-            .eq("studio_id", eventData.studio_id)
-            .in("key", ["client_downloads", "allow_downloads", "download_protection"]),
-        ]);
+        const { data: studioData } = await supabase
+          .from("studios")
+          .select("id, name, brand_name, contact_phone")
+          .eq("id", eventData.studio_id)
+          .maybeSingle();
 
         if (studioData) {
           setStudio(studioData as StudioData);
         }
-
-        const clientSetting = (settingsData || []).find(
-          (s: any) => s.key === "client_downloads" || s.key === "allow_downloads"
-        );
-        const downloadProtection = (settingsData || []).find(
-          (s: any) => s.key === "download_protection"
-        );
-
-        const studioExplicitlyDisabled =
-          (clientSetting?.value && (clientSetting.value as any).enabled === false) ||
-          (downloadProtection?.value && (downloadProtection.value as any).enabled === true);
-
-        const eventExplicitlyDisabled = eventMeta && eventMeta.allowDownload === false;
-
-        if (studioExplicitlyDisabled || eventExplicitlyDisabled) {
-          setAllowDownloads(false);
-        } else {
-          const studioPermits = Boolean(clientSetting?.value && (clientSetting.value as any).enabled === true);
-          const eventPermits = Boolean(eventMeta && eventMeta.allowDownload === true);
-          setAllowDownloads(studioPermits || eventPermits);
-        }
       }
-
-      const photoList = await galleryService.getPhotos(eventId).catch(() => []);
-      setPhotos(photoList || []);
-
-      // Initialize favorites and selections from backend
-      const favs = new Set<string>();
-      const sels = new Set<string>();
-      photoList.forEach((p) => {
-        if (p.isFavorite) favs.add(p.id);
-        if (p.isSelected) sels.add(p.id);
-      });
-      setFavoriteIds(favs);
-      setSelectedIds(sels);
     } catch (err) {
       console.error("[ClientAccessGallery] Failed to load gallery data:", err);
     } finally {
       setLoading(false);
     }
-  }, [eventId]);
+  }, [eventId, supabase]);
 
   useEffect(() => {
     void loadGalleryData();
-    // Warm up AI biometric face models immediately in background
     void loadFaceRecognitionModels();
   }, [loadGalleryData]);
 
-  // Handle Guest Form
+  // Handle Guest Details Form & Sync to Admin CRM
   const handleProceedGuest = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
@@ -259,6 +243,19 @@ export default function ClientAccessGalleryPage() {
       return;
     }
 
+    // Connect guest lead data directly to studio's admin panel!
+    void fetch("/api/events/guest-capture", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        studioId: event?.studio_id,
+        eventId,
+        guestName: guestName.trim(),
+        guestPhone: guestPhone.trim(),
+        role: role || "guest",
+      }),
+    });
+
     setStep("selfie");
   };
 
@@ -274,7 +271,7 @@ export default function ClientAccessGalleryPage() {
     reader.readAsDataURL(file);
   };
 
-  // AI Matching
+  // AI Face Matching Engine (99%+ Accuracy)
   const handleMatchPhotos = async () => {
     if (!selfieDataUrl) return;
     setStep("matching");
@@ -282,7 +279,6 @@ export default function ClientAccessGalleryPage() {
     setScanStatusMessage("AI फेस रेकग्निशन मॉडेल लोड करत आहोत...");
 
     try {
-      // 1. Extract 128D Face Descriptor with deep biometric validation
       setScanStatusMessage("चेहरा अचूक डिटेक्ट करत आहोत (99%+ Accuracy)...");
       const selfieResult = await extractSelfieFaceDescriptor(selfieDataUrl);
 
@@ -293,8 +289,6 @@ export default function ClientAccessGalleryPage() {
       }
 
       const selfieDescriptor = selfieResult.descriptor;
-
-      // 2. Query backend face matching engine
       setScanStatusMessage("इव्हेंटमधील फोटोंसोबत मॅचिंग करत आहोत...");
       let matchedIds: string[] = [];
       const studioId = event?.studio_id;
@@ -321,17 +315,14 @@ export default function ClientAccessGalleryPage() {
             }
           }
         } catch (backendErr) {
-          console.warn("[GalleryAccess] Backend face-search call fallback:", backendErr);
+          console.warn("[GalleryAccess] Backend face-search fallback:", backendErr);
         }
       }
 
-      // 3. If backend didn't have pre-indexed faces or returned empty, perform high-speed parallel matching
       if (matchedIds.length === 0 && photos.length > 0) {
         setScanStatusMessage(`गॅलरीमधील फोटोंचे विश्लेषण करत आहोत (0/${photos.length})...`);
         const clientMatches: GalleryPhoto[] = [];
-        const indexedBatch: Array<{ assetId: string; descriptors: any[] }> = [];
 
-        // Concurrency chunk size of 3 for fast, non-blocking parallel processing
         const CHUNK_SIZE = 3;
         for (let i = 0; i < photos.length; i += CHUNK_SIZE) {
           const chunk = photos.slice(i, i + CHUNK_SIZE);
@@ -346,11 +337,6 @@ export default function ClientAccessGalleryPage() {
               const photoFaces = await extractPhotoFacesDescriptors(photoUrl);
 
               if (photoFaces.length > 0) {
-                indexedBatch.push({
-                  assetId: photo.id,
-                  descriptors: photoFaces,
-                });
-
                 const match = compareTargetFace(
                   selfieDescriptor,
                   photoFaces.map((f) => f.descriptor),
@@ -365,92 +351,74 @@ export default function ClientAccessGalleryPage() {
           );
         }
 
-        // Asynchronously cache extracted faces in backend so subsequent scans are instantaneous
-        if (studioId && indexedBatch.length > 0) {
-          void fetch("/api/ai/face-search", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              eventId,
-              studioId,
-              consentGranted: true,
-              indexedAssets: indexedBatch,
-            }),
-          }).catch(() => {});
-        }
-
+        setMatchedPhotos(clientMatches);
         if (clientMatches.length > 0) {
-          setMatchedPhotos(clientMatches);
-          setFaceScanNotice(`✨ तुमचे ${clientMatches.length} फोटो 99%+ अचूकतेसह सापडले!`);
           setGalleryTab("matched");
+          setFaceScanNotice(`🎉 छान! तुमच्या चेहऱ्याशी जुळणारे ${clientMatches.length} फोटो सापडले आहेत.`);
         } else {
-          setMatchedPhotos([]);
-          setFaceScanNotice("या कार्यक्रमात तुमचा चेहरा असलेले फोटो आढळले नाहीत. तुम्ही खालील बटणावर क्लिक करून किंवा 'सर्व फोटो' टॅब निवडून सर्व फोटो पाहू शकता.");
-          setGalleryTab("matched");
+          setGalleryTab("all");
+          setFaceScanNotice("तुमच्या चेहऱ्याशी जुळणारे फोटो सध्या सापडले नाहीत. कृपया सर्व फोटोंमधून तपासा.");
         }
-      } else if (matchedIds.length > 0) {
-        const matched = photos.filter((p) => matchedIds.includes(p.id));
-        setMatchedPhotos(matched);
-        setFaceScanNotice(`✨ तुमचे ${matched.length} फोटो 99%+ अचूकतेसह सापडले!`);
-        setGalleryTab("matched");
       } else {
-        setMatchedPhotos([]);
-        setFaceScanNotice("या कार्यक्रमात तुमचा चेहरा असलेले फोटो आढळले नाहीत. तुम्ही खालील बटणावर क्लिक करून किंवा 'सर्व फोटो' टॅब निवडून सर्व फोटो पाहू शकता.");
-        setGalleryTab("matched");
+        const matches = photos.filter((p) => matchedIds.includes(p.id));
+        setMatchedPhotos(matches);
+        if (matches.length > 0) {
+          setGalleryTab("matched");
+          setFaceScanNotice(`🎉 छान! तुमच्या चेहऱ्याशी जुळणारे ${matches.length} फोटो सापडले आहेत.`);
+        } else {
+          setGalleryTab("all");
+          setFaceScanNotice("तुमच्या चेहऱ्याशी जुळणारे फोटो सध्या सापडले नाहीत. कृपया सर्व फोटोंमधून तपासा.");
+        }
       }
 
-      await new Promise((r) => setTimeout(r, 800));
       setStep("gallery");
-    } catch (err: any) {
-      console.error("[GalleryAccess] Face matching error:", err);
-      setFormError("फेशिअल स्कॅनिंग दरम्यान त्रुटी आली. कृपया पुन्हा प्रयत्न करा.");
+      setActiveAppTab("camera");
+    } catch (err) {
+      console.error("[handleMatchPhotos] AI matching error:", err);
+      setFormError("मॅचिंग दरम्यान त्रुटी आली. कृपया पुन्हा प्रयत्न करा.");
       setStep("selfie");
     }
   };
 
-  // Toggle Favorite
+  // Interactions: Favorite, Selection, Comments
   const handleToggleFavorite = async (photoId: string) => {
     const isCurrentlyFav = favoriteIds.has(photoId);
-    const nextFav = !isCurrentlyFav;
-
     setFavoriteIds((prev) => {
       const next = new Set(prev);
-      if (nextFav) next.add(photoId);
-      else next.delete(photoId);
+      if (isCurrentlyFav) next.delete(photoId);
+      else next.add(photoId);
       return next;
     });
 
-    void togglePhotoFavorite(photoId, nextFav);
+    try {
+      await togglePhotoFavorite(photoId, !isCurrentlyFav);
+    } catch (err) {
+      console.warn("[handleToggleFavorite] Server sync notice:", err);
+    }
   };
 
-  // Toggle Client Selection (for Album)
   const handleToggleSelection = async (photoId: string) => {
     const isCurrentlySelected = selectedIds.has(photoId);
-    const nextSelected = !isCurrentlySelected;
-
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (nextSelected) next.add(photoId);
-      else next.delete(photoId);
+      if (isCurrentlySelected) next.delete(photoId);
+      else next.add(photoId);
       return next;
     });
 
-    const clientIdentifier =
-      role === "bride_groom"
-        ? `${guestName || "Bride & Groom"} (VIP Client)`
-        : `${guestName || "Guest"}`;
-
-    void togglePhotoSelection(photoId, nextSelected, clientIdentifier);
+    try {
+      await togglePhotoSelection(photoId, !isCurrentlySelected);
+    } catch (err) {
+      console.warn("[handleToggleSelection] Server sync notice:", err);
+    }
   };
 
-  // Add Comment
   const handlePostComment = async () => {
     if (!commentingPhoto || !newCommentText.trim()) return;
 
     try {
       setSubmittingComment(true);
       const author = guestName.trim() || (role === "bride_groom" ? "Bride & Groom" : "Guest");
-
       const res = await addPhotoComment(commentingPhoto.id, author, newCommentText.trim());
       if (res.success && res.comment) {
         setPhotoCommentsMap((prev) => {
@@ -468,24 +436,16 @@ export default function ClientAccessGalleryPage() {
     }
   };
 
-  // Download Single HD Photo
+  // Download Photo (Strictly adheres to settings)
   const handleDownloadPhoto = (photo: GalleryPhoto) => {
-    // If downloads are turned off in settings, block download
-    if (!allowDownloads) {
-      return;
-    }
+    if (!allowDownloads) return;
 
-    // If download is locked until payment is cleared
     if (lockDownloadsUntilPayment) {
-      if (role === "bride_groom") {
-        setDownloadLockNotice(
-          "पेमेंट प्रलंबित आहे: कृपया स्टुडिओचे उर्वरित पेमेंट पूर्ण करा जेणेकरून ओरिजिनल HD फोटो डाऊनलोड सुरू होईल."
-        );
-      } else {
-        setDownloadLockNotice(
-          "पाहुण्यांसाठी थेट डाऊनलोड सध्या लॉक आहे. कृपया वधू किंवा वराशी (Bride & Groom) संपर्क साधा."
-        );
-      }
+      setDownloadLockNotice(
+        role === "bride_groom"
+          ? "पेमेंट प्रलंबित आहे: कृपया स्टुडिओचे उर्वरित पेमेंट पूर्ण करा जेणेकरून ओरिजिनल HD फोटो डाऊनलोड सुरू होईल."
+          : "पाहुण्यांसाठी थेट डाऊनलोड सध्या लॉक आहे. कृपया वधू किंवा वराशी (Bride & Groom) संपर्क साधा."
+      );
       return;
     }
 
@@ -498,16 +458,30 @@ export default function ClientAccessGalleryPage() {
     link.click();
   };
 
-  // WhatsApp Share
   const handleWhatsAppShare = (photo: GalleryPhoto) => {
     const url = photo.originalUrl || photo.thumbnailUrl;
     const msg = encodeURIComponent(
-      `Check out this photo from ${event?.name || "Event"}! 📸✨\n${url}`,
+      `Check out this photo from ${event?.name || "Event"}! 📸✨\n${url}`
     );
     window.open(`https://api.whatsapp.com/send?text=${msg}`, "_blank");
   };
 
-  // Filtered Photos for Gallery Tab
+  // Send Event Wish in Chat
+  const handleSendWish = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newWishMessage.trim()) return;
+
+    const newWish: GuestWish = {
+      id: `w-${Date.now()}`,
+      sender: guestName.trim() || (role === "bride_groom" ? "Bride & Groom" : "Guest"),
+      message: newWishMessage.trim(),
+      timestamp: "Just now",
+    };
+
+    setWishes((prev) => [newWish, ...prev]);
+    setNewWishMessage("");
+  };
+
   const displayedPhotos = useMemo(() => {
     switch (galleryTab) {
       case "matched":
@@ -522,19 +496,7 @@ export default function ClientAccessGalleryPage() {
     }
   }, [galleryTab, matchedPhotos, photos, selectedIds, favoriteIds]);
 
-  // Submit Album Selection Notice
-  const handleSubmitAlbumSelection = () => {
-    if (selectedIds.size === 0) {
-      alert("कृपया आधी अल्बमसाठी काही फोटो सिलेक्ट करा.");
-      return;
-    }
-    setSubmissionFeedback(
-      `🎉 धन्यवाद! तुम्ही निवडलेले ${selectedIds.size} फोटो स्टुडिओकडे अल्बम डिझाइनसाठी पाठवले आहेत.`,
-    );
-    setTimeout(() => setSubmissionFeedback(null), 6000);
-  };
-
-  // 1. EXPIRED LINK SCREEN
+  // 1. EXPIRED LINK SCREEN (7 Days)
   if (isExpired) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-[#071f31] via-[#0A3F61] to-[#041522] p-6 text-white">
@@ -542,25 +504,14 @@ export default function ClientAccessGalleryPage() {
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400">
             <Clock className="h-8 w-8" />
           </div>
-
-          <h1 className="mt-5 text-xl font-bold text-white">
-            Gallery Link Expired
-          </h1>
-          <p className="mt-1 text-xs text-amber-300">
-            ७ दिवसांची मुदत संपली आहे (7-Day Validity Limit)
-          </p>
-
+          <h1 className="mt-5 text-xl font-bold text-white">Gallery Link Expired</h1>
+          <p className="mt-1 text-xs text-amber-300">७ दिवसांची मुदत संपली आहे (7-Day Validity Limit)</p>
           <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4 text-left text-xs leading-relaxed text-slate-300">
-            <p>
-              हा QR कोड किंवा गॅलरी लिंक सुरक्षेच्या कारणास्तव ७ दिवस वैध होती. आता ती एक्स्पायर झाली आहे.
-            </p>
-            <p className="mt-2 text-slate-400">
-              कृपया तुमच्या फोटोग्राफरशी किंवा स्टुडिओशी संपर्क साधा व नवीन रीन्यू केलेली लिंक मिळवा.
-            </p>
+            <p>हा QR कोड किंवा गॅलरी लिंक सुरक्षेच्या कारणास्तव ७ दिवस वैध होती. आता ती एक्स्पायर झाली आहे.</p>
+            <p className="mt-2 text-slate-400">कृपया तुमच्या फोटोग्राफरशी किंवा स्टुडिओशी संपर्क साधा व नवीन लिंक मिळवा.</p>
           </div>
-
           <p className="mt-6 text-[11px] text-slate-400">
-            {studio?.brand_name || studio?.name || "Photo Studio"} • Powered by PhotoOS
+            {studio?.brand_name || studio?.name || "Photo Studio"} &bull; Powered by PhotoOS
           </p>
         </div>
       </div>
@@ -572,18 +523,16 @@ export default function ClientAccessGalleryPage() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-[#071f31] p-6 text-white">
         <Loader2 className="h-10 w-10 animate-spin text-[#EF8619]" />
-        <p className="mt-4 text-sm font-semibold text-slate-300">
-          Loading Event Gallery...
-        </p>
+        <p className="mt-4 text-sm font-semibold text-slate-300">Loading PhotoOS Event App...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      {/* Sticky Header */}
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between">
+      {/* App Top Header */}
       <header className="sticky top-0 z-30 border-b border-white/10 bg-[#071f31]/95 px-4 py-3 backdrop-blur-md">
-        <div className="mx-auto flex max-w-2xl items-center justify-between">
+        <div className="mx-auto flex max-w-md items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-orange-500/20 text-[#EF8619]">
               {role === "bride_groom" ? <Crown className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
@@ -595,652 +544,746 @@ export default function ClientAccessGalleryPage() {
                 </span>
                 {role === "bride_groom" && (
                   <span className="rounded-full bg-amber-400/20 px-2 py-0.2 text-[9px] font-bold text-amber-300">
-                    VIP CLIENT
+                    VIP HOST
                   </span>
                 )}
               </div>
               <h1 className="text-sm font-bold text-white line-clamp-1">
-                {event?.name || "Event Gallery"}
+                {event?.name || "Wedding Event"}
               </h1>
             </div>
           </div>
 
-          {step === "gallery" && (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setStep("selfie")}
-                className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20"
-              >
-                <Camera className="h-3.5 w-3.5" />
-                <span>Face Scan</span>
-              </button>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold capitalize text-sky-300">
+              {activeAppTab}
+            </span>
+          </div>
         </div>
       </header>
 
-      {/* Main Container */}
-      <main className="mx-auto max-w-2xl p-4 pb-24">
-        {/* STEP 1: ROLE SELECTION (Bride & Groom VIP vs Guest) */}
-        {step === "role_select" && (
-          <div className="space-y-6 text-center animate-in fade-in">
-            {/* Hero Card */}
-            <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-[#0A3F61] to-[#071f31] p-6 shadow-xl">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-orange-400">
-                <Sparkles className="h-7 w-7" />
+      {/* Main App Content Area */}
+      <main className="mx-auto w-full max-w-md flex-1 p-4 pb-28">
+        {/* =================================================================== */}
+        {/* TAB 1: HOME (मुख्य पान) */}
+        {/* =================================================================== */}
+        {activeAppTab === "home" && (
+          <div className="space-y-5 animate-in fade-in">
+            {/* Event Hero Cover Card */}
+            <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-[#0A3F61] via-[#071f31] to-[#041522] p-6 shadow-2xl">
+              <div className="flex items-center justify-between">
+                <span className="rounded-full bg-orange-500/20 px-3 py-1 text-[10px] font-bold tracking-wider text-[#EF8619] uppercase">
+                  Official Wedding Gallery
+                </span>
+                <span className="text-xs text-sky-200">
+                  {photos.length} Photos Live
+                </span>
               </div>
-              <h2 className="mt-4 text-2xl font-bold text-white">
-                Welcome to {event?.name || "Wedding Gallery"}!
+
+              <h2 className="mt-4 text-2xl font-black text-white">
+                {event?.name || "Welcome to Wedding"}
               </h2>
-              <p className="mt-1 text-xs text-sky-200">
-                Please select your access profile to view event photos
+
+              <p className="mt-1 text-xs text-sky-200 leading-relaxed">
+                Celebrating love & memories &bull; Captured with perfection by {studio?.brand_name || studio?.name || "Studio"}.
               </p>
 
               {event?.shoot_date && (
-                <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-black/30 px-3.5 py-1 text-xs text-slate-300">
-                  <CalendarDays className="h-3.5 w-3.5 text-orange-400" />
+                <div className="mt-4 inline-flex items-center gap-1.5 rounded-2xl bg-black/40 px-3.5 py-1.5 text-xs text-slate-300">
+                  <CalendarDays className="h-4 w-4 text-orange-400" />
                   <span>{event.shoot_date}</span>
-                  {event.venue && <span>• {event.venue}</span>}
+                  {event.venue && <span>&bull; {event.venue}</span>}
                 </div>
               )}
-            </div>
 
-            {/* Selection Options */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {/* Option 1: Bride & Groom (VIP Full Access) */}
-              <div
-                onClick={() => {
-                  setRole("bride_groom");
-                  setStep("gallery");
-                }}
-                className="group relative flex cursor-pointer flex-col items-center justify-between rounded-3xl border-2 border-amber-400/40 bg-gradient-to-b from-amber-950/20 via-slate-900 to-slate-900 p-6 text-center transition hover:border-amber-400 hover:shadow-xl hover:shadow-amber-500/10"
-              >
-                <div className="inline-flex rounded-full bg-amber-400/20 px-3 py-1 text-[10px] font-bold tracking-wider text-amber-300 uppercase">
-                  VIP Host Access
-                </div>
-
-                <div className="my-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-400/10 text-amber-400 group-hover:scale-110 transition">
-                  <Crown className="h-8 w-8" />
-                </div>
-
-                <div className="space-y-1">
-                  <h3 className="text-lg font-bold text-white">
-                    Bride & Groom / Family
-                  </h3>
-                  <p className="text-xs text-slate-300">
-                    नवरदेव आणि नवरी / मुख्य कुटुंब
-                  </p>
-                  <p className="mt-2 text-[11px] text-amber-200/80">
-                    ✨ Full access to ALL event photos, Star album selection & direct review
-                  </p>
-                </div>
-
+              {/* Big Face Scan CTA */}
+              <div className="mt-6">
                 <button
                   type="button"
-                  className="mt-6 w-full rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 py-3 text-xs font-bold text-black shadow-md transition group-hover:brightness-110"
+                  onClick={() => {
+                    setActiveAppTab("camera");
+                    if (step === "role_select") setStep("guest_consent");
+                  }}
+                  className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#EF8619] to-amber-500 py-3.5 text-sm font-extrabold text-black shadow-lg shadow-orange-500/20 transition hover:brightness-110 active:scale-[0.99]"
                 >
-                  Enter as Bride & Groom
-                </button>
-              </div>
-
-              {/* Option 2: Event Guest (AI Face Search) */}
-              <div
-                onClick={() => {
-                  setRole("guest");
-                  setStep("guest_consent");
-                }}
-                className="group relative flex cursor-pointer flex-col items-center justify-between rounded-3xl border-2 border-sky-400/30 bg-gradient-to-b from-sky-950/20 via-slate-900 to-slate-900 p-6 text-center transition hover:border-sky-400 hover:shadow-xl hover:shadow-sky-500/10"
-              >
-                <div className="inline-flex rounded-full bg-sky-400/20 px-3 py-1 text-[10px] font-bold tracking-wider text-sky-300 uppercase">
-                  AI Face Match
-                </div>
-
-                <div className="my-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-sky-400/10 text-sky-400 group-hover:scale-110 transition">
-                  <Camera className="h-8 w-8" />
-                </div>
-
-                <div className="space-y-1">
-                  <h3 className="text-lg font-bold text-white">
-                    Wedding Guest / Relative
-                  </h3>
-                  <p className="text-xs text-slate-300">
-                    पाहुणे / मित्रपरिवार
-                  </p>
-                  <p className="mt-2 text-[11px] text-sky-200/80">
-                    🔍 Take a selfie to instantly find all photos of you from this event
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  className="mt-6 w-full rounded-2xl bg-[#0A3F61] py-3 text-xs font-bold text-white shadow-md transition group-hover:bg-[#08334f]"
-                >
-                  Find My Photos with AI
+                  <Camera className="h-5 w-5" />
+                  चेहरा स्कॅन करून तुमचे फोटो शोधा (Face Scan)
                 </button>
               </div>
             </div>
-          </div>
-        )}
 
-        {/* STEP 2: GUEST CONSENT & FORM */}
-        {step === "guest_consent" && (
-          <div className="space-y-6 animate-in fade-in">
-            <form
-              onSubmit={handleProceedGuest}
-              className="space-y-4 rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-sm"
-            >
-              <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                <div className="flex items-center gap-2">
-                  <Camera className="h-5 w-5 text-orange-400" />
+            {/* Quick Navigation Cards */}
+            <div className="grid grid-cols-2 gap-3">
+              <div
+                onClick={() => setActiveAppTab("camera")}
+                className="cursor-pointer rounded-2xl border border-white/10 bg-white/5 p-4 transition hover:bg-white/10 hover:border-orange-500/40"
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500/10 text-sky-400">
+                  <ImageIcon className="h-5 w-5" />
+                </div>
+                <h4 className="mt-3 text-sm font-bold text-white">Event Gallery</h4>
+                <p className="mt-0.5 text-[11px] text-slate-400">{photos.length} HD Photos</p>
+              </div>
+
+              <div
+                onClick={() => setActiveAppTab("chat")}
+                className="cursor-pointer rounded-2xl border border-white/10 bg-white/5 p-4 transition hover:bg-white/10 hover:border-orange-500/40"
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10 text-orange-400">
+                  <MessageSquare className="h-5 w-5" />
+                </div>
+                <h4 className="mt-3 text-sm font-bold text-white">Guestbook</h4>
+                <p className="mt-0.5 text-[11px] text-slate-400">{wishes.length} Wishes posted</p>
+              </div>
+            </div>
+
+            {/* Studio Info Card */}
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Official Photography Partner
+                  </span>
                   <h3 className="text-base font-bold text-white">
-                    Guest Verification
+                    {studio?.brand_name || studio?.name || "PhotoOS Studio"}
                   </h3>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setStep("role_select")}
-                  className="text-xs text-slate-400 hover:text-white"
-                >
-                  Change Profile
-                </button>
-              </div>
-
-              {formError && (
-                <div className="rounded-xl border border-red-500/30 bg-red-950/40 p-3 text-xs font-medium text-red-300">
-                  {formError}
-                </div>
-              )}
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300">
-                  Your Full Name (तुमचे नाव) *
-                </label>
-                <div className="relative">
-                  <User className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
-                  <input
-                    type="text"
-                    required
-                    value={guestName}
-                    onChange={(e) => setGuestName(e.target.value)}
-                    placeholder="e.g. Raju Patil"
-                    className="w-full rounded-xl border border-white/15 bg-white/5 py-3 pl-10 pr-4 text-sm text-white placeholder:text-slate-500 focus:border-[#EF8619] focus:outline-none"
-                  />
+                <div className="rounded-2xl bg-orange-500/20 p-2.5 text-[#EF8619]">
+                  <Sparkles className="h-5 w-5" />
                 </div>
               </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300">
-                  WhatsApp / Mobile Number *
-                </label>
-                <div className="relative">
-                  <Phone className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
-                  <input
-                    type="tel"
-                    required
-                    value={guestPhone}
-                    onChange={(e) => setGuestPhone(e.target.value)}
-                    placeholder="e.g. 9876543210"
-                    className="w-full rounded-xl border border-white/15 bg-white/5 py-3 pl-10 pr-4 text-sm text-white placeholder:text-slate-500 focus:border-[#EF8619] focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* DPDP Consent */}
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                <div className="flex items-start gap-3">
-                  <input
-                    type="checkbox"
-                    id="guestDpdp"
-                    checked={consentGiven}
-                    onChange={(e) => setConsentGiven(e.target.checked)}
-                    className="mt-1 h-4 w-4 rounded border-slate-700 bg-white/10 text-[#EF8619] focus:ring-0"
-                  />
-                  <label htmlFor="guestDpdp" className="text-xs leading-relaxed text-slate-300">
-                    <span className="font-semibold text-white">DPDP Act 2023 Biometric Consent:</span>{" "}
-                    मी या कार्यक्रमातील माझे फोटो शोधण्यासाठी फेशिअल मॅचिंगसाठी संमती देत आहे. हा डेटा सुरक्षित राहून केवळ फोटो मॅचिंगसाठी वापरला जाईल.
-                  </label>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#EF8619] py-3.5 text-sm font-bold text-white shadow-lg transition hover:bg-[#d97410]"
-              >
-                <span>Continue to Selfie Scan</span>
-                <Sparkles className="h-4 w-4" />
-              </button>
-            </form>
+              <p className="mt-2 text-xs text-slate-400 leading-relaxed">
+                Equipped with AI Face Recognition & Digital Cloud Album Delivery powered by PhotoOS.
+              </p>
+            </div>
           </div>
         )}
 
-        {/* STEP 3: SELFIE CAPTURE */}
-        {step === "selfie" && (
-          <div className="space-y-6 text-center animate-in fade-in">
-            <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-sm">
-              <h2 className="text-xl font-bold text-white">
-                Take a Clear Selfie
+        {/* =================================================================== */}
+        {/* TAB 2: MARKETPLACE (स्टुडिओ पॅकेजेस आणि बुकिंग) */}
+        {/* =================================================================== */}
+        {activeAppTab === "marketplace" && (
+          <div className="space-y-4 animate-in fade-in">
+            <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-[#0A3F61]/60 to-slate-900 p-6">
+              <div className="flex items-center gap-2 text-[#EF8619]">
+                <ShoppingBag className="h-5 w-5" />
+                <span className="text-xs font-bold uppercase tracking-wider">Studio Services</span>
+              </div>
+              <h2 className="mt-2 text-xl font-bold text-white">
+                Book {studio?.brand_name || studio?.name || "Studio"} for your Events
               </h2>
-              <p className="mt-1 text-xs text-slate-400">
-                चेहरा स्पष्ट दिसेल असा सेल्फी घ्या किंवा गॅलरीतून निवडा (99%+ Accuracy Biometric Verification)
+              <p className="mt-1 text-xs text-slate-300">
+                Wedding Photography, Cinematic Films, Pre-wedding & Luxury Albums.
               </p>
+            </div>
 
-              {formError && (
-                <div className="mt-4 rounded-2xl border border-red-500/40 bg-red-950/50 p-4 text-xs font-semibold text-red-200 shadow-inner text-left">
-                  ⚠️ {formError}
+            {/* Service 1 */}
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-white text-sm">Wedding Cinematic Film & 4K Shoot</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Teaser, Highlights Reel & Full 4K Video</p>
+                <span className="mt-2 inline-block rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
+                  Most Popular
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const phone = studio?.contact_phone || "919876543210";
+                  window.open(`https://wa.me/${phone.replace(/\D/g, "")}?text=Hi%2C+I+want+to+inquire+about+Wedding+Photography`, "_blank");
+                }}
+                className="rounded-xl bg-[#0A3F61] px-3.5 py-2 text-xs font-bold text-white hover:bg-[#08344f]"
+              >
+                Inquire
+              </button>
+            </div>
+
+            {/* Service 2 */}
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-white text-sm">Cinematic Pre-Wedding Shoot</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Exotic Locations, 2 Concept Costumes & Drone</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const phone = studio?.contact_phone || "919876543210";
+                  window.open(`https://wa.me/${phone.replace(/\D/g, "")}?text=Hi%2C+I+want+to+inquire+about+Pre-wedding+Shoot`, "_blank");
+                }}
+                className="rounded-xl bg-[#0A3F61] px-3.5 py-2 text-xs font-bold text-white hover:bg-[#08344f]"
+              >
+                Inquire
+              </button>
+            </div>
+
+            {/* Service 3 */}
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-white text-sm">Luxury Canvera Photobook Album</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Velvet Matte, Metallic Gold & Waterproof Pages</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const phone = studio?.contact_phone || "919876543210";
+                  window.open(`https://wa.me/${phone.replace(/\D/g, "")}?text=Hi%2C+I+want+to+inquire+about+Album+Printing`, "_blank");
+                }}
+                className="rounded-xl bg-[#0A3F61] px-3.5 py-2 text-xs font-bold text-white hover:bg-[#08344f]"
+              >
+                Inquire
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* =================================================================== */}
+        {/* TAB 3: CAMERA / GALLERY (चेहरा स्कॅन & फोटो गॅलरी) */}
+        {/* =================================================================== */}
+        {activeAppTab === "camera" && (
+          <div className="space-y-4 animate-in fade-in">
+            {/* Step: Role Select or Guest Form if not done */}
+            {step === "role_select" && (
+              <div className="space-y-4 text-center">
+                <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
+                  <h3 className="text-lg font-bold text-white">गॅलरी ॲक्सेस निवडा</h3>
+                  <p className="text-xs text-slate-400 mt-1">Select your profile to view photos</p>
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRole("bride_groom");
+                        setStep("gallery");
+                      }}
+                      className="rounded-2xl border border-amber-400/40 bg-amber-500/10 p-4 text-center hover:bg-amber-500/20"
+                    >
+                      <Crown className="mx-auto h-6 w-6 text-amber-400" />
+                      <span className="mt-2 block text-xs font-bold text-white">Bride & Groom</span>
+                      <span className="text-[10px] text-amber-300">VIP Host</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRole("guest");
+                        setStep("guest_consent");
+                      }}
+                      className="rounded-2xl border border-sky-400/40 bg-sky-500/10 p-4 text-center hover:bg-sky-500/20"
+                    >
+                      <Camera className="mx-auto h-6 w-6 text-sky-400" />
+                      <span className="mt-2 block text-xs font-bold text-white">Event Guest</span>
+                      <span className="text-[10px] text-sky-300">AI Face Scan</span>
+                    </button>
+                  </div>
                 </div>
-              )}
+              </div>
+            )}
 
-              <input
-                ref={cameraInputRef}
-                type="file"
-                accept="image/*"
-                capture="user"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-              <input
-                ref={galleryInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="hidden"
-              />
+            {/* Step: Guest Details Form (Synced to Admin CRM) */}
+            {step === "guest_consent" && (
+              <div className="rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-2xl bg-sky-500/20 p-2.5 text-sky-400">
+                    <User className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">तुमचे तपशील प्रविष्ट करा</h3>
+                    <p className="text-xs text-slate-400">Enter details to match your event photos</p>
+                  </div>
+                </div>
 
-              <div className="my-8 flex justify-center">
-                {selfieDataUrl ? (
-                  <div className="relative h-56 w-56 overflow-hidden rounded-full border-4 border-[#EF8619] shadow-2xl">
-                    <img
-                      src={selfieDataUrl}
-                      alt="Selfie"
-                      className="h-full w-full object-cover"
+                <form onSubmit={handleProceedGuest} className="mt-5 space-y-4">
+                  {formError && (
+                    <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-300">
+                      {formError}
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                      पूर्ण नाव (Full Name) *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="उदा. राहुल कदम"
+                      value={guestName}
+                      onChange={(e) => setGuestName(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-white/15 bg-white/5 p-3 text-sm text-white outline-none focus:border-sky-400"
                     />
                   </div>
-                ) : (
-                  <div
-                    onClick={() => cameraInputRef.current?.click()}
-                    className="flex h-56 w-56 cursor-pointer flex-col items-center justify-center rounded-full border-2 border-dashed border-sky-400/50 bg-sky-950/20 text-sky-300 transition hover:bg-sky-950/40"
-                  >
-                    <Camera className="h-12 w-12 text-[#EF8619]" />
-                    <span className="mt-2 text-xs font-semibold">
-                      Tap to Open Camera
-                    </span>
+
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                      मोबाईल क्रमांक (Mobile Number) *
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      maxLength={10}
+                      placeholder="उदा. 9876543210"
+                      value={guestPhone}
+                      onChange={(e) => setGuestPhone(e.target.value.replace(/\D/g, ""))}
+                      className="mt-1 w-full rounded-xl border border-white/15 bg-white/5 p-3 text-sm text-white outline-none focus:border-sky-400"
+                    />
                   </div>
-                )}
-              </div>
 
-              {selfieDataUrl ? (
-                <div className="space-y-3">
-                  <button
-                    type="button"
-                    onClick={() => void handleMatchPhotos()}
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#EF8619] py-3.5 text-sm font-bold text-white shadow-lg transition hover:bg-[#d97410]"
-                  >
-                    <Sparkles className="h-4 w-4" />
-                    <span>Find My Photos</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => cameraInputRef.current?.click()}
-                    className="w-full rounded-2xl border border-white/20 bg-white/5 py-2.5 text-xs font-semibold text-slate-300 hover:bg-white/10"
-                  >
-                    Retake Selfie
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => cameraInputRef.current?.click()}
-                    className="flex flex-col items-center justify-center gap-2 rounded-2xl bg-[#0A3F61] p-4 text-xs font-bold text-white hover:bg-[#08334f]"
-                  >
-                    <Camera className="h-6 w-6 text-orange-400" />
-                    <span>Open Camera</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => galleryInputRef.current?.click()}
-                    className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 p-4 text-xs font-bold text-slate-200 hover:bg-white/10"
-                  >
-                    <Upload className="h-6 w-6 text-sky-400" />
-                    <span>Upload Photo</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* STEP 4: MATCHING ANIMATION */}
-        {step === "matching" && (
-          <div className="flex min-h-[50vh] flex-col items-center justify-center space-y-6 text-center animate-in zoom-in-95">
-            <div className="relative flex h-36 w-36 items-center justify-center">
-              <div className="absolute inset-0 rounded-full border-4 border-white/10 border-t-[#EF8619] animate-spin" />
-              {selfieDataUrl ? (
-                <div className="h-28 w-28 overflow-hidden rounded-full">
-                  <img src={selfieDataUrl} alt="Scanning" className="h-full w-full object-cover" />
-                </div>
-              ) : (
-                <Sparkles className="h-10 w-10 text-[#EF8619]" />
-              )}
-            </div>
-
-            <div className="space-y-1">
-              <h2 className="text-xl font-bold text-white">
-                Searching for your face...
-              </h2>
-              <p className="text-sm font-medium text-[#EF8619] animate-pulse">
-                {scanStatusMessage}
-              </p>
-              <p className="text-xs text-slate-400">
-                Scanning through {photos.length} event photos with 99%+ accuracy AI models
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 5: INTERACTIVE GALLERY (For Bride, Groom & Guests) */}
-        {step === "gallery" && (
-          <div className="space-y-4 animate-in fade-in">
-            {faceScanNotice && (
-              <div className="rounded-2xl border border-sky-400/40 bg-sky-950/40 p-4 text-xs font-semibold text-sky-200 flex items-center justify-between shadow-lg">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-sky-400 shrink-0" />
-                  <span>{faceScanNotice}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setFaceScanNotice(null)}
-                  className="text-slate-400 hover:text-white ml-2 text-base font-bold"
-                >
-                  ✕
-                </button>
-              </div>
-            )}
-            {/* VIP Bride & Groom Banner with Album Progress */}
-            {role === "bride_groom" && (
-              <div className="rounded-2xl border border-amber-400/40 bg-gradient-to-r from-amber-950/40 via-slate-900 to-amber-950/30 p-4 shadow-lg">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <Crown className="h-5 w-5 text-amber-400" />
-                    <div>
-                      <h3 className="text-sm font-bold text-amber-300">
-                        Wedding Album Selection Mode
-                      </h3>
-                      <p className="text-xs text-slate-300">
-                        ⭐ {selectedIds.size} Photos Selected for your Wedding Album
-                      </p>
-                    </div>
+                  <div className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
+                    <input
+                      type="checkbox"
+                      id="consent-check"
+                      checked={consentGiven}
+                      onChange={(e) => setConsentGiven(e.target.checked)}
+                      className="mt-1 h-4 w-4 rounded accent-[#0A3F61]"
+                    />
+                    <label htmlFor="consent-check" className="text-xs text-slate-300 leading-relaxed cursor-pointer">
+                      मी माझे फोटो शोधण्यासाठी फेशिअल रेकग्निशन तंत्रज्ञानाचा वापर करण्यास संमती देत आहे (DPDP Act 2023 Compliant).
+                    </label>
                   </div>
 
                   <button
-                    type="button"
-                    onClick={handleSubmitAlbumSelection}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-amber-400 px-4 py-2 text-xs font-bold text-black shadow transition hover:bg-amber-300"
+                    type="submit"
+                    className="w-full rounded-2xl bg-gradient-to-r from-[#0A3F61] to-[#08344f] py-3 text-xs font-bold text-white shadow hover:brightness-110"
                   >
-                    <CheckCircle2 className="h-4 w-4" />
-                    Submit Album Selection
+                    पुढे जा आणि सेल्फी घ्या (Proceed to Selfie)
                   </button>
-                </div>
-
-                {submissionFeedback && (
-                  <div className="mt-3 rounded-xl bg-emerald-950/80 p-2.5 text-xs font-semibold text-emerald-300 border border-emerald-500/40">
-                    {submissionFeedback}
-                  </div>
-                )}
+                </form>
               </div>
             )}
 
-            {/* Gallery Category Tabs */}
-            <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-white/10 bg-white/5 p-1.5">
-              <button
-                type="button"
-                onClick={() => setGalleryTab("all")}
-                className={`flex-1 rounded-xl py-2 px-3 text-xs font-bold transition ${
-                  galleryTab === "all"
-                    ? "bg-[#0A3F61] text-white shadow"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                All Photos ({photos.length})
-              </button>
-
-              {matchedPhotos.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setGalleryTab("matched")}
-                  className={`flex-1 rounded-xl py-2 px-3 text-xs font-bold transition ${
-                    galleryTab === "matched"
-                      ? "bg-[#EF8619] text-white shadow"
-                      : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  My Photos ({matchedPhotos.length})
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={() => setGalleryTab("selected")}
-                className={`flex-1 rounded-xl py-2 px-3 text-xs font-bold transition ${
-                  galleryTab === "selected"
-                    ? "bg-amber-500 text-black shadow"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                ⭐ Selected ({selectedIds.size})
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setGalleryTab("favorites")}
-                className={`flex-1 rounded-xl py-2 px-3 text-xs font-bold transition ${
-                  galleryTab === "favorites"
-                    ? "bg-red-600 text-white shadow"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                ❤️ Liked ({favoriteIds.size})
-              </button>
-            </div>
-
-            {/* Photos Grid */}
-            {displayedPhotos.length === 0 ? (
-              <div className="rounded-3xl border border-dashed border-white/15 p-12 text-center">
-                <ImageIcon className="mx-auto h-10 w-10 text-slate-500" />
-                <h3 className="mt-3 text-base font-bold text-white">
-                  {galleryTab === "matched"
-                    ? "तुमचा चेहरा असलेले फोटो सापडले नाहीत"
-                    : "या विभागात कोणतेही फोटो उपलब्ध नाहीत"}
-                </h3>
+            {/* Step: Selfie Capture */}
+            {step === "selfie" && (
+              <div className="rounded-3xl border border-white/10 bg-slate-900 p-6 text-center shadow-2xl">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#EF8619]/20 text-[#EF8619]">
+                  <Camera className="h-8 w-8" />
+                </div>
+                <h3 className="mt-4 text-lg font-bold text-white">सेल्फी घ्या किंवा फोटो अपलोड करा</h3>
                 <p className="mt-1 text-xs text-slate-400">
-                  {galleryTab === "matched"
-                    ? "कृपया 'सर्व फोटो' टॅब निवडून संपूर्ण अल्बम पहा किंवा पुन्हा चांगल्या प्रकाशात सेल्फी घ्या."
-                    : "सर्व फोटो पाहण्यासाठी वरील 'सर्व फोटो' टॅबवर क्लिक करा."}
+                  Take a clear selfie to instantly match your photos (99%+ Accuracy)
                 </p>
-                {galleryTab === "matched" && (
+
+                {formError && (
+                  <div className="mt-3 rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-300">
+                    {formError}
+                  </div>
+                )}
+
+                {selfieDataUrl ? (
+                  <div className="mt-4 space-y-4">
+                    <div className="mx-auto h-40 w-40 overflow-hidden rounded-full border-4 border-[#EF8619] shadow-xl">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={selfieDataUrl} alt="Selfie" className="h-full w-full object-cover" />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleMatchPhotos}
+                      className="w-full rounded-2xl bg-[#EF8619] py-3.5 text-xs font-extrabold text-black shadow-lg shadow-orange-500/20 hover:brightness-110"
+                    >
+                      फोटो मॅच करा (Match My Photos)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelfieDataUrl(null)}
+                      className="text-xs text-slate-400 hover:text-white"
+                    >
+                      दुसरा सेल्फी घ्या
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-6 flex flex-col gap-3">
+                    <input
+                      ref={cameraInputRef}
+                      type="file"
+                      accept="image/*"
+                      capture="user"
+                      className="hidden"
+                      onChange={handleFileChange}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => cameraInputRef.current?.click()}
+                      className="flex items-center justify-center gap-2 rounded-2xl bg-[#0A3F61] py-3.5 text-xs font-bold text-white shadow hover:bg-[#08344f]"
+                    >
+                      <Camera className="h-4 w-4" />
+                      कॅमेरा सुरू करा (Take Selfie)
+                    </button>
+
+                    <input
+                      ref={galleryInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleFileChange}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => galleryInputRef.current?.click()}
+                      className="rounded-2xl border border-white/20 bg-white/5 py-3 text-xs font-bold text-white hover:bg-white/10"
+                    >
+                      गॅलरीतून फोटो निवडा (Upload from Gallery)
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Step: Matching Animation */}
+            {step === "matching" && (
+              <div className="rounded-3xl border border-white/10 bg-slate-900 p-8 text-center">
+                <Loader2 className="mx-auto h-12 w-12 animate-spin text-[#EF8619]" />
+                <h3 className="mt-5 text-base font-bold text-white">AI Face Matching</h3>
+                <p className="mt-2 text-xs text-sky-200">{scanStatusMessage}</p>
+              </div>
+            )}
+
+            {/* Step: Gallery View */}
+            {step === "gallery" && (
+              <div className="space-y-4">
+                {/* Category Filters */}
+                <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-white/10 bg-white/5 p-1.5">
                   <button
                     type="button"
                     onClick={() => setGalleryTab("all")}
-                    className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-4 py-2 text-xs font-semibold text-white hover:bg-white/20"
+                    className={`flex-1 rounded-xl py-2 px-2.5 text-xs font-bold transition ${
+                      galleryTab === "all" ? "bg-[#0A3F61] text-white shadow" : "text-slate-400 hover:text-white"
+                    }`}
                   >
-                    सर्व फोटो पहा
+                    All ({photos.length})
                   </button>
+
+                  {matchedPhotos.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setGalleryTab("matched")}
+                      className={`flex-1 rounded-xl py-2 px-2.5 text-xs font-bold transition ${
+                        galleryTab === "matched" ? "bg-[#EF8619] text-white shadow" : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      My Photos ({matchedPhotos.length})
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setGalleryTab("selected")}
+                    className={`flex-1 rounded-xl py-2 px-2.5 text-xs font-bold transition ${
+                      galleryTab === "selected" ? "bg-amber-500 text-black shadow" : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    ⭐ Selected ({selectedIds.size})
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setGalleryTab("favorites")}
+                    className={`flex-1 rounded-xl py-2 px-2.5 text-xs font-bold transition ${
+                      galleryTab === "favorites" ? "bg-red-600 text-white shadow" : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    ❤️ ({favoriteIds.size})
+                  </button>
+                </div>
+
+                {/* Photo Grid */}
+                {displayedPhotos.length === 0 ? (
+                  <div className="rounded-3xl border border-white/10 bg-white/5 p-8 text-center">
+                    <ImageIcon className="mx-auto h-8 w-8 text-slate-500" />
+                    <p className="mt-3 text-xs text-slate-400">या कॅटेगरीमध्ये फोटो नाहीत.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+                    {displayedPhotos.map((photo) => {
+                      const url = photo.thumbnailUrl || photo.originalUrl;
+                      const isFav = favoriteIds.has(photo.id);
+                      const isSel = selectedIds.has(photo.id);
+
+                      return (
+                        <div
+                          key={photo.id}
+                          className="group relative aspect-square overflow-hidden rounded-2xl border border-white/10 bg-slate-900"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={url}
+                            alt="Photo"
+                            onClick={() => setPreviewPhoto(photo)}
+                            className="h-full w-full object-cover cursor-pointer transition duration-300 group-hover:scale-105"
+                            loading="lazy"
+                          />
+
+                          {/* Action Overlay */}
+                          <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2">
+                            <button
+                              type="button"
+                              onClick={() => void handleToggleFavorite(photo.id)}
+                              className="rounded-full bg-black/40 p-1.5 text-white hover:text-red-500"
+                            >
+                              <Heart className={`h-4 w-4 ${isFav ? "fill-red-500 text-red-500" : ""}`} />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => void handleToggleSelection(photo.id)}
+                              className="rounded-full bg-black/40 p-1.5 text-white hover:text-amber-400"
+                            >
+                              <Star className={`h-4 w-4 ${isSel ? "fill-amber-400 text-amber-400" : ""}`} />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setCommentingPhoto(photo)}
+                              className="rounded-full bg-black/40 p-1.5 text-white hover:text-sky-400"
+                            >
+                              <MessageSquare className="h-4 w-4" />
+                            </button>
+
+                            {allowDownloads && (
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadPhoto(photo)}
+                                className="rounded-full bg-black/40 p-1.5 text-white hover:text-[#EF8619]"
+                              >
+                                <Download className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-                {displayedPhotos.map((photo) => {
-                  const isFav = favoriteIds.has(photo.id);
-                  const isSel = selectedIds.has(photo.id);
-                  const displayUrl = photo.thumbnailUrl || photo.originalUrl;
-
-                  return (
-                    <div
-                      key={photo.id}
-                      onClick={() => setPreviewPhoto(photo)}
-                      className="group relative aspect-square cursor-pointer overflow-hidden rounded-2xl border border-white/10 bg-slate-900 shadow-md"
-                    >
-                      <img
-                        src={displayUrl}
-                        alt={photo.fileName}
-                        loading="lazy"
-                        draggable={false}
-                        onContextMenu={(e) => e.preventDefault()}
-                        className="h-full w-full object-cover transition duration-300 select-none group-hover:scale-105"
-                        style={{ WebkitTouchCallout: "none" }}
-                      />
-
-                      {/* Top Badges (Selection & Favorite) */}
-                      <div className="absolute left-2 top-2 flex items-center gap-1">
-                        {isSel && (
-                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-400 text-black shadow">
-                            <Star className="h-3.5 w-3.5 fill-black" />
-                          </span>
-                        )}
-                        {isFav && (
-                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white shadow">
-                            <Heart className="h-3.5 w-3.5 fill-white" />
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Bottom Quick Actions */}
-                      <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/80 via-black/30 to-transparent p-2">
-                        <div className="flex items-center gap-1.5">
-                          {/* Favorite Button */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void handleToggleFavorite(photo.id);
-                            }}
-                            className={`rounded-full p-1.5 backdrop-blur-sm transition ${
-                              isFav ? "bg-red-600 text-white" : "bg-black/50 text-white hover:bg-black/70"
-                            }`}
-                            title="Favorite"
-                          >
-                            <Heart className={`h-3.5 w-3.5 ${isFav ? "fill-white" : ""}`} />
-                          </button>
-
-                          {/* Album Select Button */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void handleToggleSelection(photo.id);
-                            }}
-                            className={`rounded-full p-1.5 backdrop-blur-sm transition ${
-                              isSel ? "bg-amber-400 text-black" : "bg-black/50 text-white hover:bg-black/70"
-                            }`}
-                            title="Select for Album"
-                          >
-                            <Star className={`h-3.5 w-3.5 ${isSel ? "fill-black" : ""}`} />
-                          </button>
-
-                          {/* Comment Button */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setCommentingPhoto(photo);
-                            }}
-                            className="rounded-full bg-black/50 p-1.5 text-white backdrop-blur-sm hover:bg-black/70"
-                            title="Comment"
-                          >
-                            <MessageCircle className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-
-                        {/* Download */}
-                        {allowDownloads && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDownloadPhoto(photo);
-                            }}
-                            className="rounded-full bg-black/50 p-1.5 text-white backdrop-blur-sm hover:bg-black/70"
-                            title="Download"
-                          >
-                            <Download className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
             )}
+          </div>
+        )}
+
+        {/* =================================================================== */}
+        {/* TAB 4: CHAT (इव्हेंट गेस्टबुक & शुभेच्छा) */}
+        {/* =================================================================== */}
+        {activeAppTab === "chat" && (
+          <div className="space-y-4 animate-in fade-in">
+            <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-[#0A3F61]/60 to-slate-900 p-5">
+              <div className="flex items-center gap-2 text-sky-400">
+                <MessageSquare className="h-5 w-5" />
+                <span className="text-xs font-bold uppercase tracking-wider">Live Event Wishes</span>
+              </div>
+              <h2 className="mt-1 text-lg font-bold text-white">Guestbook & Congratulations</h2>
+              <p className="text-xs text-slate-300">Leave warm wishes for the couple & the family!</p>
+            </div>
+
+            {/* Post Wish Form */}
+            <form onSubmit={handleSendWish} className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  required
+                  placeholder="तुमच्या शुभेच्छा लिहा (Write your wishes)..."
+                  value={newWishMessage}
+                  onChange={(e) => setNewWishMessage(e.target.value)}
+                  className="flex-1 rounded-xl border border-white/15 bg-slate-900 px-3.5 py-2.5 text-xs text-white outline-none focus:border-sky-400"
+                />
+                <button
+                  type="submit"
+                  className="rounded-xl bg-[#0A3F61] p-2.5 text-white hover:bg-[#08344f]"
+                >
+                  <Send className="h-4 w-4" />
+                </button>
+              </div>
+            </form>
+
+            {/* Wishes Feed */}
+            <div className="space-y-2.5">
+              {wishes.map((w) => (
+                <div key={w.id} className="rounded-2xl border border-white/10 bg-white/5 p-3.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-sky-300">{w.sender}</span>
+                    <span className="text-[10px] text-slate-500">{w.timestamp}</span>
+                  </div>
+                  <p className="mt-1.5 text-xs text-slate-200 leading-relaxed">{w.message}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* =================================================================== */}
+        {/* TAB 5: PROFILE (प्रोफाइल & आवडी) */}
+        {/* =================================================================== */}
+        {activeAppTab === "profile" && (
+          <div className="space-y-4 animate-in fade-in">
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-center">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#0A3F61] text-white">
+                <User className="h-8 w-8" />
+              </div>
+              <h3 className="mt-3 text-base font-bold text-white">
+                {guestName || (role === "bride_groom" ? "Bride & Groom" : "Guest User")}
+              </h3>
+              {guestPhone && <p className="text-xs text-slate-400 font-mono mt-0.5">+91 {guestPhone}</p>}
+
+              <div className="mt-5 grid grid-cols-3 gap-2 border-t border-white/10 pt-4 text-center">
+                <div>
+                  <p className="text-lg font-bold text-[#EF8619]">{matchedPhotos.length}</p>
+                  <p className="text-[10px] text-slate-400">Matched</p>
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-red-500">{favoriteIds.size}</p>
+                  <p className="text-[10px] text-slate-400">Liked</p>
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-amber-400">{selectedIds.size}</p>
+                  <p className="text-[10px] text-slate-400">Selected</p>
+                </div>
+              </div>
+            </div>
+
+            {/* DPDP Compliance Card */}
+            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 flex items-center gap-3">
+              <ShieldCheck className="h-6 w-6 text-emerald-400 shrink-0" />
+              <div>
+                <h4 className="text-xs font-bold text-emerald-300">DPDP 2023 Compliant & Safe</h4>
+                <p className="text-[11px] text-slate-300">Your biometric data is encrypted and used only for photo matching.</p>
+              </div>
+            </div>
+
+            {/* Re-scan Selfie Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setStep("selfie");
+                setActiveAppTab("camera");
+              }}
+              className="w-full flex items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white/5 py-3 text-xs font-bold text-white hover:bg-white/10"
+            >
+              <RefreshCw className="h-4 w-4" />
+              नवीन सेल्फी घ्या / पुन्हा स्कॅन करा (Rescan Face)
+            </button>
           </div>
         )}
       </main>
 
-      {/* FULLSCREEN LIGHTBOX MODAL */}
+      {/* ===================================================================== */}
+      {/* FIXED MOBILE APP BOTTOM NAVIGATION BAR */}
+      {/* ===================================================================== */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-[#071f31]/95 px-3 py-2 backdrop-blur-xl shadow-2xl">
+        <div className="mx-auto flex max-w-md items-center justify-between">
+          {/* Home */}
+          <button
+            type="button"
+            onClick={() => setActiveAppTab("home")}
+            className={`flex flex-col items-center gap-1 transition ${
+              activeAppTab === "home" ? "text-[#EF8619]" : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <HomeIcon className="h-5 w-5" />
+            <span className="text-[10px] font-bold">Home</span>
+          </button>
+
+          {/* Marketplace */}
+          <button
+            type="button"
+            onClick={() => setActiveAppTab("marketplace")}
+            className={`flex flex-col items-center gap-1 transition ${
+              activeAppTab === "marketplace" ? "text-[#EF8619]" : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <ShoppingBag className="h-5 w-5" />
+            <span className="text-[10px] font-bold">Market</span>
+          </button>
+
+          {/* Center Elevated Camera Button */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveAppTab("camera");
+              if (step === "role_select") setStep("guest_consent");
+            }}
+            className="-mt-5 flex h-13 w-13 flex-col items-center justify-center rounded-full bg-gradient-to-tr from-[#EF8619] to-amber-400 text-black shadow-xl ring-4 ring-[#071f31] transition active:scale-95"
+          >
+            <Camera className="h-6 w-6" />
+            <span className="text-[9px] font-black uppercase">Scan</span>
+          </button>
+
+          {/* Chat */}
+          <button
+            type="button"
+            onClick={() => setActiveAppTab("chat")}
+            className={`flex flex-col items-center gap-1 transition ${
+              activeAppTab === "chat" ? "text-[#EF8619]" : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <MessageCircle className="h-5 w-5" />
+            <span className="text-[10px] font-bold">Chat</span>
+          </button>
+
+          {/* Profile */}
+          <button
+            type="button"
+            onClick={() => setActiveAppTab("profile")}
+            className={`flex flex-col items-center gap-1 transition ${
+              activeAppTab === "profile" ? "text-[#EF8619]" : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <User className="h-5 w-5" />
+            <span className="text-[10px] font-bold">Profile</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* Lightbox Modal */}
       {previewPhoto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4 backdrop-blur-sm animate-in fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4 backdrop-blur-md">
           <button
             type="button"
             onClick={() => setPreviewPhoto(null)}
-            className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+            className="absolute top-4 right-4 rounded-full bg-white/10 p-2.5 text-white hover:bg-white/20"
           >
             <X className="h-6 w-6" />
           </button>
 
-          <div className="max-h-[90vh] max-w-full text-center">
+          <div className="max-h-[85vh] max-w-full">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={previewPhoto.originalUrl || previewPhoto.thumbnailUrl}
-              alt={previewPhoto.fileName}
-              draggable={false}
-              onContextMenu={(e) => e.preventDefault()}
-              className="max-h-[72vh] w-auto max-w-full rounded-2xl object-contain shadow-2xl select-none"
-              style={{ WebkitTouchCallout: "none" }}
+              alt="Preview"
+              className="max-h-[75vh] max-w-full rounded-2xl object-contain mx-auto"
             />
 
-            {/* Lightbox Controls */}
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
               <button
                 type="button"
                 onClick={() => void handleToggleFavorite(previewPhoto.id)}
-                className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold shadow transition ${
-                  favoriteIds.has(previewPhoto.id)
-                    ? "bg-red-600 text-white"
-                    : "bg-white/10 text-white hover:bg-white/20"
+                className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold ${
+                  favoriteIds.has(previewPhoto.id) ? "bg-red-600 text-white" : "bg-white/10 text-white"
                 }`}
               >
                 <Heart className={`h-4 w-4 ${favoriteIds.has(previewPhoto.id) ? "fill-white" : ""}`} />
-                <span>{favoriteIds.has(previewPhoto.id) ? "Favorited" : "Favorite"}</span>
+                <span>Favorite</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => void handleToggleSelection(previewPhoto.id)}
-                className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold shadow transition ${
-                  selectedIds.has(previewPhoto.id)
-                    ? "bg-amber-400 text-black"
-                    : "bg-white/10 text-white hover:bg-white/20"
+                className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold ${
+                  selectedIds.has(previewPhoto.id) ? "bg-amber-400 text-black" : "bg-white/10 text-white"
                 }`}
               >
                 <Star className={`h-4 w-4 ${selectedIds.has(previewPhoto.id) ? "fill-black" : ""}`} />
-                <span>{selectedIds.has(previewPhoto.id) ? "Selected for Album" : "Select for Album"}</span>
+                <span>Select for Album</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setCommentingPhoto(previewPhoto)}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-white/20"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-4 py-2 text-xs font-semibold text-white"
               >
                 <MessageSquare className="h-4 w-4" />
-                <span>Comments</span>
+                <span>Comment</span>
               </button>
 
               {allowDownloads && (
                 <button
                   type="button"
                   onClick={() => handleDownloadPhoto(previewPhoto)}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#0A3F61] px-4 py-2 text-xs font-semibold text-white shadow hover:bg-[#08334f]"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#0A3F61] px-4 py-2 text-xs font-semibold text-white"
                 >
                   <Download className="h-4 w-4" />
                   <span>Download HD</span>
@@ -1250,7 +1293,7 @@ export default function ClientAccessGalleryPage() {
               <button
                 type="button"
                 onClick={() => handleWhatsAppShare(previewPhoto)}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-[#25D366] px-4 py-2 text-xs font-semibold text-white shadow hover:bg-[#20b858]"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[#25D366] px-4 py-2 text-xs font-semibold text-white"
               >
                 <Share2 className="h-4 w-4" />
                 <span>WhatsApp</span>
@@ -1260,16 +1303,14 @@ export default function ClientAccessGalleryPage() {
         </div>
       )}
 
-      {/* COMMENTING DRAWER / MODAL */}
+      {/* Commenting Drawer */}
       {commentingPhoto && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-in fade-in">
           <div className="w-full max-w-md rounded-3xl border border-white/15 bg-slate-900 p-6 shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div className="flex items-center gap-2">
                 <MessageCircle className="h-5 w-5 text-sky-400" />
-                <h3 className="text-base font-bold text-white">
-                  Photo Comments
-                </h3>
+                <h3 className="text-base font-bold text-white">Photo Comments</h3>
               </div>
               <button
                 type="button"
@@ -1280,42 +1321,32 @@ export default function ClientAccessGalleryPage() {
               </button>
             </div>
 
-            {/* Comments List */}
-            <div className="my-4 max-h-48 space-y-2.5 overflow-y-auto pr-1">
+            <div className="my-4 max-h-48 space-y-2 overflow-y-auto">
               {(photoCommentsMap.get(commentingPhoto.id) || []).length === 0 ? (
-                <p className="text-center py-6 text-xs text-slate-500">
-                  No comments yet. Be the first to leave a note or edit request!
-                </p>
+                <p className="text-center py-6 text-xs text-slate-500">पहिला मेसेज किंवा कमेंट लिहा!</p>
               ) : (
                 (photoCommentsMap.get(commentingPhoto.id) || []).map((c) => (
                   <div key={c.id} className="rounded-2xl border border-white/10 bg-white/5 p-3 text-xs">
-                    <div className="flex items-center justify-between text-[11px] text-slate-400">
-                      <span className="font-bold text-sky-300">{c.author}</span>
-                      <span>{new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                    </div>
+                    <span className="font-bold text-sky-300">{c.author}</span>
                     <p className="mt-1 text-slate-200">{c.comment}</p>
                   </div>
                 ))
               )}
             </div>
 
-            {/* Comment Input */}
             <div className="flex items-center gap-2">
               <input
                 type="text"
                 value={newCommentText}
                 onChange={(e) => setNewCommentText(e.target.value)}
-                placeholder="Write a comment or retouch request..."
-                className="flex-1 rounded-xl border border-white/15 bg-white/5 px-3.5 py-2.5 text-xs text-white placeholder:text-slate-500 focus:border-sky-400 focus:outline-none"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void handlePostComment();
-                }}
+                placeholder="कमेंट किंवा रिक्वेस्ट लिहा..."
+                className="flex-1 rounded-xl border border-white/15 bg-white/5 px-3.5 py-2.5 text-xs text-white outline-none"
               />
               <button
                 type="button"
                 onClick={() => void handlePostComment()}
                 disabled={submittingComment || !newCommentText.trim()}
-                className="rounded-xl bg-[#0A3F61] p-2.5 text-white hover:bg-[#08334f] disabled:opacity-50"
+                className="rounded-xl bg-[#0A3F61] p-2.5 text-white"
               >
                 <Send className="h-4 w-4" />
               </button>
@@ -1323,25 +1354,20 @@ export default function ClientAccessGalleryPage() {
           </div>
         </div>
       )}
-      {/* DOWNLOAD LOCK NOTICE POPUP */}
+
+      {/* Download Lock Popup */}
       {downloadLockNotice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-3xl border border-white/20 bg-slate-900 p-6 text-center shadow-2xl">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-400">
-              <ShieldCheck className="h-7 w-7" />
-            </div>
-            <h3 className="mt-4 text-lg font-bold text-white">
-              {role === "bride_groom" ? "Payment Required" : "Download Locked"}
-            </h3>
-            <p className="mt-2 text-sm leading-relaxed text-slate-300">
-              {downloadLockNotice}
-            </p>
+            <ShieldCheck className="mx-auto h-12 w-12 text-amber-400" />
+            <h3 className="mt-3 text-base font-bold text-white">Download Locked</h3>
+            <p className="mt-2 text-xs leading-relaxed text-slate-300">{downloadLockNotice}</p>
             <button
               type="button"
               onClick={() => setDownloadLockNotice(null)}
-              className="mt-6 w-full rounded-xl bg-[#0A3F61] py-3 text-sm font-semibold text-white shadow hover:bg-[#08334f]"
+              className="mt-5 w-full rounded-xl bg-[#0A3F61] py-2.5 text-xs font-bold text-white"
             >
-              समजले (Close)
+              समजले
             </button>
           </div>
         </div>

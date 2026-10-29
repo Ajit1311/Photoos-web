@@ -121,3 +121,4 @@ CREATE INDEX IF NOT EXISTS idx_security_audit_logs_studio_created
   ON public.security_audit_logs (studio_id, created_at DESC);
 
 COMMIT;
+
