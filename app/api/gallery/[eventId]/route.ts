@@ -95,19 +95,30 @@ export async function GET(
       ]);
       studio = studioData;
 
-      // Event-level setting takes precedence, then workspace setting
+      // Strict Download Enforcement:
+      // If either studio settings or event settings turns OFF downloads, downloads MUST be completely disabled.
       const eventMeta = (event.metadata || {}) as any;
-      if (typeof eventMeta.allowDownload === "boolean") {
-        allowDownloads = eventMeta.allowDownload;
+      const clientDownloadsSetting = (settingsData || []).find(
+        (s) => s.key === "client_downloads" || s.key === "allow_downloads"
+      );
+      const downloadProtectionSetting = (settingsData || []).find(
+        (s) => s.key === "download_protection"
+      );
+
+      const studioExplicitlyDisabled =
+        (clientDownloadsSetting?.value && (clientDownloadsSetting.value as any).enabled === false) ||
+        (downloadProtectionSetting?.value && (downloadProtectionSetting.value as any).enabled === true);
+
+      const eventExplicitlyDisabled = eventMeta && eventMeta.allowDownload === false;
+
+      if (studioExplicitlyDisabled || eventExplicitlyDisabled) {
+        allowDownloads = false;
       } else {
-        const clientDownloadsSetting = (settingsData || []).find(
-          (s) => s.key === "client_downloads" || s.key === "allow_downloads"
+        const studioExplicitlyEnabled = Boolean(
+          clientDownloadsSetting?.value && (clientDownloadsSetting.value as any).enabled === true
         );
-        if (clientDownloadsSetting?.value && typeof (clientDownloadsSetting.value as any).enabled === "boolean") {
-          allowDownloads = Boolean((clientDownloadsSetting.value as any).enabled);
-        } else {
-          allowDownloads = false; // Default: hidden unless turned ON in settings
-        }
+        const eventExplicitlyEnabled = Boolean(eventMeta && eventMeta.allowDownload === true);
+        allowDownloads = studioExplicitlyEnabled || eventExplicitlyEnabled;
       }
 
       if (typeof eventMeta.lockDownloadsUntilPayment === "boolean") {

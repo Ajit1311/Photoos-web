@@ -41,6 +41,7 @@ import {
   extractSelfieFaceDescriptor,
   extractPhotoFacesDescriptors,
   compareTargetFace,
+  loadFaceRecognitionModels,
   MATCH_THRESHOLD,
 } from "@/lib/ai/face-recognition";
 import type { GalleryPhoto } from "@/types/events/gallery";
@@ -139,11 +140,7 @@ export default function ClientAccessGalleryPage() {
             if (json.event) setEvent(json.event as EventData);
             if (json.studio) setStudio(json.studio as StudioData);
 
-            const canDownload = Boolean(
-              json.allowDownloads ??
-              json.event?.metadata?.allowDownload ??
-              false
-            );
+            const canDownload = typeof json.allowDownloads === "boolean" ? json.allowDownloads : false;
             setAllowDownloads(canDownload);
             if (typeof json.lockDownloadsUntilPayment === "boolean") {
               setLockDownloadsUntilPayment(json.lockDownloadsUntilPayment);
@@ -180,13 +177,6 @@ export default function ClientAccessGalleryPage() {
       if (eventData) {
         setEvent(eventData as EventData);
         const eventMeta = (eventData.metadata || {}) as any;
-        if (typeof eventMeta.allowDownload === "boolean") {
-          setAllowDownloads(eventMeta.allowDownload);
-        }
-        if (typeof eventMeta.lockDownloadsUntilPayment === "boolean") {
-          setLockDownloadsUntilPayment(eventMeta.lockDownloadsUntilPayment);
-        }
-
         const [{ data: studioData }, { data: settingsData }] = await Promise.all([
           supabase
             .from("studios")
@@ -197,22 +187,32 @@ export default function ClientAccessGalleryPage() {
             .from("workspace_settings")
             .select("key, value")
             .eq("studio_id", eventData.studio_id)
-            .in("key", ["client_downloads", "allow_downloads"]),
+            .in("key", ["client_downloads", "allow_downloads", "download_protection"]),
         ]);
 
         if (studioData) {
           setStudio(studioData as StudioData);
         }
 
-        if (typeof eventMeta.allowDownload !== "boolean") {
-          const clientSetting = (settingsData || []).find(
-            (s: any) => s.key === "client_downloads" || s.key === "allow_downloads"
-          );
-          if (clientSetting?.value && typeof (clientSetting.value as any).enabled === "boolean") {
-            setAllowDownloads(Boolean((clientSetting.value as any).enabled));
-          } else {
-            setAllowDownloads(false);
-          }
+        const clientSetting = (settingsData || []).find(
+          (s: any) => s.key === "client_downloads" || s.key === "allow_downloads"
+        );
+        const downloadProtection = (settingsData || []).find(
+          (s: any) => s.key === "download_protection"
+        );
+
+        const studioExplicitlyDisabled =
+          (clientSetting?.value && (clientSetting.value as any).enabled === false) ||
+          (downloadProtection?.value && (downloadProtection.value as any).enabled === true);
+
+        const eventExplicitlyDisabled = eventMeta && eventMeta.allowDownload === false;
+
+        if (studioExplicitlyDisabled || eventExplicitlyDisabled) {
+          setAllowDownloads(false);
+        } else {
+          const studioPermits = Boolean(clientSetting?.value && (clientSetting.value as any).enabled === true);
+          const eventPermits = Boolean(eventMeta && eventMeta.allowDownload === true);
+          setAllowDownloads(studioPermits || eventPermits);
         }
       }
 
@@ -237,6 +237,8 @@ export default function ClientAccessGalleryPage() {
 
   useEffect(() => {
     void loadGalleryData();
+    // Warm up AI biometric face models immediately in background
+    void loadFaceRecognitionModels();
   }, [loadGalleryData]);
 
   // Handle Guest Form
@@ -323,36 +325,44 @@ export default function ClientAccessGalleryPage() {
         }
       }
 
-      // 3. If backend didn't have pre-indexed faces or returned empty, perform real client-side matching across all event photos
+      // 3. If backend didn't have pre-indexed faces or returned empty, perform high-speed parallel matching
       if (matchedIds.length === 0 && photos.length > 0) {
         setScanStatusMessage(`गॅलरीमधील फोटोंचे विश्लेषण करत आहोत (0/${photos.length})...`);
         const clientMatches: GalleryPhoto[] = [];
         const indexedBatch: Array<{ assetId: string; descriptors: any[] }> = [];
 
-        for (let i = 0; i < photos.length; i++) {
-          const photo = photos[i];
-          const photoUrl = photo.originalUrl || photo.thumbnailUrl;
-          if (!photoUrl) continue;
+        // Concurrency chunk size of 3 for fast, non-blocking parallel processing
+        const CHUNK_SIZE = 3;
+        for (let i = 0; i < photos.length; i += CHUNK_SIZE) {
+          const chunk = photos.slice(i, i + CHUNK_SIZE);
+          const currentProgress = Math.min(i + chunk.length, photos.length);
+          setScanStatusMessage(`फोटोंचे विश्लेषण करत आहोत (${currentProgress}/${photos.length})...`);
 
-          setScanStatusMessage(`फोटोंचे विश्लेषण करत आहोत (${i + 1}/${photos.length})...`);
-          const photoFaces = await extractPhotoFacesDescriptors(photoUrl);
+          await Promise.all(
+            chunk.map(async (photo) => {
+              const photoUrl = photo.originalUrl || photo.thumbnailUrl;
+              if (!photoUrl) return;
 
-          if (photoFaces.length > 0) {
-            indexedBatch.push({
-              assetId: photo.id,
-              descriptors: photoFaces,
-            });
+              const photoFaces = await extractPhotoFacesDescriptors(photoUrl);
 
-            const match = compareTargetFace(
-              selfieDescriptor,
-              photoFaces.map((f) => f.descriptor),
-              MATCH_THRESHOLD
-            );
+              if (photoFaces.length > 0) {
+                indexedBatch.push({
+                  assetId: photo.id,
+                  descriptors: photoFaces,
+                });
 
-            if (match.isMatch) {
-              clientMatches.push(photo);
-            }
-          }
+                const match = compareTargetFace(
+                  selfieDescriptor,
+                  photoFaces.map((f) => f.descriptor),
+                  MATCH_THRESHOLD
+                );
+
+                if (match.isMatch) {
+                  clientMatches.push(photo);
+                }
+              }
+            })
+          );
         }
 
         // Asynchronously cache extracted faces in backend so subsequent scans are instantaneous

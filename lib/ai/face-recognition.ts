@@ -226,8 +226,37 @@ export async function extractSelfieFaceDescriptor(
 }
 
 /**
+ * Scales an image down to a maximum dimension (default 1024px) for blazing-fast neural network inference
+ * while preserving high fidelity for 128D face embeddings.
+ */
+export function createOptimizedFaceCanvas(
+  img: HTMLImageElement,
+  maxDimension = 1024
+): HTMLCanvasElement | HTMLImageElement {
+  if (typeof document === "undefined") return img;
+  const w = img.naturalWidth || img.width;
+  const h = img.naturalHeight || img.height;
+  if (!w || !h || (w <= maxDimension && h <= maxDimension)) {
+    return img;
+  }
+
+  const scale = maxDimension / Math.max(w, h);
+  const targetW = Math.round(w * scale);
+  const targetH = Math.round(h * scale);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = targetW;
+  canvas.height = targetH;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return img;
+
+  ctx.drawImage(img, 0, 0, targetW, targetH);
+  return canvas;
+}
+
+/**
  * Detects all faces present in a gallery photo and extracts their 128D descriptors.
- * Handles both individual portraits and multi-person group photos.
+ * Handles both individual portraits and multi-person group photos with blazing-fast dual-stage AI.
  */
 export async function extractPhotoFacesDescriptors(
   imageSource: string | HTMLImageElement
@@ -236,11 +265,28 @@ export async function extractPhotoFacesDescriptors(
   if (!ready) return [];
 
   try {
-    const img = await loadImageElement(imageSource);
+    const rawImg = await loadImageElement(imageSource);
+    const img = createOptimizedFaceCanvas(rawImg, 1024);
 
-    // 1. Primary detection: SSD MobileNet v1 for high-accuracy multi-person photos
+    // 1. Ultra-fast Primary Detection: TinyFaceDetector with 512 input size (~30-40ms!)
     let detections: any[] = [];
-    if (faceapi.nets.ssdMobilenetv1.isLoaded) {
+    if (faceapi.nets.tinyFaceDetector.isLoaded) {
+      try {
+        const tinyOptions = new faceapi.TinyFaceDetectorOptions({
+          inputSize: 512,
+          scoreThreshold: 0.35,
+        });
+        detections = await faceapi
+          .detectAllFaces(img, tinyOptions)
+          .withFaceLandmarks()
+          .withFaceDescriptors();
+      } catch (tinyErr) {
+        console.warn("[FaceRecognition] Tiny detector notice:", tinyErr);
+      }
+    }
+
+    // 2. High-precision fallback: SSD MobileNet v1 only if Tiny detector found no faces
+    if (detections.length === 0 && faceapi.nets.ssdMobilenetv1.isLoaded) {
       try {
         const ssdOptions = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.25 });
         detections = await faceapi
@@ -248,20 +294,8 @@ export async function extractPhotoFacesDescriptors(
           .withFaceLandmarks()
           .withFaceDescriptors();
       } catch (ssdErr) {
-        console.warn("[FaceRecognition] SSD MobileNet failed, falling back to TinyFaceDetector:", ssdErr);
+        console.warn("[FaceRecognition] SSD MobileNet fallback notice:", ssdErr);
       }
-    }
-
-    // 2. Fallback to TinyFaceDetector if SSD was not loaded or found no faces
-    if (detections.length === 0 && faceapi.nets.tinyFaceDetector.isLoaded) {
-      const tinyOptions = new faceapi.TinyFaceDetectorOptions({
-        inputSize: 608,
-        scoreThreshold: 0.25,
-      });
-      detections = await faceapi
-        .detectAllFaces(img, tinyOptions)
-        .withFaceLandmarks()
-        .withFaceDescriptors();
     }
 
     return detections.map((d) => ({
