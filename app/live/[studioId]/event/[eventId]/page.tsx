@@ -36,6 +36,7 @@ import {
   extractSelfieFaceDescriptor,
   extractPhotoFacesDescriptors,
   compareTargetFace,
+  MATCH_THRESHOLD,
 } from "@/lib/ai/face-recognition";
 import type { GalleryPhoto } from "@/types/events/gallery";
 
@@ -245,7 +246,7 @@ export default function GuestLiveEventPage() {
 
         for (let i = 0; i < allPhotos.length; i++) {
           const photo = allPhotos[i];
-          const photoUrl = photo.thumbnailUrl || photo.originalUrl;
+          const photoUrl = photo.originalUrl || photo.thumbnailUrl;
           if (!photoUrl) continue;
 
           setScanStatusMessage(`फोटोंचे विश्लेषण करत आहोत (${i + 1}/${allPhotos.length})...`);
@@ -260,7 +261,7 @@ export default function GuestLiveEventPage() {
             const match = compareTargetFace(
               selfieDescriptor,
               photoFaces.map((f) => f.descriptor),
-              0.52
+              MATCH_THRESHOLD
             );
 
             if (match.isMatch) {
@@ -289,8 +290,8 @@ export default function GuestLiveEventPage() {
           setGalleryTab("matched");
         } else {
           setMatchedPhotos([]);
-          setFaceScanNotice("या कार्यक्रमात तुमचा चेहरा असलेले फोटो आढळले नाहीत. तुम्ही 'सर्व फोटो' टॅबमध्ये पाहू शकता.");
-          setGalleryTab("all");
+          setFaceScanNotice("या कार्यक्रमात तुमचा चेहरा असलेले फोटो आढळले नाहीत. तुम्ही खालील बटणावर क्लिक करून किंवा 'सर्व फोटो' टॅब निवडून सर्व फोटो पाहू शकता.");
+          setGalleryTab("matched");
         }
       } else if (matchedIds.length > 0) {
         const matched = allPhotos.filter((p) => matchedIds.includes(p.id));
@@ -299,8 +300,8 @@ export default function GuestLiveEventPage() {
         setGalleryTab("matched");
       } else {
         setMatchedPhotos([]);
-        setFaceScanNotice("या कार्यक्रमात तुमचा चेहरा असलेले फोटो आढळले नाहीत. तुम्ही 'सर्व फोटो' टॅबमध्ये पाहू शकता.");
-        setGalleryTab("all");
+        setFaceScanNotice("या कार्यक्रमात तुमचा चेहरा असलेले फोटो आढळले नाहीत. तुम्ही खालील बटणावर क्लिक करून किंवा 'सर्व फोटो' टॅब निवडून सर्व फोटो पाहू शकता.");
+        setGalleryTab("matched");
       }
 
       await new Promise((resolve) => setTimeout(resolve, 800));
@@ -392,7 +393,7 @@ export default function GuestLiveEventPage() {
   const displayedPhotos = useMemo(() => {
     switch (galleryTab) {
       case "matched":
-        return matchedPhotos.length > 0 ? matchedPhotos : allPhotos;
+        return matchedPhotos;
       case "selected":
         return allPhotos.filter((p) => selectedIds.has(p.id));
       case "favorites":
@@ -877,11 +878,24 @@ export default function GuestLiveEventPage() {
               <div className="rounded-3xl border border-dashed border-white/15 p-12 text-center">
                 <ImageIcon className="mx-auto h-10 w-10 text-slate-500" />
                 <h3 className="mt-3 text-base font-bold text-white">
-                  No photos in this section
+                  {galleryTab === "matched"
+                    ? "तुमचा चेहरा असलेले फोटो सापडले नाहीत"
+                    : "या विभागात कोणतेही फोटो उपलब्ध नाहीत"}
                 </h3>
                 <p className="mt-1 text-xs text-slate-400">
-                  Switch to &quot;All Photos&quot; to browse all event pictures.
+                  {galleryTab === "matched"
+                    ? "कृपया 'सर्व फोटो' टॅब निवडून संपूर्ण अल्बम पहा किंवा पुन्हा चांगल्या प्रकाशात सेल्फी घ्या."
+                    : "सर्व फोटो पाहण्यासाठी वरील 'सर्व फोटो' टॅबवर क्लिक करा."}
                 </p>
+                {galleryTab === "matched" && (
+                  <button
+                    type="button"
+                    onClick={() => setGalleryTab("all")}
+                    className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-4 py-2 text-xs font-semibold text-white hover:bg-white/20"
+                  >
+                    सर्व फोटो पहा
+                  </button>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">

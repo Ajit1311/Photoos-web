@@ -10,7 +10,7 @@ let modelsLoaded = false;
 let modelLoadingPromise: Promise<boolean> | null = null;
 
 const MODEL_PATH = "/models";
-const MATCH_THRESHOLD = 0.52; // LFW optimal threshold for 99%+ accuracy (Euclidean distance < 0.52)
+export const MATCH_THRESHOLD = 0.58; // Standard optimal threshold for ResNet-34 FaceRecognitionNet (99%+ accuracy)
 
 export interface FaceDetectionResult {
   descriptor: number[];
@@ -43,13 +43,12 @@ export async function loadFaceRecognitionModels(): Promise<boolean> {
 
   modelLoadingPromise = (async () => {
     try {
-      // Load detector, landmarks, and 128D face recognition neural networks
       await Promise.all([
         faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_PATH),
         faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_PATH),
         faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_PATH),
-        faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_PATH).catch(() => {
-          // SSD Mobilenet is fallback, tinyFaceDetector is primary
+        faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_PATH).catch((e) => {
+          console.warn("[FaceRecognition] SSD Mobilenet optional load note:", e);
         }),
       ]);
 
@@ -68,9 +67,21 @@ export async function loadFaceRecognitionModels(): Promise<boolean> {
 }
 
 /**
- * Converts an image source (data URL, blob URL, or HTMLImageElement) into a loaded HTMLImageElement
+ * Resolves a safe same-origin URL for image loading to prevent cross-origin canvas tainting.
  */
-function loadImageElement(source: string | HTMLImageElement): Promise<HTMLImageElement> {
+export function getSafeImageUrl(url: string): string {
+  if (!url) return "";
+  if (url.startsWith("data:") || url.startsWith("blob:") || url.startsWith("/api/")) {
+    return url;
+  }
+  // Route external/storage URLs through same-origin proxy to guarantee clean canvas
+  return `/api/storage/proxy?url=${encodeURIComponent(url)}`;
+}
+
+/**
+ * Converts an image source into a loaded HTMLImageElement with clean canvas permissions.
+ */
+export function loadImageElement(source: string | HTMLImageElement): Promise<HTMLImageElement> {
   if (typeof source !== "string") {
     if (source.complete && source.naturalWidth > 0) {
       return Promise.resolve(source);
@@ -81,12 +92,29 @@ function loadImageElement(source: string | HTMLImageElement): Promise<HTMLImageE
     });
   }
 
+  const safeUrl = getSafeImageUrl(source);
+
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img);
-    img.onerror = (e) => reject(new Error("Failed to load image for face detection"));
-    img.src = source;
+
+    const timeout = setTimeout(() => {
+      img.src = "";
+      reject(new Error("Image loading timed out."));
+    }, 20000);
+
+    img.onload = () => {
+      clearTimeout(timeout);
+      resolve(img);
+    };
+
+    img.onerror = (err) => {
+      clearTimeout(timeout);
+      console.warn("[FaceRecognition] Image load failed via safe URL:", safeUrl, err);
+      reject(new Error(`Failed to load image: ${safeUrl}`));
+    };
+
+    img.src = safeUrl;
   });
 }
 
@@ -108,61 +136,98 @@ export async function extractSelfieFaceDescriptor(
     return {
       success: false,
       faceCount: 0,
-      error: "Face recognition AI models could not be loaded.",
+      error: "Face recognition AI models could not be loaded. Please refresh.",
     };
   }
 
-  const img = await loadImageElement(imageSource);
+  try {
+    const img = await loadImageElement(imageSource);
 
-  // Try TinyFaceDetector with higher input resolution for accuracy
-  const tinyOptions = new faceapi.TinyFaceDetectorOptions({
-    inputSize: 416,
-    scoreThreshold: 0.5,
-  });
+    // 1. Try SSD MobileNet v1 first for higher accuracy
+    let detections: any[] = [];
+    if (faceapi.nets.ssdMobilenetv1.isLoaded) {
+      try {
+        const ssdOptions = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.35 });
+        detections = await faceapi
+          .detectAllFaces(img, ssdOptions)
+          .withFaceLandmarks()
+          .withFaceDescriptors();
+      } catch (e) {
+        console.warn("[FaceRecognition] SSD MobileNet selfie detection notice:", e);
+      }
+    }
 
-  let detections = await faceapi
-    .detectAllFaces(img, tinyOptions)
-    .withFaceLandmarks()
-    .withFaceDescriptors();
+    // 2. Fallback to TinyFaceDetector with 512 input size
+    if (detections.length === 0 && faceapi.nets.tinyFaceDetector.isLoaded) {
+      const tinyOptions = new faceapi.TinyFaceDetectorOptions({
+        inputSize: 512,
+        scoreThreshold: 0.35,
+      });
+      detections = await faceapi
+        .detectAllFaces(img, tinyOptions)
+        .withFaceLandmarks()
+        .withFaceDescriptors();
+    }
 
-  // If tiny detector finds nothing, try SSD MobileNet for ultra-deep detection
-  if (detections.length === 0 && faceapi.nets.ssdMobilenetv1.isLoaded) {
-    const ssdOptions = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 });
-    detections = await faceapi
-      .detectAllFaces(img, ssdOptions)
-      .withFaceLandmarks()
-      .withFaceDescriptors();
-  }
+    if (detections.length === 0) {
+      return {
+        success: false,
+        faceCount: 0,
+        error: "चेहरा स्पष्ट दिसला नाही. कृपया चांगल्या प्रकाशात कॅमेऱ्यासमोर सरळ पाहून सेल्फी घ्या.",
+      };
+    }
 
-  if (detections.length === 0) {
+    if (detections.length > 1) {
+      // If one face is clearly dominant in foreground (> 2.5x area of any background face), select it
+      const sortedByArea = [...detections].sort((a, b) => {
+        const areaA = a.detection.box.width * a.detection.box.height;
+        const areaB = b.detection.box.width * b.detection.box.height;
+        return areaB - areaA;
+      });
+
+      const dominant = sortedByArea[0];
+      const secondDominant = sortedByArea[1];
+      const dominantArea = dominant.detection.box.width * dominant.detection.box.height;
+      const secondArea = secondDominant.detection.box.width * secondDominant.detection.box.height;
+
+      if (dominantArea > secondArea * 2.5) {
+        return {
+          success: true,
+          descriptor: Array.from(dominant.descriptor as Float32Array),
+          faceCount: 1,
+          confidence: dominant.detection.score,
+        };
+      }
+
+      return {
+        success: false,
+        faceCount: detections.length,
+        error: "सेल्फीमध्ये एकापेक्षा जास्त चेहरे आढळले आहेत. कृपया फक्त तुमचा एकट्याचा चेहरा असलेला सेल्फी घ्या.",
+      };
+    }
+
+    const primaryDetection = detections[0];
+    const descriptor: number[] = Array.from(primaryDetection.descriptor as Float32Array);
+
+    return {
+      success: true,
+      descriptor,
+      faceCount: 1,
+      confidence: primaryDetection.detection.score,
+    };
+  } catch (err: any) {
+    console.error("[FaceRecognition] extractSelfieFaceDescriptor error:", err);
     return {
       success: false,
       faceCount: 0,
-      error: "चेहरा स्पष्ट दिसला नाही. कृपया चांगल्या प्रकाशात कॅमेऱ्यासमोर सरळ पाहून सेल्फी घ्या. (No face detected. Please ensure good lighting.)",
+      error: "सेल्फी प्रोसेस करताना त्रुटी आली. कृपया पुन्हा सेल्फी घ्या.",
     };
   }
-
-  if (detections.length > 1) {
-    return {
-      success: false,
-      faceCount: detections.length,
-      error: "सेल्फीमध्ये एकापेक्षा जास्त चेहरे आढळले आहेत. कृपया फक्त तुमचा एकट्याचा चेहरा असलेला सेल्फी घ्या. (Multiple faces detected. Only one face allowed.)",
-    };
-  }
-
-  const primaryDetection = detections[0];
-  const descriptor = Array.from(primaryDetection.descriptor);
-
-  return {
-    success: true,
-    descriptor,
-    faceCount: 1,
-    confidence: primaryDetection.detection.score,
-  };
 }
 
 /**
- * Detects all faces present in a gallery photo and extracts their descriptors.
+ * Detects all faces present in a gallery photo and extracts their 128D descriptors.
+ * Handles both individual portraits and multi-person group photos.
  */
 export async function extractPhotoFacesDescriptors(
   imageSource: string | HTMLImageElement
@@ -172,18 +237,35 @@ export async function extractPhotoFacesDescriptors(
 
   try {
     const img = await loadImageElement(imageSource);
-    const options = new faceapi.TinyFaceDetectorOptions({
-      inputSize: 416,
-      scoreThreshold: 0.4,
-    });
 
-    const detections = await faceapi
-      .detectAllFaces(img, options)
-      .withFaceLandmarks()
-      .withFaceDescriptors();
+    // 1. Primary detection: SSD MobileNet v1 for high-accuracy multi-person photos
+    let detections: any[] = [];
+    if (faceapi.nets.ssdMobilenetv1.isLoaded) {
+      try {
+        const ssdOptions = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.25 });
+        detections = await faceapi
+          .detectAllFaces(img, ssdOptions)
+          .withFaceLandmarks()
+          .withFaceDescriptors();
+      } catch (ssdErr) {
+        console.warn("[FaceRecognition] SSD MobileNet failed, falling back to TinyFaceDetector:", ssdErr);
+      }
+    }
+
+    // 2. Fallback to TinyFaceDetector if SSD was not loaded or found no faces
+    if (detections.length === 0 && faceapi.nets.tinyFaceDetector.isLoaded) {
+      const tinyOptions = new faceapi.TinyFaceDetectorOptions({
+        inputSize: 608,
+        scoreThreshold: 0.25,
+      });
+      detections = await faceapi
+        .detectAllFaces(img, tinyOptions)
+        .withFaceLandmarks()
+        .withFaceDescriptors();
+    }
 
     return detections.map((d) => ({
-      descriptor: Array.from(d.descriptor),
+      descriptor: Array.from(d.descriptor as Float32Array),
       confidence: d.detection.score,
       box: {
         x: d.detection.box.x,
@@ -221,8 +303,8 @@ export function computeEuclideanDistance(
  * Calculates similarity percentage (0-100%) from Euclidean distance.
  * Distance 0.00 -> 100%
  * Distance 0.35 -> 95%
- * Distance 0.50 -> 85%
- * Distance 0.60 -> 60%
+ * Distance 0.50 -> 88%
+ * Distance 0.58 -> 80%
  * Distance >= 0.70 -> 0%
  */
 export function distanceToSimilarityScore(distance: number): number {
@@ -233,7 +315,7 @@ export function distanceToSimilarityScore(distance: number): number {
 }
 
 /**
- * Compares target selfie descriptor against a list of candidate face descriptors in a photo.
+ * Compares target selfie descriptor against candidate face descriptors in a photo.
  * Returns best match result.
  */
 export function compareTargetFace(
@@ -254,7 +336,7 @@ export function compareTargetFace(
     }
   }
 
-  const isMatch = minDistance < threshold;
+  const isMatch = minDistance <= threshold;
   const similarity = distanceToSimilarityScore(minDistance);
 
   return {

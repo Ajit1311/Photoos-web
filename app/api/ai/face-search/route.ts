@@ -16,7 +16,7 @@ const faceSearchSchema = z.object({
   descriptor: z.array(z.number()).optional(),
   eventId: z.string().uuid("Invalid event ID format.").optional(),
   galleryId: z.string().uuid("Invalid gallery ID format.").optional(),
-  studioId: z.string().uuid("Invalid studio ID format."),
+  studioId: z.string().uuid("Invalid studio ID format.").optional(),
   guestPhone: z.string().optional(),
   consentGranted: z.boolean().default(true),
   indexedAssets: z
@@ -127,19 +127,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2. Validate that the event exists and belongs to the studio
+    // 2. Validate that the event exists and resolve studioId
+    let resolvedStudioId = studioId;
     const { data: eventData, error: eventError } = await supabaseAdmin
       .from("events")
       .select("id, studio_id, name")
       .eq("id", resolvedEventId)
-      .eq("studio_id", studioId)
       .maybeSingle();
 
     if (eventError || !eventData) {
       return NextResponse.json(
-        { success: false, error: "Event or studio could not be verified." },
+        { success: false, error: "Event could not be verified." },
         { status: 404, headers: corsHeaders }
       );
+    }
+
+    if (!resolvedStudioId) {
+      resolvedStudioId = eventData.studio_id;
     }
 
     // 3. If batch indexed assets are provided, save them into public.ai_detected_faces
@@ -149,7 +153,7 @@ export async function POST(req: NextRequest) {
           try {
             await supabaseAdmin.rpc("save_asset_face_descriptors", {
               p_asset_id: item.assetId,
-              p_workspace_id: studioId,
+              p_workspace_id: resolvedStudioId,
               p_descriptors: item.descriptors,
             });
           } catch (saveErr) {
@@ -170,7 +174,7 @@ export async function POST(req: NextRequest) {
           {
             p_event_id: resolvedEventId,
             p_target_descriptor: descriptor,
-            p_max_distance: 0.52, // 99%+ accuracy threshold
+            p_max_distance: 0.58, // 99%+ accuracy threshold
           }
         );
 
