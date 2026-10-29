@@ -11,6 +11,8 @@ export async function POST(req: NextRequest) {
     const {
       department = "noreply",
       to,
+      cc,
+      bcc,
       subject,
       html,
       template,
@@ -47,6 +49,8 @@ export async function POST(req: NextRequest) {
     const result = await sendEmailWithResend({
       department: department as EmailDepartment,
       to,
+      cc,
+      bcc,
       subject: subject || "Notification from PhotoOS",
       html: finalHtml,
       attachments,

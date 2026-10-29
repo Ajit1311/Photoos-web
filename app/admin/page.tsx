@@ -341,7 +341,7 @@ export default function AdminDashboardPage() {
             value={number(
               overview.total_studios,
             )}
-            detail={`${overview.active_studios} active studios`}
+            detail={`${overview.trial_studios || 1} in free trial`}
             icon={Building2}
           />
 
@@ -350,7 +350,7 @@ export default function AdminDashboardPage() {
             value={currency(
               revenue.monthly_recurring_revenue,
             )}
-            detail={`${currency(
+            detail={revenue.monthly_recurring_revenue === 0 ? "Free Trial Phase (₹0)" : `${currency(
               revenue.annual_recurring_revenue,
             )} annualized`}
             icon={CircleDollarSign}

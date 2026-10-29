@@ -486,3 +486,4 @@ class PlatformLiveStore {
 
 // Global singleton
 export const platformLiveStore = new PlatformLiveStore();
+

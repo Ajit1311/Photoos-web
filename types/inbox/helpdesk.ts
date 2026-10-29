@@ -43,6 +43,8 @@ export interface EmailMessage {
   attachments?: EmailAttachment[];
 }
 
+export type EmailFolder = "inbox" | "sent" | "starred" | "drafts" | "trash";
+
 export interface EmailThread {
   id: string;
   department: Exclude<Department, "all">;
@@ -53,10 +55,12 @@ export interface EmailThread {
   customerEmail: string;
   customerPhone?: string;
   customerAvatar?: string;
-  customerPlan: "Free Trial" | "Growth Studio" | "Pro Studio" | "Enterprise" | "Prospective Partner";
+  customerPlan: "Free Trial" | "Growth Studio" | "Pro Studio" | "Enterprise" | "Prospective Partner" | "Direct Recipient" | "Internal Team";
   status: "open" | "pending" | "resolved";
   priority: TicketPriority;
   unread: boolean;
+  starred?: boolean;
+  folder?: EmailFolder;
   assignedTo?: string;
   createdAt: string;
   lastUpdated: string;

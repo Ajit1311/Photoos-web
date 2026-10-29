@@ -63,10 +63,12 @@ const IN_MEMORY_LIVE_MESSAGES: Array<{
   message: EmailMessage;
 }> = [];
 
+const IN_MEMORY_NEW_THREADS: EmailThread[] = [];
+
 export async function GET(req: NextRequest) {
   try {
     if (!RESEND_API_KEY) {
-      return NextResponse.json({ success: true, threads: [] });
+      return NextResponse.json({ success: true, threads: IN_MEMORY_NEW_THREADS });
     }
 
     // 1. Fetch live list of emails from Resend API
@@ -81,7 +83,7 @@ export async function GET(req: NextRequest) {
 
     if (!listRes.ok) {
       console.warn("[/api/email/inbox] Resend list error:", listRes.status);
-      return NextResponse.json({ success: true, threads: [] });
+      return NextResponse.json({ success: true, threads: IN_MEMORY_NEW_THREADS });
     }
 
     const listData = await listRes.json();
@@ -93,9 +95,9 @@ export async function GET(req: NextRequest) {
       created_at: string;
     }> = listData.data || [];
 
-    // 2. Fetch full body content for the latest 15 emails concurrently
+    // 2. Fetch full body content for the latest 20 emails concurrently
     const detailedEmails = await Promise.all(
-      emailsList.slice(0, 15).map(async (item) => {
+      emailsList.slice(0, 20).map(async (item) => {
         try {
           const detailRes = await fetch(`https://api.resend.com/emails/${item.id}`, {
             method: "GET",
@@ -138,10 +140,12 @@ export async function GET(req: NextRequest) {
         cleanHtmlToSnippet(email.html) ||
         `Email dispatched to ${toStr}`;
 
+      const isOutbound = email.from.toLowerCase().includes("photoos.in");
+
       const messageObj: EmailMessage = {
         id: `msg_${email.id}`,
         threadId: threadKey,
-        senderType: email.from.toLowerCase().includes("support@photoos.in") ? "agent" : "customer",
+        senderType: isOutbound ? "agent" : "customer",
         senderName: fromObj.name,
         senderEmail: fromObj.email,
         departmentEmail: email.from,
@@ -161,7 +165,9 @@ export async function GET(req: NextRequest) {
           customerPlan: "Pro Studio",
           status: "open",
           priority: cleanSubject.toLowerCase().includes("2fa") || cleanSubject.toLowerCase().includes("urgent") ? "urgent" : "normal",
-          unread: false,
+          unread: !isOutbound,
+          folder: isOutbound ? "sent" : "inbox",
+          starred: false,
           assignedTo: "Ajit Pawar",
           createdAt: email.created_at,
           lastUpdated: formatRelativeTime(email.created_at),
@@ -184,6 +190,13 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // 5. Merge in-memory newly composed threads
+    for (const newTh of IN_MEMORY_NEW_THREADS) {
+      if (!threadMap.has(newTh.id)) {
+        threadMap.set(newTh.id, newTh);
+      }
+    }
+
     const threads = Array.from(threadMap.values()).sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
@@ -198,7 +211,11 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { threadId, message } = body;
+    const { threadId, message, newThread } = body;
+
+    if (newThread) {
+      IN_MEMORY_NEW_THREADS.unshift(newThread);
+    }
 
     if (threadId && message) {
       IN_MEMORY_LIVE_MESSAGES.push({ threadId, message });

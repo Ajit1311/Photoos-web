@@ -24,6 +24,18 @@ import {
   FileIcon,
   Download,
   AlertCircle,
+  Plus,
+  Star,
+  Minimize2,
+  Maximize2,
+  Minus,
+  PenSquare,
+  Tag,
+  Shield,
+  Layers,
+  Clock,
+  ExternalLink,
+  ChevronRight,
 } from "lucide-react";
 
 import {
@@ -33,6 +45,7 @@ import {
   EmailMessage,
   CannedResponse,
   TicketStatus,
+  EmailFolder,
 } from "@/types/inbox/helpdesk";
 
 import {
@@ -48,10 +61,65 @@ interface LocalAttachment {
   contentType: string;
 }
 
+// All official PhotoOS sending identities available for Admin
+const OFFICIAL_IDENTITIES = [
+  {
+    key: "support",
+    email: "support@photoos.in",
+    label: "PhotoOS Support",
+    desc: "Customer helpdesk, bug reports, studio setup",
+    dept: "support" as const,
+    color: "text-blue-400 bg-blue-500/10 border-blue-500/30",
+  },
+  {
+    key: "billing",
+    email: "billing@photoos.in",
+    label: "PhotoOS Billing",
+    desc: "GST invoices, payment reminders, plan renewals",
+    dept: "billing" as const,
+    color: "text-amber-400 bg-amber-500/10 border-amber-500/30",
+  },
+  {
+    key: "marketing",
+    email: "marketing@photoos.in",
+    label: "PhotoOS Marketing",
+    desc: "Creator collaborations, onboarding, promotions",
+    dept: "marketing" as const,
+    color: "text-purple-400 bg-purple-500/10 border-purple-500/30",
+  },
+  {
+    key: "founder",
+    email: "founder@photoos.in",
+    label: "PhotoOS Founder & Legal",
+    desc: "Enterprise deals, VIP studios, legal/DPDP notices",
+    dept: "founder_legal" as const,
+    color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/30",
+  },
+  {
+    key: "team",
+    email: "team@photoos.in",
+    label: "PhotoOS Internal Team",
+    desc: "Internal staff updates, team invitations",
+    dept: "support" as const,
+    color: "text-sky-400 bg-sky-500/10 border-sky-500/30",
+  },
+  {
+    key: "noreply",
+    email: "noreply@photoos.in",
+    label: "PhotoOS System Alerts",
+    desc: "Automated OTPs, 2FA, system notices",
+    dept: "support" as const,
+    color: "text-slate-400 bg-slate-500/10 border-slate-500/30",
+  },
+];
+
 export default function HelpdeskInbox() {
   // Current Active User (Super Admin / Agent Switcher)
   const [currentUser, setCurrentUser] = useState<UserProfile>(USER_PROFILES[0]);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+
+  // Folder state (Inbox, Sent, Starred, Drafts, Trash)
+  const [activeFolder, setActiveFolder] = useState<EmailFolder>("inbox");
 
   // Department Filter
   const [activeDepartment, setActiveDepartment] = useState<Department>("all");
@@ -62,7 +130,7 @@ export default function HelpdeskInbox() {
   // Search Query
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Live Threads from Resend API & Database
+  // Live Threads from Resend API & Server
   const [threads, setThreads] = useState<EmailThread[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -72,19 +140,40 @@ export default function HelpdeskInbox() {
 
   // Reply Draft & Sending State
   const [replyText, setReplyText] = useState("");
+  const [replySendFrom, setReplySendFrom] = useState<string>("support");
   const [sendingReply, setSendingReply] = useState(false);
   const [sendSuccessToast, setSendSuccessToast] = useState<string | null>(null);
 
-  // File Attachments
+  // File Attachments for Reply
   const [attachments, setAttachments] = useState<LocalAttachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Custom Super Admin "Send From" override (if any)
-  const [customSendFrom, setCustomSendFrom] = useState<string | null>(null);
-
-  // Dropdowns
+  // Transfer & Canned dropdowns
   const [transferMenuOpen, setTransferMenuOpen] = useState(false);
   const [cannedMenuOpen, setCannedMenuOpen] = useState(false);
+  const [replyFromDropdownOpen, setReplyFromDropdownOpen] = useState(false);
+
+  // =========================================================================
+  // GMAIL-STYLE COMPOSE MODAL STATE
+  // =========================================================================
+  const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [isComposeMinimized, setIsComposeMinimized] = useState(false);
+  const [isComposeMaximized, setIsComposeMaximized] = useState(false);
+
+  const [composeFrom, setComposeFrom] = useState<string>("support");
+  const [composeFromDropdownOpen, setComposeFromDropdownOpen] = useState(false);
+  const [composeTo, setComposeTo] = useState("");
+  const [composeCc, setComposeCc] = useState("");
+  const [composeBcc, setComposeBcc] = useState("");
+  const [showCc, setShowCc] = useState(false);
+  const [showBcc, setShowBcc] = useState(false);
+  const [composeSubject, setComposeSubject] = useState("");
+  const [composeBody, setComposeBody] = useState("");
+  const [composeAttachments, setComposeAttachments] = useState<LocalAttachment[]>([]);
+  const [composeCannedOpen, setComposeCannedOpen] = useState(false);
+  const [isSendingCompose, setIsSendingCompose] = useState(false);
+  const composeFileInputRef = useRef<HTMLInputElement>(null);
+  const composeBodyRef = useRef<HTMLTextAreaElement>(null);
 
   // Textarea Ref & Auto-scroll
   const replyInputRef = useRef<HTMLTextAreaElement>(null);
@@ -126,10 +215,11 @@ export default function HelpdeskInbox() {
     setUserDropdownOpen(false);
     if (profile.role !== "SUPER_ADMIN") {
       setActiveDepartment(profile.allowedDepartment);
+      setComposeFrom(profile.allowedDepartment === "founder_legal" ? "founder" : profile.allowedDepartment);
+      setReplySendFrom(profile.allowedDepartment === "founder_legal" ? "founder" : profile.allowedDepartment);
     } else {
       setActiveDepartment("all");
     }
-    setCustomSendFrom(null);
   };
 
   const isDepartmentAllowed = (dept: Department): boolean => {
@@ -138,7 +228,7 @@ export default function HelpdeskInbox() {
     return currentUser.allowedDepartment === dept;
   };
 
-  // Filter threads by user permission, department tab, status, and search query
+  // Filter threads by Folder, User permission, Department tab, Status, and Search
   const filteredThreads = useMemo(() => {
     return threads.filter((thread) => {
       // 1. RBAC Restriction: Department agents only see their department
@@ -146,17 +236,31 @@ export default function HelpdeskInbox() {
         return false;
       }
 
-      // 2. Department Tab Filter
+      // 2. Folder filter (Gmail style)
+      if (activeFolder === "sent") {
+        if (thread.folder !== "sent") return false;
+      } else if (activeFolder === "starred") {
+        if (!thread.starred) return false;
+      } else if (activeFolder === "trash") {
+        if (thread.folder !== "trash") return false;
+      } else if (activeFolder === "drafts") {
+        if (thread.folder !== "drafts") return false;
+      } else {
+        // "inbox": show normal incoming/active tickets (exclude trash)
+        if (thread.folder === "trash") return false;
+      }
+
+      // 3. Department Tab Filter
       if (activeDepartment !== "all" && thread.department !== activeDepartment) {
         return false;
       }
 
-      // 3. Status Filter
+      // 4. Status Filter
       if (statusFilter === "unread" && !thread.unread) return false;
       if (statusFilter === "open" && thread.status !== "open") return false;
       if (statusFilter === "resolved" && thread.status !== "resolved") return false;
 
-      // 4. Search Filter
+      // 5. Search Filter
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const matchesSubject = thread.subject.toLowerCase().includes(query);
@@ -172,7 +276,7 @@ export default function HelpdeskInbox() {
 
       return true;
     });
-  }, [threads, isSuperAdmin, currentUser, activeDepartment, statusFilter, searchQuery]);
+  }, [threads, isSuperAdmin, currentUser, activeFolder, activeDepartment, statusFilter, searchQuery]);
 
   // Active Selected Thread
   const selectedThread = useMemo(() => {
@@ -202,6 +306,14 @@ export default function HelpdeskInbox() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [selectedThread?.messages.length, selectedThreadId]);
 
+  // Toggle Starred
+  const handleToggleStar = (threadId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setThreads((prev) =>
+      prev.map((t) => (t.id === threadId ? { ...t, starred: !t.starred } : t))
+    );
+  };
+
   // Re-assign / Transfer thread department (Super Admin)
   const handleTransferDepartment = (newDept: Exclude<Department, "all">) => {
     if (!isSuperAdmin || !selectedThread) return;
@@ -223,6 +335,7 @@ export default function HelpdeskInbox() {
     setTimeout(() => setSendSuccessToast(null), 3000);
   };
 
+  // Mark status
   const handleToggleStatus = () => {
     if (!selectedThread) return;
     const nextStatus = selectedThread.status === "resolved" ? "open" : "resolved";
@@ -233,17 +346,22 @@ export default function HelpdeskInbox() {
     );
   };
 
-  const handleDeleteThread = () => {
+  // Move thread to Trash (or Restore)
+  const handleMoveToTrash = () => {
     if (!selectedThread) return;
-    const confirmDelete = window.confirm(
-      `Delete conversation: "${selectedThread.subject}"?`
-    );
-    if (!confirmDelete) return;
+    const isAlreadyTrash = selectedThread.folder === "trash";
+    const newFolder: EmailFolder = isAlreadyTrash ? "inbox" : "trash";
 
-    setThreads((prev) => prev.filter((t) => t.id !== selectedThread.id));
-    const remaining = filteredThreads.filter((t) => t.id !== selectedThread.id);
-    if (remaining.length > 0) setSelectedThreadId(remaining[0].id);
-    else setSelectedThreadId(null);
+    setThreads((prev) =>
+      prev.map((t) =>
+        t.id === selectedThread.id ? { ...t, folder: newFolder } : t
+      )
+    );
+
+    setSendSuccessToast(
+      isAlreadyTrash ? "Conversation restored to Inbox" : "Conversation moved to Trash"
+    );
+    setTimeout(() => setSendSuccessToast(null), 3000);
   };
 
   const handleInsertCanned = (canned: CannedResponse) => {
@@ -252,8 +370,17 @@ export default function HelpdeskInbox() {
     replyInputRef.current?.focus();
   };
 
-  // Real File Upload Selection Handler
-  const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInsertComposeCanned = (canned: CannedResponse) => {
+    setComposeBody((prev) => (prev ? `${prev}\n\n${canned.content}` : canned.content));
+    setComposeCannedOpen(false);
+    composeBodyRef.current?.focus();
+  };
+
+  // File Upload Handlers
+  const handleFilesSelected = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    isCompose = false
+  ) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
@@ -266,15 +393,18 @@ export default function HelpdeskInbox() {
             ? `${Math.round(file.size / 1024)} KB`
             : `${(file.size / (1024 * 1024)).toFixed(1)} MB`;
 
-        setAttachments((prev) => [
-          ...prev,
-          {
-            filename: file.name,
-            size: sizeFormatted,
-            content: base64Data,
-            contentType: file.type || "application/octet-stream",
-          },
-        ]);
+        const newAtt: LocalAttachment = {
+          filename: file.name,
+          size: sizeFormatted,
+          content: base64Data,
+          contentType: file.type || "application/octet-stream",
+        };
+
+        if (isCompose) {
+          setComposeAttachments((prev) => [...prev, newAtt]);
+        } else {
+          setAttachments((prev) => [...prev, newAtt]);
+        }
       };
       reader.readAsDataURL(file);
     });
@@ -282,12 +412,21 @@ export default function HelpdeskInbox() {
     e.target.value = "";
   };
 
-  const handleRemoveAttachment = (indexToRemove: number) => {
-    setAttachments((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  const handleRemoveAttachment = (indexToRemove: number, isCompose = false) => {
+    if (isCompose) {
+      setComposeAttachments((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+    } else {
+      setAttachments((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+    }
   };
 
-  const handleFormatText = (prefix: string, suffix = prefix) => {
-    const el = replyInputRef.current;
+  const handleFormatText = (
+    targetRef: React.RefObject<HTMLTextAreaElement | null>,
+    prefix: string,
+    suffix = prefix,
+    setter: (val: string) => void
+  ) => {
+    const el = targetRef.current;
     if (!el) return;
     const start = el.selectionStart;
     const end = el.selectionEnd;
@@ -295,42 +434,35 @@ export default function HelpdeskInbox() {
     const selected = text.substring(start, end) || "text";
     const replacement = `${prefix}${selected}${suffix}`;
     const nextVal = text.substring(0, start) + replacement + text.substring(end);
-    setReplyText(nextVal);
+    setter(nextVal);
     setTimeout(() => {
       el.focus();
       el.setSelectionRange(start + prefix.length, end + prefix.length);
     }, 0);
   };
 
-  const activeSendFrom = useMemo(() => {
-    if (customSendFrom) return customSendFrom;
-    if (!selectedThread) return "support@photoos.in";
-    return selectedThread.departmentEmail;
-  }, [customSendFrom, selectedThread]);
-
-  // Send Real Live Email Reply via Resend
+  // Dispatch Outbound Email Reply via Resend
   const handleSendReply = async () => {
     if (!replyText.trim() || !selectedThread) return;
 
     setSendingReply(true);
 
     try {
-      const deptKey =
-        selectedThread.department === "founder_legal"
-          ? "founder"
-          : selectedThread.department;
-
       const payloadAttachments = attachments.map((a) => ({
         filename: a.filename,
         content: a.content,
       }));
+
+      const activeIdentity =
+        OFFICIAL_IDENTITIES.find((id) => id.key === replySendFrom) ||
+        OFFICIAL_IDENTITIES[0];
 
       // 1. Dispatch live email via Resend API
       const res = await fetch("/api/email/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          department: deptKey,
+          department: activeIdentity.key,
           to: selectedThread.customerEmail,
           subject: `Re: ${selectedThread.subject}`,
           html: `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b;">
@@ -344,7 +476,7 @@ export default function HelpdeskInbox() {
             }
             <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
             <p style="font-size: 12px; color: #64748b;">
-              Sent by ${currentUser.name} via PhotoOS ${DEPARTMENT_CONFIG[selectedThread.department].label} &lt;${activeSendFrom}&gt;
+              Sent by ${currentUser.name} via ${activeIdentity.label} &lt;${activeIdentity.email}&gt;
             </p>
           </div>`,
           attachments: payloadAttachments,
@@ -361,9 +493,9 @@ export default function HelpdeskInbox() {
         id: `msg_rep_${Date.now()}`,
         threadId: selectedThread.id,
         senderType: "agent",
-        senderName: `${currentUser.name} (${DEPARTMENT_CONFIG[selectedThread.department].label})`,
-        senderEmail: activeSendFrom,
-        departmentEmail: activeSendFrom,
+        senderName: `${currentUser.name} (${activeIdentity.label})`,
+        senderEmail: activeIdentity.email,
+        departmentEmail: activeIdentity.email,
         timestamp: "Just now",
         body: replyText.trim(),
         attachments: attachments.map((a) => ({
@@ -398,7 +530,7 @@ export default function HelpdeskInbox() {
 
       setReplyText("");
       setAttachments([]);
-      setSendSuccessToast(`Email successfully delivered to ${selectedThread.customerEmail} via Resend!`);
+      setSendSuccessToast(`Email delivered to ${selectedThread.customerEmail} from ${activeIdentity.email}!`);
       setTimeout(() => setSendSuccessToast(null), 4000);
     } catch (err) {
       console.error("Live reply error:", err);
@@ -409,9 +541,160 @@ export default function HelpdeskInbox() {
     }
   };
 
-  // Department counts
-  const departmentCounts = useMemo(() => {
-    const counts: Record<string, number> = {
+  // =========================================================================
+  // GMAIL-STYLE COMPOSE SEND HANDLER (NEW EMAIL TO ANY RECIPIENT)
+  // =========================================================================
+  const handleSendCompose = async () => {
+    if (!composeTo.trim()) {
+      alert("Please enter a recipient email address (To).");
+      return;
+    }
+    if (!composeSubject.trim()) {
+      alert("Please enter an email subject line.");
+      return;
+    }
+    if (!composeBody.trim()) {
+      alert("Please enter an email message body.");
+      return;
+    }
+
+    setIsSendingCompose(true);
+
+    try {
+      const activeIdentity =
+        OFFICIAL_IDENTITIES.find((id) => id.key === composeFrom) ||
+        OFFICIAL_IDENTITIES[0];
+
+      const payloadAttachments = composeAttachments.map((a) => ({
+        filename: a.filename,
+        content: a.content,
+      }));
+
+      // Parse multi-recipient commas or semicolons
+      const parseList = (str: string) =>
+        str
+          .split(/[,;]/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+
+      const toList = parseList(composeTo);
+      const ccList = showCc && composeCc.trim() ? parseList(composeCc) : undefined;
+      const bccList = showBcc && composeBcc.trim() ? parseList(composeBcc) : undefined;
+
+      // 1. Dispatch live via Resend API
+      const res = await fetch("/api/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          department: activeIdentity.key,
+          to: toList,
+          cc: ccList,
+          bcc: bccList,
+          subject: composeSubject,
+          html: `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b;">
+            <p>${composeBody.replace(/\n/g, "<br/>")}</p>
+            ${
+              payloadAttachments.length > 0
+                ? `<p style="font-size: 13px; color: #475569;"><strong>Attachments:</strong> ${payloadAttachments
+                    .map((a) => a.filename)
+                    .join(", ")}</p>`
+                : ""
+            }
+            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+            <p style="font-size: 12px; color: #64748b;">
+              Sent by ${currentUser.name} via ${activeIdentity.label} &lt;${activeIdentity.email}&gt;
+            </p>
+          </div>`,
+          attachments: payloadAttachments,
+        }),
+      });
+
+      const resData = await res.json();
+      if (!res.ok) {
+        console.warn("Compose Resend API status:", resData);
+      }
+
+      // 2. Build local thread representation for Sent folder
+      const newThreadId = `th_comp_${Date.now()}`;
+      const firstRecipient = toList[0] || composeTo;
+      const recipientName = firstRecipient.split("@")[0];
+
+      const newSentThread: EmailThread = {
+        id: newThreadId,
+        department: activeIdentity.dept,
+        departmentEmail: activeIdentity.email,
+        subject: composeSubject,
+        snippet: composeBody.slice(0, 140),
+        customerName: recipientName,
+        customerEmail: firstRecipient,
+        customerPlan: "Direct Recipient",
+        status: "open",
+        priority: "normal",
+        unread: false,
+        starred: false,
+        folder: "sent",
+        createdAt: new Date().toISOString(),
+        lastUpdated: "Just now",
+        messages: [
+          {
+            id: `msg_comp_${Date.now()}`,
+            threadId: newThreadId,
+            senderType: "agent",
+            senderName: `${currentUser.name} (${activeIdentity.label})`,
+            senderEmail: activeIdentity.email,
+            departmentEmail: activeIdentity.email,
+            timestamp: "Just now",
+            body: composeBody,
+            attachments: composeAttachments.map((a) => ({
+              name: a.filename,
+              size: a.size,
+              type: a.contentType,
+            })),
+          },
+        ],
+      };
+
+      setThreads((prev) => [newSentThread, ...prev]);
+      setSelectedThreadId(newThreadId);
+      setActiveFolder("sent");
+
+      // 3. Save to server store
+      await fetch("/api/email/inbox", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newThread: newSentThread }),
+      }).catch(() => null);
+
+      // Reset and close Compose
+      setComposeTo("");
+      setComposeCc("");
+      setComposeBcc("");
+      setShowCc(false);
+      setShowBcc(false);
+      setComposeSubject("");
+      setComposeBody("");
+      setComposeAttachments([]);
+      setIsComposeOpen(false);
+
+      setSendSuccessToast(`Email successfully dispatched to ${firstRecipient} via ${activeIdentity.email}!`);
+      setTimeout(() => setSendSuccessToast(null), 4000);
+    } catch (err) {
+      console.error("Compose send error:", err);
+      alert("Failed to deliver email. Check connection or credentials.");
+    } finally {
+      setIsSendingCompose(false);
+    }
+  };
+
+  // Folder and Department count metrics
+  const counts = useMemo(() => {
+    let inboxCount = 0;
+    let sentCount = 0;
+    let starredCount = 0;
+    let draftsCount = 0;
+    let trashCount = 0;
+
+    const deptCounts: Record<string, number> = {
       all: 0,
       support: 0,
       billing: 0,
@@ -420,31 +703,56 @@ export default function HelpdeskInbox() {
     };
 
     threads.forEach((t) => {
-      counts.all += 1;
-      if (counts[t.department] !== undefined) {
-        counts[t.department] += 1;
+      if (t.folder === "sent") sentCount += 1;
+      else if (t.folder === "trash") trashCount += 1;
+      else if (t.folder === "drafts") draftsCount += 1;
+      else {
+        inboxCount += 1;
+        if (t.unread) deptCounts.all += 1;
+      }
+
+      if (t.starred) starredCount += 1;
+
+      if (deptCounts[t.department] !== undefined) {
+        deptCounts[t.department] += 1;
       }
     });
 
-    return counts;
+    return {
+      inbox: inboxCount,
+      sent: sentCount,
+      starred: starredCount,
+      drafts: draftsCount,
+      trash: trashCount,
+      departments: deptCounts,
+    };
   }, [threads]);
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-slate-950 font-sans text-slate-100 antialiased selection:bg-sky-500/30 selection:text-white">
-      {/* Hidden File Input for Real Attachments */}
+      {/* Hidden File Input for Reply Attachments */}
       <input
         type="file"
         ref={fileInputRef}
         multiple
         className="hidden"
-        onChange={handleFilesSelected}
+        onChange={(e) => handleFilesSelected(e, false)}
+      />
+
+      {/* Hidden File Input for Compose Attachments */}
+      <input
+        type="file"
+        ref={composeFileInputRef}
+        multiple
+        className="hidden"
+        onChange={(e) => handleFilesSelected(e, true)}
       />
 
       {/* ===================================================================== */}
-      {/* 1. TOP BAR / ROLE SWITCHER & DEPARTMENT TABS HEADER */}
+      {/* 1. TOP HEADER BAR */}
       {/* ===================================================================== */}
-      <header className="relative z-30 flex h-16 shrink-0 items-center justify-between border-b border-white/10 bg-slate-900/90 px-6 backdrop-blur-md">
-        {/* Left: Brand & Live Status */}
+      <header className="relative z-30 flex h-16 shrink-0 items-center justify-between border-b border-white/10 bg-slate-900/90 px-5 backdrop-blur-md">
+        {/* Left: Brand & Status */}
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-[#0A3F61] to-[#0d5583] text-sky-400 shadow-lg shadow-sky-950/40 border border-sky-400/20">
             <Mail className="h-5 w-5" />
@@ -452,118 +760,30 @@ export default function HelpdeskInbox() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-sm font-bold tracking-tight text-white">
-                PhotoOS Support & Routing Inbox
+                PhotoOS Mail & Helpdesk Console
               </h1>
               <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-500/20">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Live Resend & Cloudflare
+                Live Resend Delivery
               </span>
             </div>
             <p className="text-[11px] text-slate-400">
-              Direct routing for adskartmedia11@gmail.com & photoos.in
+              Official dispatch identities: support, billing, marketing, founder & team
             </p>
           </div>
         </div>
 
-        {/* Center: Department Filter Tabs */}
-        <div className="hidden items-center rounded-xl border border-white/10 bg-slate-950/60 p-1 md:flex">
-          {/* ALL TAB (Super Admin) */}
-          {isSuperAdmin && (
-            <button
-              onClick={() => setActiveDepartment("all")}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                activeDepartment === "all"
-                  ? "bg-white/15 text-white shadow-sm font-semibold"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              <Inbox className="h-3.5 w-3.5" />
-              <span>All Inboxes</span>
-              <span className="ml-1 rounded-full bg-white/10 px-1.5 py-0.2 text-[10px] text-slate-300">
-                {departmentCounts.all}
-              </span>
-            </button>
-          )}
-
-          {/* SUPPORT TAB */}
-          <button
-            onClick={() => isDepartmentAllowed("support") && setActiveDepartment("support")}
-            disabled={!isDepartmentAllowed("support")}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-              activeDepartment === "support"
-                ? "bg-blue-600 text-white shadow-sm font-semibold"
-                : isDepartmentAllowed("support")
-                ? "text-slate-400 hover:text-slate-200"
-                : "cursor-not-allowed opacity-30 text-slate-600"
-            }`}
-          >
-            <span>Support</span>
-            {!isDepartmentAllowed("support") && <Lock className="h-3 w-3" />}
-            <span className="ml-1 rounded-full bg-white/10 px-1.5 py-0.2 text-[10px]">
-              {departmentCounts.support}
-            </span>
-          </button>
-
-          {/* BILLING TAB */}
-          <button
-            onClick={() => isDepartmentAllowed("billing") && setActiveDepartment("billing")}
-            disabled={!isDepartmentAllowed("billing")}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-              activeDepartment === "billing"
-                ? "bg-amber-600 text-white shadow-sm font-semibold"
-                : isDepartmentAllowed("billing")
-                ? "text-slate-400 hover:text-slate-200"
-                : "cursor-not-allowed opacity-30 text-slate-600"
-            }`}
-          >
-            <span>Billing</span>
-            {!isDepartmentAllowed("billing") && <Lock className="h-3 w-3" />}
-            <span className="ml-1 rounded-full bg-white/10 px-1.5 py-0.2 text-[10px]">
-              {departmentCounts.billing}
-            </span>
-          </button>
-
-          {/* MARKETING TAB */}
-          <button
-            onClick={() => isDepartmentAllowed("marketing") && setActiveDepartment("marketing")}
-            disabled={!isDepartmentAllowed("marketing")}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-              activeDepartment === "marketing"
-                ? "bg-purple-600 text-white shadow-sm font-semibold"
-                : isDepartmentAllowed("marketing")
-                ? "text-slate-400 hover:text-slate-200"
-                : "cursor-not-allowed opacity-30 text-slate-600"
-            }`}
-          >
-            <span>Marketing</span>
-            {!isDepartmentAllowed("marketing") && <Lock className="h-3 w-3" />}
-            <span className="ml-1 rounded-full bg-white/10 px-1.5 py-0.2 text-[10px]">
-              {departmentCounts.marketing}
-            </span>
-          </button>
-
-          {/* FOUNDER & LEGAL TAB */}
-          <button
-            onClick={() => isDepartmentAllowed("founder_legal") && setActiveDepartment("founder_legal")}
-            disabled={!isDepartmentAllowed("founder_legal")}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-              activeDepartment === "founder_legal"
-                ? "bg-slate-700 text-white shadow-sm font-semibold"
-                : isDepartmentAllowed("founder_legal")
-                ? "text-slate-400 hover:text-slate-200"
-                : "cursor-not-allowed opacity-30 text-slate-600"
-            }`}
-          >
-            <span>Founder/Legal</span>
-            {!isDepartmentAllowed("founder_legal") && <Lock className="h-3 w-3" />}
-            <span className="ml-1 rounded-full bg-white/10 px-1.5 py-0.2 text-[10px]">
-              {departmentCounts.founder_legal}
-            </span>
-          </button>
+        {/* Center: Search / Filter Info */}
+        <div className="hidden lg:flex items-center gap-2 rounded-xl border border-white/10 bg-slate-950/70 px-3.5 py-1.5 text-xs text-slate-400">
+          <Shield className="h-3.5 w-3.5 text-sky-400" />
+          <span>Active Identity:</span>
+          <strong className="text-white">
+            {OFFICIAL_IDENTITIES.find((i) => i.key === composeFrom)?.email}
+          </strong>
         </div>
 
         {/* Right: Refresh & Active User Role Switcher */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           {/* Refresh Inbox Button */}
           <button
             type="button"
@@ -573,10 +793,10 @@ export default function HelpdeskInbox() {
             className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-slate-300 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
           >
             <RefreshCw className={`h-3.5 w-3.5 text-sky-400 ${refreshing ? "animate-spin" : ""}`} />
-            <span className="hidden sm:inline">{refreshing ? "Refreshing..." : "Refresh"}</span>
+            <span className="hidden sm:inline">{refreshing ? "Refreshing..." : "Sync"}</span>
           </button>
 
-          {/* Role Switcher */}
+          {/* User Role Switcher */}
           <div className="relative">
             <button
               type="button"
@@ -598,46 +818,53 @@ export default function HelpdeskInbox() {
                         : "bg-purple-500/20 text-purple-300 border border-purple-500/30"
                     }`}
                   >
-                    {currentUser.roleTitle}
+                    {isSuperAdmin ? "Super Admin" : "Agent"}
                   </span>
                 </div>
                 <div className="text-[10px] text-slate-400">{currentUser.email}</div>
               </div>
-              <ChevronDown className="h-4 w-4 text-slate-400" />
+              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
             </button>
 
+            {/* Dropdown Menu */}
             {userDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-80 overflow-hidden rounded-2xl border border-white/15 bg-slate-900 p-2 shadow-2xl backdrop-blur-xl z-50 animate-in fade-in zoom-in-95">
-                <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/10">
-                  Role-Based Access Switcher
+              <div className="absolute right-0 top-12 z-50 w-72 rounded-2xl border border-white/15 bg-slate-900/95 p-2 shadow-2xl backdrop-blur-xl">
+                <div className="px-3 py-2 border-b border-white/10">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    Switch Test User Role
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    Verify RBAC department view and routing restrictions
+                  </div>
                 </div>
+
                 <div className="mt-1 space-y-1">
-                  {USER_PROFILES.map((profile) => (
-                    <button
-                      key={profile.id}
-                      onClick={() => handleUserChange(profile)}
-                      className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition ${
-                        currentUser.id === profile.id
-                          ? "bg-sky-500/15 text-white font-semibold"
-                          : "text-slate-300 hover:bg-white/5"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-[11px] font-bold">
-                          {profile.avatar}
-                        </div>
-                        <div>
-                          <div className="font-medium text-white">{profile.name}</div>
-                          <div className="text-[10px] text-slate-400">
-                            {profile.roleTitle} &bull; {profile.email}
+                  {USER_PROFILES.map((profile) => {
+                    const isSelected = profile.id === currentUser.id;
+                    return (
+                      <button
+                        key={profile.id}
+                        type="button"
+                        onClick={() => handleUserChange(profile)}
+                        className={`flex w-full items-center justify-between rounded-xl p-2.5 text-left text-xs transition ${
+                          isSelected
+                            ? "bg-sky-500/20 text-white font-semibold"
+                            : "text-slate-300 hover:bg-white/5"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-[11px] font-bold text-sky-400">
+                            {profile.avatar}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-white">{profile.name}</div>
+                            <div className="text-[10px] text-slate-400">{profile.roleTitle}</div>
                           </div>
                         </div>
-                      </div>
-                      {currentUser.id === profile.id && (
-                        <Check className="h-4 w-4 text-sky-400" />
-                      )}
-                    </button>
-                  ))}
+                        {isSelected && <Check className="h-4 w-4 text-sky-400" />}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -654,33 +881,301 @@ export default function HelpdeskInbox() {
       )}
 
       {/* ===================================================================== */}
-      {/* 2. MAIN 2-PANE WORKSPACE: THREAD LIST & ACTIVE CONVERSATION */}
+      {/* 2. THREE-PANE GMAIL WORKSPACE */}
+      {/* Pane 1: Gmail Navigation Sidebar (Folders & Compose) */}
+      {/* Pane 2: Department Thread List */}
+      {/* Pane 3: Conversation Stream & Dispatch Reply */}
       {/* ===================================================================== */}
       <div className="flex flex-1 overflow-hidden">
-        {/* LEFT COLUMN: LIVE THREAD LIST (~380px fixed) */}
-        <aside className="flex w-[380px] shrink-0 flex-col border-r border-white/10 bg-slate-900/50">
-          {/* Header */}
+        {/* ================================================================= */}
+        {/* PANE 1: GMAIL LEFT RAIL / FOLDER NAVIGATION (~230px fixed) */}
+        {/* ================================================================= */}
+        <nav className="flex w-[230px] shrink-0 flex-col border-r border-white/10 bg-slate-900/70 p-3 select-none">
+          {/* Prominent Gmail-style Compose Button */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsComposeOpen(true);
+              setIsComposeMinimized(false);
+            }}
+            className="group flex w-full items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 px-4 py-3 text-xs font-bold text-white shadow-lg shadow-sky-950/60 transition hover:brightness-110 active:scale-[0.98]"
+          >
+            <Plus className="h-4 w-4 transition group-hover:rotate-90" />
+            <span>Compose Email</span>
+          </button>
+
+          {/* Standard Folders List */}
+          <div className="mt-5 space-y-1">
+            <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Folders
+            </div>
+
+            {/* Inbox */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveFolder("inbox");
+                setActiveDepartment("all");
+              }}
+              className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition ${
+                activeFolder === "inbox"
+                  ? "bg-sky-500/15 text-white font-semibold"
+                  : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Inbox className={`h-4 w-4 ${activeFolder === "inbox" ? "text-sky-400" : ""}`} />
+                <span>Inbox</span>
+              </div>
+              {counts.inbox > 0 && (
+                <span className="rounded-full bg-sky-500/20 px-2 py-0.5 text-[10px] font-bold text-sky-300">
+                  {counts.inbox}
+                </span>
+              )}
+            </button>
+
+            {/* Sent */}
+            <button
+              type="button"
+              onClick={() => setActiveFolder("sent")}
+              className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition ${
+                activeFolder === "sent"
+                  ? "bg-sky-500/15 text-white font-semibold"
+                  : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Send className={`h-4 w-4 ${activeFolder === "sent" ? "text-sky-400" : ""}`} />
+                <span>Sent</span>
+              </div>
+              {counts.sent > 0 && (
+                <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-slate-400">
+                  {counts.sent}
+                </span>
+              )}
+            </button>
+
+            {/* Starred */}
+            <button
+              type="button"
+              onClick={() => setActiveFolder("starred")}
+              className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition ${
+                activeFolder === "starred"
+                  ? "bg-amber-500/15 text-amber-200 font-semibold"
+                  : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Star
+                  className={`h-4 w-4 ${
+                    activeFolder === "starred" ? "text-amber-400 fill-amber-400" : ""
+                  }`}
+                />
+                <span>Starred</span>
+              </div>
+              {counts.starred > 0 && (
+                <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300">
+                  {counts.starred}
+                </span>
+              )}
+            </button>
+
+            {/* Drafts */}
+            <button
+              type="button"
+              onClick={() => setActiveFolder("drafts")}
+              className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition ${
+                activeFolder === "drafts"
+                  ? "bg-sky-500/15 text-white font-semibold"
+                  : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <FileText className="h-4 w-4" />
+                <span>Drafts</span>
+              </div>
+              {counts.drafts > 0 && (
+                <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-slate-400">
+                  {counts.drafts}
+                </span>
+              )}
+            </button>
+
+            {/* Trash */}
+            <button
+              type="button"
+              onClick={() => setActiveFolder("trash")}
+              className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition ${
+                activeFolder === "trash"
+                  ? "bg-rose-500/15 text-rose-200 font-semibold"
+                  : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Trash2 className="h-4 w-4" />
+                <span>Trash</span>
+              </div>
+              {counts.trash > 0 && (
+                <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-slate-400">
+                  {counts.trash}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Department Labels Filter */}
+          <div className="mt-6 flex-1 space-y-1">
+            <div className="flex items-center justify-between px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              <span>Departments</span>
+              <Tag className="h-3 w-3 text-slate-500" />
+            </div>
+
+            {/* All Inboxes */}
+            {isSuperAdmin && (
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveDepartment("all");
+                  setActiveFolder("inbox");
+                }}
+                className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition ${
+                  activeDepartment === "all" && activeFolder === "inbox"
+                    ? "bg-white/15 text-white font-semibold"
+                    : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-sky-400" />
+                  <span>All Inboxes</span>
+                </div>
+                <span className="text-[10px] font-mono text-slate-400">
+                  {counts.departments.all}
+                </span>
+              </button>
+            )}
+
+            {/* Support */}
+            <button
+              type="button"
+              onClick={() => isDepartmentAllowed("support") && setActiveDepartment("support")}
+              disabled={!isDepartmentAllowed("support")}
+              className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition ${
+                activeDepartment === "support"
+                  ? "bg-blue-600/20 text-blue-300 font-semibold border border-blue-500/30"
+                  : isDepartmentAllowed("support")
+                  ? "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                  : "opacity-40 cursor-not-allowed text-slate-600"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-blue-500" />
+                <span>Support Desk</span>
+              </div>
+              <span className="text-[10px] font-mono text-slate-400">
+                {counts.departments.support}
+              </span>
+            </button>
+
+            {/* Billing */}
+            <button
+              type="button"
+              onClick={() => isDepartmentAllowed("billing") && setActiveDepartment("billing")}
+              disabled={!isDepartmentAllowed("billing")}
+              className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition ${
+                activeDepartment === "billing"
+                  ? "bg-amber-600/20 text-amber-300 font-semibold border border-amber-500/30"
+                  : isDepartmentAllowed("billing")
+                  ? "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                  : "opacity-40 cursor-not-allowed text-slate-600"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-amber-500" />
+                <span>Billing Desk</span>
+              </div>
+              <span className="text-[10px] font-mono text-slate-400">
+                {counts.departments.billing}
+              </span>
+            </button>
+
+            {/* Marketing */}
+            <button
+              type="button"
+              onClick={() => isDepartmentAllowed("marketing") && setActiveDepartment("marketing")}
+              disabled={!isDepartmentAllowed("marketing")}
+              className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition ${
+                activeDepartment === "marketing"
+                  ? "bg-purple-600/20 text-purple-300 font-semibold border border-purple-500/30"
+                  : isDepartmentAllowed("marketing")
+                  ? "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                  : "opacity-40 cursor-not-allowed text-slate-600"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-purple-500" />
+                <span>Marketing & Leads</span>
+              </div>
+              <span className="text-[10px] font-mono text-slate-400">
+                {counts.departments.marketing}
+              </span>
+            </button>
+
+            {/* Founder & Legal */}
+            <button
+              type="button"
+              onClick={() => isDepartmentAllowed("founder_legal") && setActiveDepartment("founder_legal")}
+              disabled={!isDepartmentAllowed("founder_legal")}
+              className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition ${
+                activeDepartment === "founder_legal"
+                  ? "bg-emerald-600/20 text-emerald-300 font-semibold border border-emerald-500/30"
+                  : isDepartmentAllowed("founder_legal")
+                  ? "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                  : "opacity-40 cursor-not-allowed text-slate-600"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <span>Founder & Legal</span>
+              </div>
+              <span className="text-[10px] font-mono text-slate-400">
+                {counts.departments.founder_legal}
+              </span>
+            </button>
+          </div>
+
+          {/* Sync status footer */}
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2.5 text-center text-[10px] text-slate-400">
+            <div className="font-semibold text-slate-300">PhotoOS Enterprise Mail</div>
+            <div className="text-slate-400">Connected to Resend Cloud</div>
+          </div>
+        </nav>
+
+        {/* ================================================================= */}
+        {/* PANE 2: THREAD LIST COLUMN (~380px fixed) */}
+        {/* ================================================================= */}
+        <aside className="flex w-[380px] shrink-0 flex-col border-r border-white/10 bg-slate-900/40">
+          {/* Header Search & Filters */}
           <div className="border-b border-white/10 p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-white uppercase tracking-wider">
-                  {activeDepartment === "all"
-                    ? "Live Inboxes"
-                    : `${DEPARTMENT_CONFIG[activeDepartment].label} Inbox`}
+                <span className="text-xs font-bold uppercase tracking-wider text-white">
+                  {activeFolder === "sent"
+                    ? "Dispatched Mails"
+                    : activeFolder === "starred"
+                    ? "Starred Mails"
+                    : activeFolder === "trash"
+                    ? "Trash Bin"
+                    : activeDepartment === "all"
+                    ? "All Conversations"
+                    : `${DEPARTMENT_CONFIG[activeDepartment].label} Conversations`}
                 </span>
-                <span className="rounded-full bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold text-sky-400 border border-sky-500/20">
-                  {filteredThreads.length} live
+                <span className="rounded-full bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-400 border border-sky-500/20">
+                  {filteredThreads.length}
                 </span>
               </div>
               <span className="text-[10px] font-mono text-slate-400">
-                Resend Synced
+                {activeFolder.toUpperCase()}
               </span>
-            </div>
-
-            <div className="mt-1 text-[11px] text-slate-400 truncate">
-              {activeDepartment === "all"
-                ? "Unified emails routed to adskartmedia11@gmail.com"
-                : DEPARTMENT_CONFIG[activeDepartment].email}
             </div>
 
             {/* Search Input */}
@@ -690,7 +1185,7 @@ export default function HelpdeskInbox() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search subject, recipient, or body..."
+                placeholder="Search subject, sender, or message..."
                 className="w-full rounded-xl border border-white/10 bg-white/5 py-1.5 pl-9 pr-8 text-xs text-white placeholder-slate-500 outline-none transition focus:border-sky-400 focus:bg-white/10"
               />
               {searchQuery && (
@@ -704,22 +1199,24 @@ export default function HelpdeskInbox() {
               )}
             </div>
 
-            {/* Status Filter Tabs */}
-            <div className="mt-3 flex items-center gap-1.5">
-              {(["all", "unread", "open", "resolved"] as TicketStatus[]).map((st) => (
-                <button
-                  key={st}
-                  onClick={() => setStatusFilter(st)}
-                  className={`rounded-lg px-2.5 py-1 text-[11px] font-medium capitalize transition ${
-                    statusFilter === st
-                      ? "bg-white/15 text-white font-semibold"
-                      : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
-                  }`}
-                >
-                  {st}
-                </button>
-              ))}
-            </div>
+            {/* Status Filter Chips */}
+            {activeFolder !== "trash" && (
+              <div className="mt-3 flex items-center gap-1.5">
+                {(["all", "unread", "open", "resolved"] as TicketStatus[]).map((st) => (
+                  <button
+                    key={st}
+                    onClick={() => setStatusFilter(st)}
+                    className={`rounded-lg px-2.5 py-1 text-[11px] font-medium capitalize transition ${
+                      statusFilter === st
+                        ? "bg-white/15 text-white font-semibold"
+                        : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                    }`}
+                  >
+                    {st}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Thread Cards List */}
@@ -727,78 +1224,103 @@ export default function HelpdeskInbox() {
             {loading ? (
               <div className="flex flex-col items-center justify-center p-12 text-center text-slate-400">
                 <RefreshCw className="h-7 w-7 text-sky-400 animate-spin mb-3" />
-                <p className="text-xs font-semibold text-white">Loading live emails...</p>
-                <p className="mt-1 text-[11px] text-slate-500">
-                  Fetching messages from Resend & adskartmedia11@gmail.com
+                <p className="text-xs font-semibold text-white">Loading emails...</p>
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Fetching live messages from Resend
                 </p>
               </div>
             ) : filteredThreads.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-8 text-center text-slate-400">
                 <Inbox className="h-8 w-8 text-slate-600 mb-2" />
-                <p className="text-xs font-semibold text-slate-300">No emails in this inbox</p>
-                <p className="mt-1 text-[11px] text-slate-500 max-w-xs">
+                <p className="text-xs font-semibold text-slate-300">No conversations in this view</p>
+                <p className="mt-1 text-[11px] text-slate-400 max-w-xs">
                   {searchQuery
-                    ? "No live emails match your search query."
-                    : "Incoming emails and replies will appear here in real-time."}
+                    ? "No emails matched your search query."
+                    : "Sent emails and incoming replies will appear here."}
                 </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsComposeOpen(true);
+                    setIsComposeMinimized(false);
+                  }}
+                  className="mt-4 flex items-center gap-1.5 rounded-xl bg-sky-500/20 px-3 py-1.5 text-xs font-bold text-sky-400 border border-sky-400/30 hover:bg-sky-500/30 transition"
+                >
+                  <PenSquare className="h-3.5 w-3.5" />
+                  <span>Compose New Email</span>
+                </button>
               </div>
             ) : (
               filteredThreads.map((thread) => {
                 const isSelected = selectedThread?.id === thread.id;
                 const deptConf = DEPARTMENT_CONFIG[thread.department];
+                const hasAttachments = thread.messages.some((m) => (m.attachments?.length || 0) > 0);
 
                 return (
                   <div
                     key={thread.id}
                     onClick={() => handleSelectThread(thread)}
-                    className={`group relative flex cursor-pointer gap-3 p-4 transition ${
+                    className={`group relative flex cursor-pointer gap-3 p-3.5 transition ${
                       isSelected
-                        ? "bg-sky-500/10 border-l-4 border-sky-400"
-                        : "hover:bg-white/[0.03] border-l-4 border-transparent"
-                    }`}
+                        ? "bg-sky-500/10 border-l-2 border-sky-400"
+                        : "hover:bg-white/[0.04]"
+                    } ${thread.unread ? "font-semibold" : ""}`}
                   >
-                    {/* Avatar */}
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-800 text-xs font-bold text-slate-200 border border-white/10">
+                    {/* Star Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => handleToggleStar(thread.id, e)}
+                      title={thread.starred ? "Unstar" : "Star"}
+                      className="mt-1 text-slate-500 hover:text-amber-400"
+                    >
+                      <Star
+                        className={`h-4 w-4 ${
+                          thread.starred ? "text-amber-400 fill-amber-400" : ""
+                        }`}
+                      />
+                    </button>
+
+                    {/* Sender Avatar */}
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-slate-700 to-slate-800 text-xs font-bold text-white border border-white/10 shadow-sm">
                       {thread.customerAvatar || thread.customerName.slice(0, 2).toUpperCase()}
                     </div>
 
                     {/* Card Content */}
-                    <div className="flex-1 min-w-0">
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-1">
-                        <span className="text-xs font-bold text-white truncate">
+                        <span className="truncate text-xs font-semibold text-white">
                           {thread.customerName}
                         </span>
-                        <span className="text-[10px] text-slate-500 shrink-0">
+                        <span className="shrink-0 text-[10px] text-slate-400">
                           {thread.lastUpdated}
                         </span>
                       </div>
 
-                      {/* Department Badge */}
-                      <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                      <div className="mt-0.5 flex items-center gap-1.5">
                         <span
-                          className={`rounded-md px-1.5 py-0.5 text-[9px] font-semibold border ${deptConf.badgeBg} ${deptConf.badgeText} ${deptConf.borderCol}`}
+                          className={`rounded px-1.5 py-0.2 text-[9px] font-bold uppercase ${deptConf?.badgeBg} ${deptConf?.badgeText} border ${deptConf?.borderCol}`}
                         >
-                          {deptConf.label}
+                          {deptConf?.label || thread.department}
                         </span>
-
-                        <span className="rounded-md bg-white/5 px-1.5 py-0.5 text-[9px] text-slate-400 border border-white/5">
+                        <span className="truncate text-[10px] text-slate-400">
                           {thread.customerEmail}
                         </span>
+                      </div>
 
-                        {thread.status === "resolved" && (
-                          <span className="rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[9px] text-emerald-400 border border-emerald-500/20">
-                            Resolved
-                          </span>
+                      <div className="mt-1 flex items-center justify-between gap-2">
+                        <p
+                          className={`truncate text-xs ${
+                            thread.unread ? "text-white font-bold" : "text-slate-300"
+                          }`}
+                        >
+                          {thread.subject}
+                        </p>
+                        {hasAttachments && (
+                          <Paperclip className="h-3 w-3 shrink-0 text-slate-400" />
                         )}
                       </div>
 
-                      {/* Subject */}
-                      <div className="mt-1 text-xs font-medium text-slate-200 truncate">
-                        {thread.subject}
-                      </div>
-
-                      {/* Snippet */}
-                      <p className="mt-0.5 line-clamp-2 text-[11px] text-slate-400">
+                      <p className="mt-0.5 line-clamp-1 text-[11px] text-slate-400">
                         {thread.snippet}
                       </p>
                     </div>
@@ -809,182 +1331,163 @@ export default function HelpdeskInbox() {
           </div>
         </aside>
 
-        {/* RIGHT PANE: ACTIVE CONVERSATION & REPLY VIEW (flex-1) */}
+        {/* ================================================================= */}
+        {/* PANE 3: ACTIVE CONVERSATION & REPLY VIEW (flex-1) */}
+        {/* ================================================================= */}
         <main className="flex flex-1 flex-col overflow-hidden bg-slate-950">
           {selectedThread ? (
             <>
-              {/* CONVERSATION TOP BAR */}
-              <div className="flex h-20 shrink-0 items-center justify-between border-b border-white/10 bg-slate-900/60 px-6 backdrop-blur-sm">
-                <div className="min-w-0 flex-1 pr-4">
+              {/* Conversation Top Header */}
+              <div className="flex items-center justify-between border-b border-white/10 bg-slate-900/60 p-4">
+                <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <h2 className="text-sm font-bold text-white truncate">
+                    <h2 className="truncate text-base font-bold text-white">
                       {selectedThread.subject}
                     </h2>
                     <span
-                      className={`rounded-md px-2 py-0.5 text-[10px] font-semibold border ${
-                        DEPARTMENT_CONFIG[selectedThread.department].badgeBg
-                      } ${DEPARTMENT_CONFIG[selectedThread.department].badgeText} ${
-                        DEPARTMENT_CONFIG[selectedThread.department].borderCol
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                        selectedThread.status === "resolved"
+                          ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                          : "bg-sky-500/20 text-sky-300 border border-sky-500/30"
                       }`}
                     >
-                      {DEPARTMENT_CONFIG[selectedThread.department].label}
+                      {selectedThread.status}
                     </span>
                   </div>
 
-                  {/* Customer details row */}
                   <div className="mt-1 flex items-center gap-3 text-xs text-slate-400">
-                    <span className="font-semibold text-white">
-                      Recipient / Sender: {selectedThread.customerName}
+                    <span className="text-white font-medium">
+                      {selectedThread.customerName} &lt;{selectedThread.customerEmail}&gt;
                     </span>
                     <span>&bull;</span>
-                    <a
-                      href={`mailto:${selectedThread.customerEmail}`}
-                      className="text-sky-400 hover:underline"
-                    >
-                      {selectedThread.customerEmail}
-                    </a>
+                    <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-semibold text-sky-300">
+                      {selectedThread.customerPlan}
+                    </span>
+                    <span>&bull;</span>
+                    <span>{selectedThread.departmentEmail}</span>
                   </div>
                 </div>
 
-                {/* Header Actions */}
-                <div className="flex items-center gap-2 shrink-0">
-                  {/* Department Transfer Dropdown */}
+                {/* Actions: Transfer, Resolve, Star, Trash */}
+                <div className="flex items-center gap-2">
+                  {/* Super Admin Transfer Dropdown */}
                   {isSuperAdmin && (
                     <div className="relative">
                       <button
                         type="button"
                         onClick={() => setTransferMenuOpen(!transferMenuOpen)}
-                        className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:bg-white/10"
+                        className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:bg-white/10 hover:text-white"
                       >
                         <ArrowRightLeft className="h-3.5 w-3.5 text-sky-400" />
-                        <span>Transfer Dept</span>
-                        <ChevronDown className="h-3 w-3 text-slate-400" />
+                        <span>Transfer</span>
                       </button>
 
                       {transferMenuOpen && (
-                        <div className="absolute right-0 mt-2 w-56 overflow-hidden rounded-2xl border border-white/15 bg-slate-900 p-1.5 shadow-2xl backdrop-blur-xl z-50 animate-in fade-in zoom-in-95">
-                          <div className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                            Re-assign to Department
+                        <div className="absolute right-0 top-10 z-50 w-56 rounded-2xl border border-white/15 bg-slate-900/95 p-1.5 shadow-2xl backdrop-blur-xl">
+                          <div className="px-2.5 py-1 text-[10px] font-bold uppercase text-slate-400">
+                            Re-route Department
                           </div>
-                          {(
-                            ["support", "billing", "marketing", "founder_legal"] as Array<
-                              Exclude<Department, "all">
-                            >
-                          ).map((dept) => {
-                            const conf = DEPARTMENT_CONFIG[dept];
-                            const isCurrent = selectedThread.department === dept;
-                            return (
+                          {(["support", "billing", "marketing", "founder_legal"] as const).map(
+                            (dept) => (
                               <button
                                 key={dept}
+                                type="button"
                                 onClick={() => handleTransferDepartment(dept)}
-                                disabled={isCurrent}
-                                className={`flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 text-xs text-left transition ${
-                                  isCurrent
-                                    ? "bg-white/10 font-bold text-white opacity-60 cursor-default"
-                                    : "text-slate-300 hover:bg-white/5 hover:text-white"
-                                }`}
+                                className="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left text-xs text-slate-200 hover:bg-white/10"
                               >
-                                <span>{conf.label}</span>
-                                <span className="text-[10px] text-slate-500 font-mono">
-                                  {conf.email.split("@")[0]}
+                                <span>{DEPARTMENT_CONFIG[dept].label}</span>
+                                <span className="text-[10px] text-slate-400">
+                                  {DEPARTMENT_CONFIG[dept].email}
                                 </span>
                               </button>
-                            );
-                          })}
+                            )
+                          )}
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* Mark as Resolved */}
+                  {/* Toggle Resolved */}
                   <button
                     type="button"
                     onClick={handleToggleStatus}
-                    className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition ${
-                      selectedThread.status === "resolved"
-                        ? "border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
-                        : "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
-                    }`}
+                    className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:bg-white/10 hover:text-white"
                   >
-                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    <CheckCircle2
+                      className={`h-3.5 w-3.5 ${
+                        selectedThread.status === "resolved" ? "text-emerald-400" : "text-slate-400"
+                      }`}
+                    />
                     <span>
-                      {selectedThread.status === "resolved" ? "Reopen" : "Mark Resolved"}
+                      {selectedThread.status === "resolved" ? "Mark Open" : "Mark Resolved"}
                     </span>
                   </button>
 
-                  {/* Delete Thread */}
+                  {/* Star Toggle */}
                   <button
                     type="button"
-                    onClick={handleDeleteThread}
-                    title="Delete thread"
-                    className="flex h-8 w-8 items-center justify-center rounded-xl border border-rose-500/20 bg-rose-500/5 text-rose-400 transition hover:bg-rose-500/15"
+                    onClick={() => handleToggleStar(selectedThread.id)}
+                    title="Star thread"
+                    className="rounded-xl border border-white/15 bg-white/5 p-1.5 text-slate-300 hover:bg-white/10 hover:text-amber-400"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Star
+                      className={`h-4 w-4 ${
+                        selectedThread.starred ? "text-amber-400 fill-amber-400" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {/* Move to Trash */}
+                  <button
+                    type="button"
+                    onClick={handleMoveToTrash}
+                    title={selectedThread.folder === "trash" ? "Restore to Inbox" : "Move to Trash"}
+                    className="rounded-xl border border-white/15 bg-white/5 p-1.5 text-slate-300 hover:bg-rose-500/20 hover:text-rose-400"
+                  >
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               </div>
 
-              {/* MESSAGE STREAM (Middle Scrollable Area) */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-5">
-                {selectedThread.messages.map((message) => {
-                  const isAgent = message.senderType === "agent";
-
+              {/* Message Stream Scroll Area */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                {selectedThread.messages.map((msg) => {
+                  const isAgent = msg.senderType === "agent";
                   return (
                     <div
-                      key={message.id}
-                      className={`flex gap-3.5 max-w-3xl ${
-                        isAgent ? "ml-auto flex-row-reverse" : "mr-auto"
-                      }`}
+                      key={msg.id}
+                      className={`flex flex-col ${isAgent ? "items-end" : "items-start"}`}
                     >
-                      <div
-                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold border ${
-                          isAgent
-                            ? "bg-sky-600/20 text-sky-300 border-sky-500/30"
-                            : "bg-slate-800 text-slate-200 border-white/10"
-                        }`}
-                      >
-                        {isAgent ? "PO" : selectedThread.customerAvatar || "CU"}
+                      <div className="flex items-center gap-2 mb-1 text-[11px] text-slate-400">
+                        <span className="font-semibold text-slate-300">{msg.senderName}</span>
+                        <span>&bull;</span>
+                        <span className="text-[10px] font-mono text-slate-400">{msg.departmentEmail}</span>
+                        <span>&bull;</span>
+                        <span>{msg.timestamp}</span>
                       </div>
 
                       <div
-                        className={`rounded-2xl p-4 shadow-sm text-xs leading-relaxed border ${
+                        className={`max-w-2xl rounded-2xl p-4 text-xs leading-relaxed shadow-md ${
                           isAgent
-                            ? "bg-blue-600/15 border-blue-500/30 text-slate-100"
-                            : "bg-white/5 border-white/10 text-slate-200"
+                            ? "bg-gradient-to-r from-sky-600 to-blue-600 text-white"
+                            : "bg-slate-900/90 text-slate-200 border border-white/10"
                         }`}
                       >
-                        <div className="flex items-center justify-between gap-4 mb-2 pb-2 border-b border-white/10">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-white">
-                              {message.senderName}
-                            </span>
-                            <span className="text-[10px] text-slate-400">
-                              {isAgent ? `via ${message.departmentEmail}` : message.senderEmail}
-                            </span>
-                          </div>
-                          <span className="text-[10px] text-slate-400 shrink-0">
-                            {message.timestamp}
-                          </span>
-                        </div>
+                        <p className="whitespace-pre-wrap">{msg.body}</p>
 
-                        {/* Body */}
-                        <div className="whitespace-pre-line text-slate-200 text-xs">
-                          {message.body}
-                        </div>
-
-                        {/* Attachments (if present) */}
-                        {message.attachments && message.attachments.length > 0 && (
-                          <div className="mt-3 pt-2.5 border-t border-white/10 flex flex-wrap gap-2">
-                            {message.attachments.map((att, attIdx) => (
+                        {/* Attachments rendering */}
+                        {msg.attachments && msg.attachments.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-white/20 flex flex-wrap gap-2">
+                            {msg.attachments.map((att, idx) => (
                               <div
-                                key={attIdx}
-                                className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] text-slate-200"
+                                key={idx}
+                                className="flex items-center gap-2 rounded-xl bg-black/20 px-2.5 py-1 text-[11px]"
                               >
-                                <Paperclip className="h-3 w-3 text-sky-400" />
-                                <span>{att.name}</span>
-                                <span className="text-[10px] text-slate-400 font-mono">
-                                  ({att.size})
+                                <FileIcon className="h-3.5 w-3.5" />
+                                <span className="font-medium truncate max-w-[160px]">
+                                  {att.name}
                                 </span>
+                                <span className="text-[10px] opacity-75">({att.size})</span>
                               </div>
                             ))}
                           </div>
@@ -996,18 +1499,52 @@ export default function HelpdeskInbox() {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* BOTTOM REPLY EDITOR (Sticky) */}
-              <div className="shrink-0 border-t border-white/10 bg-slate-900/80 p-4 backdrop-blur-md">
-                {/* Send From Bar */}
-                <div className="mb-2.5 flex items-center justify-between text-xs text-slate-400">
+              {/* Bottom Reply Area */}
+              <div className="border-t border-white/10 bg-slate-900/90 p-4">
+                {/* Send From Identity Selector */}
+                <div className="mb-2 flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-slate-400">Sending as:</span>
-                    <span className="rounded-md border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 font-mono text-[11px] font-semibold text-sky-300">
-                      PhotoOS {DEPARTMENT_CONFIG[selectedThread.department].label} &lt;{activeSendFrom}&gt;
-                    </span>
-                    <span className="text-[10px] text-emerald-400 font-medium">
-                      &bull; Dispatches to {selectedThread.customerEmail}
-                    </span>
+                    <span className="text-slate-400">Replying As:</span>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setReplyFromDropdownOpen(!replyFromDropdownOpen)}
+                        className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-xs font-semibold text-white hover:bg-white/10"
+                      >
+                        <span>
+                          {OFFICIAL_IDENTITIES.find((i) => i.key === replySendFrom)?.label}
+                        </span>
+                        <span className="text-sky-400 font-mono text-[11px]">
+                          &lt;{OFFICIAL_IDENTITIES.find((i) => i.key === replySendFrom)?.email}&gt;
+                        </span>
+                        <ChevronDown className="h-3 w-3 text-slate-400" />
+                      </button>
+
+                      {replyFromDropdownOpen && (
+                        <div className="absolute left-0 bottom-8 z-50 w-72 rounded-2xl border border-white/15 bg-slate-900/95 p-1.5 shadow-2xl backdrop-blur-xl">
+                          <div className="px-2.5 py-1 text-[10px] font-bold uppercase text-slate-400">
+                            Select Dispatch Identity
+                          </div>
+                          {OFFICIAL_IDENTITIES.map((id) => (
+                            <button
+                              key={id.key}
+                              type="button"
+                              onClick={() => {
+                                setReplySendFrom(id.key);
+                                setReplyFromDropdownOpen(false);
+                              }}
+                              className="flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 text-left text-xs hover:bg-white/10"
+                            >
+                              <div>
+                                <div className="font-semibold text-white">{id.label}</div>
+                                <div className="text-[10px] text-slate-400">{id.email}</div>
+                              </div>
+                              {replySendFrom === id.key && <Check className="h-3.5 w-3.5 text-sky-400" />}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Canned Templates Dropdown */}
@@ -1015,58 +1552,50 @@ export default function HelpdeskInbox() {
                     <button
                       type="button"
                       onClick={() => setCannedMenuOpen(!cannedMenuOpen)}
-                      className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-slate-300 hover:bg-white/10 hover:text-white"
+                      className="flex items-center gap-1 text-[11px] text-sky-400 hover:text-sky-300"
                     >
-                      <Sparkles className="h-3 w-3 text-amber-400" />
-                      <span>Canned Templates</span>
-                      <ChevronDown className="h-3 w-3 text-slate-400" />
+                      <Sparkles className="h-3 w-3" />
+                      <span>Quick Templates</span>
                     </button>
 
                     {cannedMenuOpen && (
-                      <div className="absolute right-0 bottom-full mb-2 w-80 overflow-hidden rounded-2xl border border-white/15 bg-slate-900 p-2 shadow-2xl backdrop-blur-xl z-50 animate-in fade-in zoom-in-95">
-                        <div className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-white/10">
-                          Pre-approved Studio Templates
+                      <div className="absolute right-0 bottom-8 z-50 w-72 rounded-2xl border border-white/15 bg-slate-900/95 p-1.5 shadow-2xl backdrop-blur-xl">
+                        <div className="px-2.5 py-1 text-[10px] font-bold uppercase text-slate-400">
+                          Insert Canned Response
                         </div>
-                        <div className="mt-1 space-y-1">
-                          {CANNED_RESPONSES.map((canned) => (
-                            <button
-                              key={canned.id}
-                              onClick={() => handleInsertCanned(canned)}
-                              className="flex w-full flex-col rounded-xl px-2.5 py-2 text-left transition hover:bg-white/10"
-                            >
-                              <div className="text-xs font-semibold text-white">
-                                {canned.title}
-                              </div>
-                              <div className="text-[10px] text-slate-400 line-clamp-1">
-                                {canned.content}
-                              </div>
-                            </button>
-                          ))}
-                        </div>
+                        {CANNED_RESPONSES.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => handleInsertCanned(c)}
+                            className="flex w-full flex-col rounded-xl px-2.5 py-1.5 text-left text-xs hover:bg-white/10"
+                          >
+                            <span className="font-semibold text-white">{c.title}</span>
+                            <span className="line-clamp-1 text-[10px] text-slate-400">
+                              {c.content}
+                            </span>
+                          </button>
+                        ))}
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Attached Files Preview Bar */}
+                {/* Reply Attachments preview */}
                 {attachments.length > 0 && (
-                  <div className="mb-2 flex flex-wrap gap-2 rounded-xl border border-sky-500/20 bg-sky-500/5 p-2">
+                  <div className="mb-2 flex flex-wrap gap-2">
                     {attachments.map((att, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center gap-1.5 rounded-lg border border-sky-400/30 bg-sky-950/60 px-2.5 py-1 text-xs text-sky-200"
+                        className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-2.5 py-1 text-xs text-slate-200"
                       >
-                        <Paperclip className="h-3.5 w-3.5 text-sky-400" />
-                        <span className="font-medium truncate max-w-[180px]">
-                          {att.filename}
-                        </span>
-                        <span className="text-[10px] text-sky-400 font-mono">
-                          ({att.size})
-                        </span>
+                        <FileIcon className="h-3.5 w-3.5 text-sky-400" />
+                        <span className="font-medium truncate max-w-[140px]">{att.filename}</span>
+                        <span className="text-[10px] text-slate-400">({att.size})</span>
                         <button
                           type="button"
-                          onClick={() => handleRemoveAttachment(idx)}
-                          className="ml-1 text-slate-400 hover:text-white"
+                          onClick={() => handleRemoveAttachment(idx, false)}
+                          className="hover:text-rose-400"
                         >
                           <X className="h-3 w-3" />
                         </button>
@@ -1075,41 +1604,32 @@ export default function HelpdeskInbox() {
                   </div>
                 )}
 
-                {/* Editor Textarea */}
-                <div className="overflow-hidden rounded-2xl border border-white/15 bg-slate-950 focus-within:border-sky-400">
-                  {/* Formatting Toolbar */}
-                  <div className="flex items-center gap-1 border-b border-white/10 bg-white/[0.02] px-3 py-1.5 text-slate-400">
+                {/* Reply Box */}
+                <div className="rounded-2xl border border-white/15 bg-slate-950/70 p-2">
+                  <div className="flex items-center gap-1 border-b border-white/10 pb-1.5 text-slate-400">
                     <button
                       type="button"
-                      onClick={() => handleFormatText("**")}
-                      title="Bold"
+                      onClick={() => handleFormatText(replyInputRef, "**", "**", setReplyText)}
                       className="rounded p-1 hover:bg-white/10 hover:text-white"
+                      title="Bold"
                     >
                       <Bold className="h-3.5 w-3.5" />
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleFormatText("*")}
-                      title="Italic"
+                      onClick={() => handleFormatText(replyInputRef, "_", "_", setReplyText)}
                       className="rounded p-1 hover:bg-white/10 hover:text-white"
+                      title="Italic"
                     >
                       <Italic className="h-3.5 w-3.5" />
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleFormatText("\n- ")}
-                      title="Bullet list"
+                      onClick={() => handleFormatText(replyInputRef, "\n- ", "", setReplyText)}
                       className="rounded p-1 hover:bg-white/10 hover:text-white"
+                      title="Bullet List"
                     >
                       <List className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleFormatText("`")}
-                      title="Inline Code"
-                      className="rounded p-1 hover:bg-white/10 hover:text-white"
-                    >
-                      <FileText className="h-3.5 w-3.5" />
                     </button>
                   </div>
 
@@ -1118,27 +1638,20 @@ export default function HelpdeskInbox() {
                     rows={3}
                     value={replyText}
                     onChange={(e) => setReplyText(e.target.value)}
-                    placeholder={`Reply to ${selectedThread.customerEmail} from ${activeSendFrom}...`}
-                    className="w-full resize-none bg-transparent p-3 text-xs text-white placeholder-slate-500 outline-none"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                        void handleSendReply();
-                      }
-                    }}
+                    placeholder={`Write a reply to ${selectedThread.customerEmail}...`}
+                    className="w-full resize-none bg-transparent p-2 text-xs text-white placeholder-slate-500 outline-none"
                   />
 
-                  {/* Actions & Submit Row */}
-                  <div className="flex items-center justify-between border-t border-white/10 bg-white/[0.02] px-3 py-2">
-                    {/* Attach File Button */}
+                  <div className="flex items-center justify-between pt-2 border-t border-white/10">
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-slate-300 transition hover:bg-white/10 hover:text-white"
+                      className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-2.5 py-1 text-xs text-slate-300 hover:bg-white/10 hover:text-white"
                     >
                       <Paperclip className="h-3.5 w-3.5 text-sky-400" />
                       <span>Attach file</span>
                       {attachments.length > 0 && (
-                        <span className="rounded-full bg-sky-500/20 px-1.5 py-0.2 text-[10px] text-sky-300 font-bold">
+                        <span className="rounded-full bg-sky-500/20 px-1.5 text-[10px] font-bold text-sky-300">
                           {attachments.length}
                         </span>
                       )}
@@ -1153,7 +1666,7 @@ export default function HelpdeskInbox() {
                       {sendingReply ? (
                         <>
                           <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                          <span>Delivering Email...</span>
+                          <span>Delivering...</span>
                         </>
                       ) : (
                         <>
@@ -1169,14 +1682,382 @@ export default function HelpdeskInbox() {
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center p-8 text-center text-slate-400">
               <Mail className="h-12 w-12 text-slate-700 mb-3" />
-              <h3 className="text-sm font-bold text-white">No active email selected</h3>
+              <h3 className="text-sm font-bold text-white">No active conversation selected</h3>
               <p className="mt-1 text-xs text-slate-400 max-w-sm">
-                Select a conversation from the left to read messages and dispatch replies to customers.
+                Select a thread from the list or click &apos;Compose Email&apos; to dispatch a new message to a client or team member.
               </p>
             </div>
           )}
         </main>
       </div>
+
+      {/* ===================================================================== */}
+      {/* 3. GMAIL FLOATING COMPOSE WINDOW (DOCKABLE & EXPANDABLE) */}
+      {/* ===================================================================== */}
+      {isComposeOpen && (
+        <div
+          className={`fixed z-50 bg-slate-900 border border-slate-700 shadow-2xl transition-all duration-200 flex flex-col ${
+            isComposeMinimized
+              ? "bottom-0 right-8 w-72 h-11 rounded-t-xl overflow-hidden"
+              : isComposeMaximized
+              ? "inset-6 rounded-2xl overflow-hidden"
+              : "bottom-0 right-8 w-[600px] max-h-[85vh] rounded-t-2xl overflow-hidden"
+          }`}
+        >
+          {/* Compose Header Bar */}
+          <div className="flex h-11 shrink-0 items-center justify-between border-b border-white/10 bg-slate-950 px-4">
+            <div
+              className="flex flex-1 cursor-pointer items-center gap-2"
+              onClick={() => setIsComposeMinimized(!isComposeMinimized)}
+            >
+              <PenSquare className="h-4 w-4 text-sky-400" />
+              <span className="text-xs font-bold text-white truncate">
+                {composeSubject ? composeSubject : "New Message"}
+              </span>
+            </div>
+
+            {/* Window Controls */}
+            <div className="flex items-center gap-1.5 text-slate-400">
+              <button
+                type="button"
+                onClick={() => setIsComposeMinimized(!isComposeMinimized)}
+                title={isComposeMinimized ? "Expand" : "Minimize"}
+                className="rounded p-1 hover:bg-white/10 hover:text-white"
+              >
+                <Minus className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsComposeMaximized(!isComposeMaximized);
+                  setIsComposeMinimized(false);
+                }}
+                title={isComposeMaximized ? "Restore" : "Maximize"}
+                className="rounded p-1 hover:bg-white/10 hover:text-white"
+              >
+                {isComposeMaximized ? (
+                  <Minimize2 className="h-3.5 w-3.5" />
+                ) : (
+                  <Maximize2 className="h-3.5 w-3.5" />
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsComposeOpen(false)}
+                title="Close"
+                className="rounded p-1 hover:bg-white/10 hover:text-white"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Compose Form Body (Hidden if minimized) */}
+          {!isComposeMinimized && (
+            <div className="flex flex-1 flex-col overflow-y-auto bg-slate-900/95 p-4 space-y-3">
+              {/* "From / Send As" Selector */}
+              <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                <span className="text-xs font-semibold text-slate-400 w-16">From:</span>
+                <div className="relative flex-1">
+                  <button
+                    type="button"
+                    onClick={() => setComposeFromDropdownOpen(!composeFromDropdownOpen)}
+                    className="flex w-full items-center justify-between rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white hover:bg-white/10"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sky-400">
+                        {OFFICIAL_IDENTITIES.find((i) => i.key === composeFrom)?.label}
+                      </span>
+                      <span className="font-mono text-slate-400 text-[11px]">
+                        &lt;{OFFICIAL_IDENTITIES.find((i) => i.key === composeFrom)?.email}&gt;
+                      </span>
+                    </div>
+                    <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {composeFromDropdownOpen && (
+                    <div className="absolute left-0 top-10 z-50 w-full rounded-2xl border border-white/15 bg-slate-950 p-2 shadow-2xl backdrop-blur-xl">
+                      <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Choose Dispatch Identity
+                      </div>
+                      {OFFICIAL_IDENTITIES.map((id) => (
+                        <button
+                          key={id.key}
+                          type="button"
+                          onClick={() => {
+                            setComposeFrom(id.key);
+                            setComposeFromDropdownOpen(false);
+                          }}
+                          className={`flex w-full items-center justify-between rounded-xl p-2.5 text-left text-xs transition ${
+                            composeFrom === id.key
+                              ? "bg-sky-500/20 text-white font-semibold"
+                              : "text-slate-300 hover:bg-white/5"
+                          }`}
+                        >
+                          <div>
+                            <div className="font-semibold text-white">{id.label}</div>
+                            <div className="text-[11px] font-mono text-sky-400">{id.email}</div>
+                            <div className="text-[10px] text-slate-400 mt-0.5">{id.desc}</div>
+                          </div>
+                          {composeFrom === id.key && <Check className="h-4 w-4 text-sky-400" />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* "To" Field with CC/BCC triggers */}
+              <div className="flex items-center border-b border-white/10 pb-2">
+                <span className="text-xs font-semibold text-slate-400 w-16">To:</span>
+                <input
+                  type="text"
+                  value={composeTo}
+                  onChange={(e) => setComposeTo(e.target.value)}
+                  placeholder="Recipient email(s), comma separated"
+                  className="flex-1 bg-transparent text-xs text-white placeholder-slate-500 outline-none"
+                />
+                <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                  {!showCc && (
+                    <button
+                      type="button"
+                      onClick={() => setShowCc(true)}
+                      className="hover:text-white px-1.5 py-0.5 rounded hover:bg-white/10"
+                    >
+                      Cc
+                    </button>
+                  )}
+                  {!showBcc && (
+                    <button
+                      type="button"
+                      onClick={() => setShowBcc(true)}
+                      className="hover:text-white px-1.5 py-0.5 rounded hover:bg-white/10"
+                    >
+                      Bcc
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* "Cc" Line (if active) */}
+              {showCc && (
+                <div className="flex items-center border-b border-white/10 pb-2 animate-in fade-in">
+                  <span className="text-xs font-semibold text-slate-400 w-16">Cc:</span>
+                  <input
+                    type="text"
+                    value={composeCc}
+                    onChange={(e) => setComposeCc(e.target.value)}
+                    placeholder="Carbon copy recipients"
+                    className="flex-1 bg-transparent text-xs text-white placeholder-slate-500 outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCc(false);
+                      setComposeCc("");
+                    }}
+                    className="text-slate-500 hover:text-white"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
+
+              {/* "Bcc" Line (if active) */}
+              {showBcc && (
+                <div className="flex items-center border-b border-white/10 pb-2 animate-in fade-in">
+                  <span className="text-xs font-semibold text-slate-400 w-16">Bcc:</span>
+                  <input
+                    type="text"
+                    value={composeBcc}
+                    onChange={(e) => setComposeBcc(e.target.value)}
+                    placeholder="Blind copy recipients"
+                    className="flex-1 bg-transparent text-xs text-white placeholder-slate-500 outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowBcc(false);
+                      setComposeBcc("");
+                    }}
+                    className="text-slate-500 hover:text-white"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
+
+              {/* Subject Field */}
+              <div className="flex items-center border-b border-white/10 pb-2">
+                <span className="text-xs font-semibold text-slate-400 w-16">Subject:</span>
+                <input
+                  type="text"
+                  value={composeSubject}
+                  onChange={(e) => setComposeSubject(e.target.value)}
+                  placeholder="Email subject line"
+                  className="flex-1 bg-transparent text-xs font-semibold text-white placeholder-slate-500 outline-none"
+                />
+              </div>
+
+              {/* Formatting Toolbar */}
+              <div className="flex items-center justify-between border-b border-white/10 pb-1.5 text-slate-400">
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleFormatText(composeBodyRef, "**", "**", setComposeBody)}
+                    className="rounded p-1 hover:bg-white/10 hover:text-white"
+                    title="Bold"
+                  >
+                    <Bold className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleFormatText(composeBodyRef, "_", "_", setComposeBody)}
+                    className="rounded p-1 hover:bg-white/10 hover:text-white"
+                    title="Italic"
+                  >
+                    <Italic className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleFormatText(composeBodyRef, "\n- ", "", setComposeBody)}
+                    className="rounded p-1 hover:bg-white/10 hover:text-white"
+                    title="Bullet List"
+                  >
+                    <List className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                {/* Canned Templates */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setComposeCannedOpen(!composeCannedOpen)}
+                    className="flex items-center gap-1 text-[11px] text-sky-400 hover:text-sky-300"
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    <span>Templates</span>
+                  </button>
+
+                  {composeCannedOpen && (
+                    <div className="absolute right-0 top-6 z-50 w-72 rounded-2xl border border-white/15 bg-slate-950 p-2 shadow-2xl backdrop-blur-xl">
+                      <div className="px-2.5 py-1 text-[10px] font-bold uppercase text-slate-400">
+                        Insert Studio Template
+                      </div>
+                      {CANNED_RESPONSES.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => handleInsertComposeCanned(c)}
+                          className="flex w-full flex-col rounded-xl px-2.5 py-1.5 text-left text-xs hover:bg-white/10"
+                        >
+                          <span className="font-semibold text-white">{c.title}</span>
+                          <span className="line-clamp-1 text-[10px] text-slate-400">
+                            {c.content}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Message Body Area */}
+              <textarea
+                ref={composeBodyRef}
+                rows={isComposeMaximized ? 18 : 9}
+                value={composeBody}
+                onChange={(e) => setComposeBody(e.target.value)}
+                placeholder="Compose your message here..."
+                className="w-full resize-none bg-transparent text-xs leading-relaxed text-white placeholder-slate-500 outline-none"
+              />
+
+              {/* Attachments preview */}
+              {composeAttachments.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-2 border-t border-white/10">
+                  {composeAttachments.map((att, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-2.5 py-1 text-xs text-slate-200"
+                    >
+                      <FileIcon className="h-3.5 w-3.5 text-sky-400" />
+                      <span className="font-medium truncate max-w-[150px]">{att.filename}</span>
+                      <span className="text-[10px] text-slate-400">({att.size})</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveAttachment(idx, true)}
+                        className="hover:text-rose-400"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Bottom Actions Row */}
+              <div className="flex items-center justify-between pt-3 border-t border-white/10">
+                <div className="flex items-center gap-2">
+                  {/* Primary Send Button */}
+                  <button
+                    type="button"
+                    disabled={isSendingCompose || !composeTo.trim() || !composeSubject.trim()}
+                    onClick={handleSendCompose}
+                    className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 px-5 py-2 text-xs font-bold text-white shadow-lg shadow-sky-950 transition hover:brightness-110 disabled:opacity-50"
+                  >
+                    {isSendingCompose ? (
+                      <>
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                        <span>Sending Live Mail...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-3.5 w-3.5" />
+                        <span>Send Mail</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Attachment Button */}
+                  <button
+                    type="button"
+                    onClick={() => composeFileInputRef.current?.click()}
+                    title="Attach files"
+                    className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-slate-300 hover:bg-white/10 hover:text-white"
+                  >
+                    <Paperclip className="h-4 w-4 text-sky-400" />
+                    <span>Attach</span>
+                    {composeAttachments.length > 0 && (
+                      <span className="rounded-full bg-sky-500/20 px-1.5 text-[10px] font-bold text-sky-300">
+                        {composeAttachments.length}
+                      </span>
+                    )}
+                  </button>
+                </div>
+
+                {/* Discard Draft Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm("Discard this message?")) {
+                      setIsComposeOpen(false);
+                      setComposeTo("");
+                      setComposeSubject("");
+                      setComposeBody("");
+                      setComposeAttachments([]);
+                    }
+                  }}
+                  title="Discard Draft"
+                  className="rounded-xl p-2 text-slate-400 hover:bg-white/10 hover:text-rose-400"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
