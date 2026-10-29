@@ -53,7 +53,11 @@ import {
   Star,
   XCircle,
   ImageIcon,
+  Sun,
+  Moon,
 } from "lucide-react";
+
+import { useTheme } from "next-themes";
 
 import {
   getPlatformAdminSession,
@@ -474,6 +478,12 @@ export default function AdminShell({
   children,
 }: AdminShellProps) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const { theme, setTheme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const isDark = mounted && (resolvedTheme === "dark" || theme === "dark");
 
   useEffect(() => {
     setOpenSections((current) => {
@@ -494,7 +504,6 @@ export default function AdminShell({
       return next;
     });
   }, [pathname]);
-  const router = useRouter();
 
   const [collapsed, setCollapsed] =
     useState(false);
@@ -1172,7 +1181,7 @@ export default function AdminShell({
                 </button>
 
                 {notificationOpen ? (
-                  <div className="absolute right-0 top-12 z-50 w-[360px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                  <div className="absolute right-0 top-12 z-50 w-[calc(100vw-32px)] sm:w-[360px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
                     <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
                       <div>
                         <div className="flex items-center gap-2">
@@ -1310,15 +1319,30 @@ export default function AdminShell({
 
               <Link
                 href="/admin/chat"
-                className="rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                className="rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition"
                 title="Internal chat"
               >
                 <MessageSquare className="h-[19px] w-[19px]" />
               </Link>
 
+              {/* Theme Toggle (Light / Dark) */}
+              <button
+                type="button"
+                onClick={() => setTheme(isDark ? "light" : "dark")}
+                className="rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition"
+                title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                aria-label="Toggle Theme"
+              >
+                {isDark ? (
+                  <Sun className="h-[19px] w-[19px] text-amber-500" />
+                ) : (
+                  <Moon className="h-[19px] w-[19px] text-slate-600" />
+                )}
+              </button>
+
               <Link
                 href="/admin/settings"
-                className="hidden rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 sm:block"
+                className="hidden rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition sm:block"
                 title="Settings"
               >
                 <Settings className="h-[19px] w-[19px]" />
@@ -1399,25 +1423,27 @@ export default function AdminShell({
             </div>
           </div>
 
-          <div className="border-t border-slate-100 px-4 py-2.5 md:hidden">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          {!pathname.startsWith("/admin/inbox") ? (
+            <div className="border-t border-slate-100 px-4 py-2.5 md:hidden">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
 
-              <input
-                value={search}
-                onChange={(event) =>
-                  setSearch(
-                    event.target.value,
-                  )
-                }
-                placeholder="Search admin platform..."
-                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none focus:border-[#0A3F61]"
-              />
+                <input
+                  value={search}
+                  onChange={(event) =>
+                    setSearch(
+                      event.target.value,
+                    )
+                  }
+                  placeholder="Search admin platform..."
+                  className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none focus:border-[#0A3F61]"
+                />
+              </div>
             </div>
-          </div>
+          ) : null}
         </header>
 
-        <main className="min-h-[calc(100vh-76px)]">
+        <main className={pathname.startsWith("/admin/inbox") ? "h-[calc(100vh-76px)] overflow-hidden" : "min-h-[calc(100vh-76px)]"}>
           {children}
         </main>
       </div>

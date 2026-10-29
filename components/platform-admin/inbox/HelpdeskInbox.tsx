@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
+import { useTheme } from "next-themes";
 import {
   Mail,
   Search,
@@ -36,6 +37,10 @@ import {
   Clock,
   ExternalLink,
   ChevronRight,
+  Sun,
+  Moon,
+  ArrowLeft,
+  Menu,
 } from "lucide-react";
 
 import {
@@ -69,7 +74,7 @@ const OFFICIAL_IDENTITIES = [
     label: "PhotoOS Support",
     desc: "Customer helpdesk, bug reports, studio setup",
     dept: "support" as const,
-    color: "text-blue-400 bg-blue-500/10 border-blue-500/30",
+    color: "text-blue-500 bg-blue-500/10 border-blue-500/30",
   },
   {
     key: "billing",
@@ -77,7 +82,7 @@ const OFFICIAL_IDENTITIES = [
     label: "PhotoOS Billing",
     desc: "GST invoices, payment reminders, plan renewals",
     dept: "billing" as const,
-    color: "text-amber-400 bg-amber-500/10 border-amber-500/30",
+    color: "text-amber-500 bg-amber-500/10 border-amber-500/30",
   },
   {
     key: "marketing",
@@ -85,7 +90,7 @@ const OFFICIAL_IDENTITIES = [
     label: "PhotoOS Marketing",
     desc: "Creator collaborations, onboarding, promotions",
     dept: "marketing" as const,
-    color: "text-purple-400 bg-purple-500/10 border-purple-500/30",
+    color: "text-purple-500 bg-purple-500/10 border-purple-500/30",
   },
   {
     key: "founder",
@@ -93,7 +98,7 @@ const OFFICIAL_IDENTITIES = [
     label: "PhotoOS Founder & Legal",
     desc: "Enterprise deals, VIP studios, legal/DPDP notices",
     dept: "founder_legal" as const,
-    color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/30",
+    color: "text-emerald-500 bg-emerald-500/10 border-emerald-500/30",
   },
   {
     key: "team",
@@ -101,7 +106,7 @@ const OFFICIAL_IDENTITIES = [
     label: "PhotoOS Internal Team",
     desc: "Internal staff updates, team invitations",
     dept: "support" as const,
-    color: "text-sky-400 bg-sky-500/10 border-sky-500/30",
+    color: "text-sky-500 bg-sky-500/10 border-sky-500/30",
   },
   {
     key: "noreply",
@@ -109,11 +114,20 @@ const OFFICIAL_IDENTITIES = [
     label: "PhotoOS System Alerts",
     desc: "Automated OTPs, 2FA, system notices",
     dept: "support" as const,
-    color: "text-slate-400 bg-slate-500/10 border-slate-500/30",
+    color: "text-slate-500 bg-slate-500/10 border-slate-500/30",
   },
 ];
 
 export default function HelpdeskInbox() {
+  // Theme Toggle State
+  const { theme, setTheme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const isDark = mounted ? resolvedTheme === "dark" || theme === "dark" : true;
+
+  // Mobile View Navigation State: "threads" | "folders" | "conversation"
+  const [mobileTab, setMobileTab] = useState<"threads" | "folders" | "conversation">("threads");
+
   // Current Active User (Super Admin / Agent Switcher)
   const [currentUser, setCurrentUser] = useState<UserProfile>(USER_PROFILES[0]);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
@@ -300,6 +314,8 @@ export default function HelpdeskInbox() {
         prev.map((t) => (t.id === thread.id ? { ...t, unread: false } : t))
       );
     }
+    // On mobile, automatically show the conversation pane
+    setMobileTab("conversation");
   };
 
   useEffect(() => {
@@ -657,6 +673,7 @@ export default function HelpdeskInbox() {
       setThreads((prev) => [newSentThread, ...prev]);
       setSelectedThreadId(newThreadId);
       setActiveFolder("sent");
+      setMobileTab("conversation");
 
       // 3. Save to server store
       await fetch("/api/email/inbox", {
@@ -729,7 +746,11 @@ export default function HelpdeskInbox() {
   }, [threads]);
 
   return (
-    <div className="flex h-screen w-full flex-col overflow-hidden bg-slate-950 font-sans text-slate-100 antialiased selection:bg-sky-500/30 selection:text-white">
+    <div
+      className={`flex h-full w-full flex-col overflow-hidden font-sans transition-colors duration-200 ${
+        isDark ? "bg-slate-950 text-slate-100" : "bg-slate-50 text-slate-800"
+      }`}
+    >
       {/* Hidden File Input for Reply Attachments */}
       <input
         type="file"
@@ -751,49 +772,102 @@ export default function HelpdeskInbox() {
       {/* ===================================================================== */}
       {/* 1. TOP HEADER BAR */}
       {/* ===================================================================== */}
-      <header className="relative z-30 flex h-16 shrink-0 items-center justify-between border-b border-white/10 bg-slate-900/90 px-5 backdrop-blur-md">
-        {/* Left: Brand & Status */}
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-[#0A3F61] to-[#0d5583] text-sky-400 shadow-lg shadow-sky-950/40 border border-sky-400/20">
-            <Mail className="h-5 w-5" />
+      <header
+        className={`relative z-30 flex h-14 shrink-0 items-center justify-between border-b px-3 sm:px-5 transition-colors duration-200 ${
+          isDark
+            ? "border-white/10 bg-slate-900/90 text-white"
+            : "border-slate-200 bg-white text-slate-900 shadow-xs"
+        }`}
+      >
+        {/* Left: Mobile Navigation Button & Brand Title */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Mobile Folder Toggle Button */}
+          <button
+            type="button"
+            onClick={() => setMobileTab(mobileTab === "folders" ? "threads" : "folders")}
+            className={`flex items-center gap-1.5 rounded-xl border p-2 text-xs font-semibold lg:hidden transition ${
+              isDark
+                ? "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+                : "border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200"
+            }`}
+            title="Folders & Departments"
+          >
+            <Menu className="h-4 w-4 text-sky-500" />
+            <span className="hidden xs:inline">Folders</span>
+          </button>
+
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-[#0A3F61] to-[#0d5583] text-sky-400 shadow-md">
+            <Mail className="h-4 w-4" />
           </div>
+
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-sm font-bold tracking-tight text-white">
-                PhotoOS Mail & Helpdesk Console
+              <h1 className="text-xs sm:text-sm font-bold tracking-tight truncate max-w-[150px] sm:max-w-none">
+                PhotoOS Helpdesk
               </h1>
-              <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-500/20">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Live Resend Delivery
+              <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-500 border border-emerald-500/20">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Resend Live
               </span>
             </div>
-            <p className="text-[11px] text-slate-400">
-              Official dispatch identities: support, billing, marketing, founder & team
-            </p>
           </div>
         </div>
 
-        {/* Center: Search / Filter Info */}
-        <div className="hidden lg:flex items-center gap-2 rounded-xl border border-white/10 bg-slate-950/70 px-3.5 py-1.5 text-xs text-slate-400">
-          <Shield className="h-3.5 w-3.5 text-sky-400" />
+        {/* Center: Active Identity Tag */}
+        <div
+          className={`hidden md:flex items-center gap-2 rounded-xl border px-3 py-1 text-xs ${
+            isDark
+              ? "border-white/10 bg-slate-950/70 text-slate-400"
+              : "border-slate-200 bg-slate-100/80 text-slate-600"
+          }`}
+        >
+          <Shield className="h-3.5 w-3.5 text-sky-500" />
           <span>Active Identity:</span>
-          <strong className="text-white">
+          <strong className={isDark ? "text-white" : "text-slate-900"}>
             {OFFICIAL_IDENTITIES.find((i) => i.key === composeFrom)?.email}
           </strong>
         </div>
 
-        {/* Right: Refresh & Active User Role Switcher */}
-        <div className="flex items-center gap-2.5">
-          {/* Refresh Inbox Button */}
+        {/* Right: Light/Dark Theme Switcher, Sync, & User Switcher */}
+        <div className="flex items-center gap-2">
+          {/* Light / Dark Mode Toggle Button */}
+          <button
+            type="button"
+            onClick={() => setTheme(isDark ? "light" : "dark")}
+            className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition ${
+              isDark
+                ? "border-white/15 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white"
+                : "border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200 hover:text-slate-900"
+            }`}
+            title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            {isDark ? (
+              <>
+                <Sun className="h-3.5 w-3.5 text-amber-400" />
+                <span className="hidden sm:inline text-[11px]">Light</span>
+              </>
+            ) : (
+              <>
+                <Moon className="h-3.5 w-3.5 text-slate-600" />
+                <span className="hidden sm:inline text-[11px]">Dark</span>
+              </>
+            )}
+          </button>
+
+          {/* Sync Button */}
           <button
             type="button"
             onClick={() => void fetchLiveEmails(true)}
             disabled={refreshing}
             title="Refresh Live Emails from Resend"
-            className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-slate-300 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
+            className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs transition disabled:opacity-50 ${
+              isDark
+                ? "border-white/15 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white"
+                : "border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200 hover:text-slate-900"
+            }`}
           >
-            <RefreshCw className={`h-3.5 w-3.5 text-sky-400 ${refreshing ? "animate-spin" : ""}`} />
-            <span className="hidden sm:inline">{refreshing ? "Refreshing..." : "Sync"}</span>
+            <RefreshCw className={`h-3.5 w-3.5 text-sky-500 ${refreshing ? "animate-spin" : ""}`} />
+            <span className="hidden sm:inline text-[11px]">{refreshing ? "Syncing..." : "Sync"}</span>
           </button>
 
           {/* User Role Switcher */}
@@ -801,40 +875,35 @@ export default function HelpdeskInbox() {
             <button
               type="button"
               onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-              className="flex items-center gap-2.5 rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 transition hover:bg-white/10"
+              className={`flex items-center gap-2 rounded-xl border px-2.5 py-1.5 transition ${
+                isDark
+                  ? "border-white/15 bg-white/5 text-white hover:bg-white/10"
+                  : "border-slate-200 bg-slate-100 text-slate-900 hover:bg-slate-200"
+              }`}
             >
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-500/20 text-xs font-bold text-sky-400 border border-sky-400/30">
+              <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-sky-500/20 text-xs font-bold text-sky-500 border border-sky-400/30">
                 {currentUser.avatar}
               </div>
-              <div className="text-left hidden sm:block">
+              <div className="text-left hidden lg:block">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-semibold text-white">
-                    {currentUser.name}
-                  </span>
-                  <span
-                    className={`rounded-md px-1.5 py-0.2 text-[9px] font-bold tracking-wider uppercase ${
-                      isSuperAdmin
-                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                        : "bg-purple-500/20 text-purple-300 border border-purple-500/30"
-                    }`}
-                  >
-                    {isSuperAdmin ? "Super Admin" : "Agent"}
-                  </span>
+                  <span className="text-xs font-semibold">{currentUser.name}</span>
                 </div>
-                <div className="text-[10px] text-slate-400">{currentUser.email}</div>
               </div>
-              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+              <ChevronDown className="h-3 w-3 text-slate-400" />
             </button>
 
             {/* Dropdown Menu */}
             {userDropdownOpen && (
-              <div className="absolute right-0 top-12 z-50 w-72 rounded-2xl border border-white/15 bg-slate-900/95 p-2 shadow-2xl backdrop-blur-xl">
+              <div
+                className={`absolute right-0 top-11 z-50 w-72 rounded-2xl border p-2 shadow-2xl backdrop-blur-xl ${
+                  isDark
+                    ? "border-white/15 bg-slate-900/95 text-white"
+                    : "border-slate-200 bg-white/95 text-slate-900"
+                }`}
+              >
                 <div className="px-3 py-2 border-b border-white/10">
                   <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                     Switch Test User Role
-                  </div>
-                  <div className="text-[10px] text-slate-500">
-                    Verify RBAC department view and routing restrictions
                   </div>
                 </div>
 
@@ -848,20 +917,22 @@ export default function HelpdeskInbox() {
                         onClick={() => handleUserChange(profile)}
                         className={`flex w-full items-center justify-between rounded-xl p-2.5 text-left text-xs transition ${
                           isSelected
-                            ? "bg-sky-500/20 text-white font-semibold"
-                            : "text-slate-300 hover:bg-white/5"
+                            ? "bg-sky-500/20 font-semibold"
+                            : isDark
+                            ? "text-slate-300 hover:bg-white/5"
+                            : "text-slate-700 hover:bg-slate-100"
                         }`}
                       >
                         <div className="flex items-center gap-2.5">
-                          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-[11px] font-bold text-sky-400">
+                          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-500/10 text-[11px] font-bold text-sky-500">
                             {profile.avatar}
                           </div>
                           <div>
-                            <div className="font-semibold text-white">{profile.name}</div>
+                            <div className="font-semibold">{profile.name}</div>
                             <div className="text-[10px] text-slate-400">{profile.roleTitle}</div>
                           </div>
                         </div>
-                        {isSelected && <Check className="h-4 w-4 text-sky-400" />}
+                        {isSelected && <Check className="h-4 w-4 text-sky-500" />}
                       </button>
                     );
                   })}
@@ -874,23 +945,48 @@ export default function HelpdeskInbox() {
 
       {/* Toast Notification */}
       {sendSuccessToast && (
-        <div className="absolute top-20 right-6 z-50 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-950/90 px-4 py-2.5 text-xs text-emerald-200 shadow-2xl backdrop-blur-md animate-in slide-in-from-top-2">
+        <div className="absolute top-16 right-4 sm:right-6 z-50 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-950/90 px-4 py-2.5 text-xs text-emerald-200 shadow-2xl backdrop-blur-md animate-in slide-in-from-top-2">
           <CheckCircle2 className="h-4 w-4 text-emerald-400" />
           <span>{sendSuccessToast}</span>
         </div>
       )}
 
       {/* ===================================================================== */}
-      {/* 2. THREE-PANE GMAIL WORKSPACE */}
-      {/* Pane 1: Gmail Navigation Sidebar (Folders & Compose) */}
-      {/* Pane 2: Department Thread List */}
-      {/* Pane 3: Conversation Stream & Dispatch Reply */}
+      {/* 2. RESPONSIVE THREE-PANE WORKSPACE */}
+      {/* Mobile: Switch between Folders, Threads, and Conversation view */}
+      {/* Desktop: 3-pane layout side-by-side */}
       {/* ===================================================================== */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
         {/* ================================================================= */}
         {/* PANE 1: GMAIL LEFT RAIL / FOLDER NAVIGATION (~230px fixed) */}
+        {/* Mobile: Shown when mobileTab === 'folders' */}
         {/* ================================================================= */}
-        <nav className="flex w-[230px] shrink-0 flex-col border-r border-white/10 bg-slate-900/70 p-3 select-none">
+        <nav
+          className={`flex-col border-r p-3 select-none transition-colors duration-200 ${
+            isDark ? "border-white/10 bg-slate-900/70" : "border-slate-200 bg-white"
+          } ${
+            mobileTab === "folders"
+              ? "flex absolute inset-0 z-40 bg-slate-950 lg:relative lg:inset-auto lg:w-[230px] lg:flex"
+              : "hidden lg:flex lg:w-[230px] shrink-0"
+          }`}
+        >
+          {/* Mobile Back / Close Button */}
+          {mobileTab === "folders" && (
+            <div className="flex items-center justify-between pb-3 mb-2 border-b border-white/10 lg:hidden">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                Navigation
+              </span>
+              <button
+                type="button"
+                onClick={() => setMobileTab("threads")}
+                className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-sky-400 hover:bg-white/10"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span>View Messages</span>
+              </button>
+            </div>
+          )}
+
           {/* Prominent Gmail-style Compose Button */}
           <button
             type="button"
@@ -898,14 +994,14 @@ export default function HelpdeskInbox() {
               setIsComposeOpen(true);
               setIsComposeMinimized(false);
             }}
-            className="group flex w-full items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 px-4 py-3 text-xs font-bold text-white shadow-lg shadow-sky-950/60 transition hover:brightness-110 active:scale-[0.98]"
+            className="group flex w-full items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 px-4 py-2.5 sm:py-3 text-xs font-bold text-white shadow-lg shadow-sky-950/40 transition hover:brightness-110 active:scale-[0.98]"
           >
             <Plus className="h-4 w-4 transition group-hover:rotate-90" />
             <span>Compose Email</span>
           </button>
 
           {/* Standard Folders List */}
-          <div className="mt-5 space-y-1">
+          <div className="mt-4 space-y-1">
             <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
               Folders
             </div>
@@ -916,19 +1012,24 @@ export default function HelpdeskInbox() {
               onClick={() => {
                 setActiveFolder("inbox");
                 setActiveDepartment("all");
+                setMobileTab("threads");
               }}
               className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition ${
                 activeFolder === "inbox"
-                  ? "bg-sky-500/15 text-white font-semibold"
-                  : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                  ? isDark
+                    ? "bg-sky-500/15 text-white font-semibold"
+                    : "bg-sky-50 text-sky-700 font-bold border border-sky-100"
+                  : isDark
+                  ? "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
               }`}
             >
               <div className="flex items-center gap-2.5">
-                <Inbox className={`h-4 w-4 ${activeFolder === "inbox" ? "text-sky-400" : ""}`} />
+                <Inbox className={`h-4 w-4 ${activeFolder === "inbox" ? "text-sky-500" : ""}`} />
                 <span>Inbox</span>
               </div>
               {counts.inbox > 0 && (
-                <span className="rounded-full bg-sky-500/20 px-2 py-0.5 text-[10px] font-bold text-sky-300">
+                <span className="rounded-full bg-sky-500/20 px-2 py-0.5 text-[10px] font-bold text-sky-500">
                   {counts.inbox}
                 </span>
               )}
@@ -937,19 +1038,26 @@ export default function HelpdeskInbox() {
             {/* Sent */}
             <button
               type="button"
-              onClick={() => setActiveFolder("sent")}
+              onClick={() => {
+                setActiveFolder("sent");
+                setMobileTab("threads");
+              }}
               className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition ${
                 activeFolder === "sent"
-                  ? "bg-sky-500/15 text-white font-semibold"
-                  : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                  ? isDark
+                    ? "bg-sky-500/15 text-white font-semibold"
+                    : "bg-sky-50 text-sky-700 font-bold border border-sky-100"
+                  : isDark
+                  ? "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
               }`}
             >
               <div className="flex items-center gap-2.5">
-                <Send className={`h-4 w-4 ${activeFolder === "sent" ? "text-sky-400" : ""}`} />
+                <Send className={`h-4 w-4 ${activeFolder === "sent" ? "text-sky-500" : ""}`} />
                 <span>Sent</span>
               </div>
               {counts.sent > 0 && (
-                <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-slate-400">
+                <span className="rounded-full bg-slate-500/10 px-2 py-0.5 text-[10px] text-slate-400">
                   {counts.sent}
                 </span>
               )}
@@ -958,23 +1066,30 @@ export default function HelpdeskInbox() {
             {/* Starred */}
             <button
               type="button"
-              onClick={() => setActiveFolder("starred")}
+              onClick={() => {
+                setActiveFolder("starred");
+                setMobileTab("threads");
+              }}
               className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition ${
                 activeFolder === "starred"
-                  ? "bg-amber-500/15 text-amber-200 font-semibold"
-                  : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                  ? isDark
+                    ? "bg-amber-500/15 text-amber-200 font-semibold"
+                    : "bg-amber-50 text-amber-800 font-bold border border-amber-100"
+                  : isDark
+                  ? "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
               }`}
             >
               <div className="flex items-center gap-2.5">
                 <Star
                   className={`h-4 w-4 ${
-                    activeFolder === "starred" ? "text-amber-400 fill-amber-400" : ""
+                    activeFolder === "starred" ? "text-amber-500 fill-amber-500" : ""
                   }`}
                 />
                 <span>Starred</span>
               </div>
               {counts.starred > 0 && (
-                <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300">
+                <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-500">
                   {counts.starred}
                 </span>
               )}
@@ -983,11 +1098,18 @@ export default function HelpdeskInbox() {
             {/* Drafts */}
             <button
               type="button"
-              onClick={() => setActiveFolder("drafts")}
+              onClick={() => {
+                setActiveFolder("drafts");
+                setMobileTab("threads");
+              }}
               className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition ${
                 activeFolder === "drafts"
-                  ? "bg-sky-500/15 text-white font-semibold"
-                  : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                  ? isDark
+                    ? "bg-sky-500/15 text-white font-semibold"
+                    : "bg-sky-50 text-sky-700 font-bold border border-sky-100"
+                  : isDark
+                  ? "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
               }`}
             >
               <div className="flex items-center gap-2.5">
@@ -995,7 +1117,7 @@ export default function HelpdeskInbox() {
                 <span>Drafts</span>
               </div>
               {counts.drafts > 0 && (
-                <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-slate-400">
+                <span className="rounded-full bg-slate-500/10 px-2 py-0.5 text-[10px] text-slate-400">
                   {counts.drafts}
                 </span>
               )}
@@ -1004,11 +1126,18 @@ export default function HelpdeskInbox() {
             {/* Trash */}
             <button
               type="button"
-              onClick={() => setActiveFolder("trash")}
+              onClick={() => {
+                setActiveFolder("trash");
+                setMobileTab("threads");
+              }}
               className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition ${
                 activeFolder === "trash"
-                  ? "bg-rose-500/15 text-rose-200 font-semibold"
-                  : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                  ? isDark
+                    ? "bg-rose-500/15 text-rose-200 font-semibold"
+                    : "bg-rose-50 text-rose-700 font-bold border border-rose-100"
+                  : isDark
+                  ? "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
               }`}
             >
               <div className="flex items-center gap-2.5">
@@ -1016,7 +1145,7 @@ export default function HelpdeskInbox() {
                 <span>Trash</span>
               </div>
               {counts.trash > 0 && (
-                <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-slate-400">
+                <span className="rounded-full bg-slate-500/10 px-2 py-0.5 text-[10px] text-slate-400">
                   {counts.trash}
                 </span>
               )}
@@ -1024,10 +1153,10 @@ export default function HelpdeskInbox() {
           </div>
 
           {/* Department Labels Filter */}
-          <div className="mt-6 flex-1 space-y-1">
+          <div className="mt-5 flex-1 space-y-1">
             <div className="flex items-center justify-between px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
               <span>Departments</span>
-              <Tag className="h-3 w-3 text-slate-500" />
+              <Tag className="h-3 w-3 text-slate-400" />
             </div>
 
             {/* All Inboxes */}
@@ -1037,15 +1166,20 @@ export default function HelpdeskInbox() {
                 onClick={() => {
                   setActiveDepartment("all");
                   setActiveFolder("inbox");
+                  setMobileTab("threads");
                 }}
                 className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition ${
                   activeDepartment === "all" && activeFolder === "inbox"
-                    ? "bg-white/15 text-white font-semibold"
-                    : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                    ? isDark
+                      ? "bg-white/15 text-white font-semibold"
+                      : "bg-slate-200 text-slate-900 font-bold"
+                    : isDark
+                    ? "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-sky-400" />
+                  <span className="h-2 w-2 rounded-full bg-sky-500" />
                   <span>All Inboxes</span>
                 </div>
                 <span className="text-[10px] font-mono text-slate-400">
@@ -1057,14 +1191,21 @@ export default function HelpdeskInbox() {
             {/* Support */}
             <button
               type="button"
-              onClick={() => isDepartmentAllowed("support") && setActiveDepartment("support")}
+              onClick={() => {
+                if (isDepartmentAllowed("support")) {
+                  setActiveDepartment("support");
+                  setMobileTab("threads");
+                }
+              }}
               disabled={!isDepartmentAllowed("support")}
               className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition ${
                 activeDepartment === "support"
-                  ? "bg-blue-600/20 text-blue-300 font-semibold border border-blue-500/30"
+                  ? "bg-blue-500/15 text-blue-500 font-bold border border-blue-500/20"
                   : isDepartmentAllowed("support")
-                  ? "text-slate-400 hover:bg-white/5 hover:text-slate-200"
-                  : "opacity-40 cursor-not-allowed text-slate-600"
+                  ? isDark
+                    ? "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  : "opacity-40 cursor-not-allowed text-slate-400"
               }`}
             >
               <div className="flex items-center gap-2">
@@ -1079,14 +1220,21 @@ export default function HelpdeskInbox() {
             {/* Billing */}
             <button
               type="button"
-              onClick={() => isDepartmentAllowed("billing") && setActiveDepartment("billing")}
+              onClick={() => {
+                if (isDepartmentAllowed("billing")) {
+                  setActiveDepartment("billing");
+                  setMobileTab("threads");
+                }
+              }}
               disabled={!isDepartmentAllowed("billing")}
               className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition ${
                 activeDepartment === "billing"
-                  ? "bg-amber-600/20 text-amber-300 font-semibold border border-amber-500/30"
+                  ? "bg-amber-500/15 text-amber-500 font-bold border border-amber-500/20"
                   : isDepartmentAllowed("billing")
-                  ? "text-slate-400 hover:bg-white/5 hover:text-slate-200"
-                  : "opacity-40 cursor-not-allowed text-slate-600"
+                  ? isDark
+                    ? "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  : "opacity-40 cursor-not-allowed text-slate-400"
               }`}
             >
               <div className="flex items-center gap-2">
@@ -1101,14 +1249,21 @@ export default function HelpdeskInbox() {
             {/* Marketing */}
             <button
               type="button"
-              onClick={() => isDepartmentAllowed("marketing") && setActiveDepartment("marketing")}
+              onClick={() => {
+                if (isDepartmentAllowed("marketing")) {
+                  setActiveDepartment("marketing");
+                  setMobileTab("threads");
+                }
+              }}
               disabled={!isDepartmentAllowed("marketing")}
               className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition ${
                 activeDepartment === "marketing"
-                  ? "bg-purple-600/20 text-purple-300 font-semibold border border-purple-500/30"
+                  ? "bg-purple-500/15 text-purple-500 font-bold border border-purple-500/20"
                   : isDepartmentAllowed("marketing")
-                  ? "text-slate-400 hover:bg-white/5 hover:text-slate-200"
-                  : "opacity-40 cursor-not-allowed text-slate-600"
+                  ? isDark
+                    ? "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  : "opacity-40 cursor-not-allowed text-slate-400"
               }`}
             >
               <div className="flex items-center gap-2">
@@ -1123,14 +1278,21 @@ export default function HelpdeskInbox() {
             {/* Founder & Legal */}
             <button
               type="button"
-              onClick={() => isDepartmentAllowed("founder_legal") && setActiveDepartment("founder_legal")}
+              onClick={() => {
+                if (isDepartmentAllowed("founder_legal")) {
+                  setActiveDepartment("founder_legal");
+                  setMobileTab("threads");
+                }
+              }}
               disabled={!isDepartmentAllowed("founder_legal")}
               className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition ${
                 activeDepartment === "founder_legal"
-                  ? "bg-emerald-600/20 text-emerald-300 font-semibold border border-emerald-500/30"
+                  ? "bg-emerald-500/15 text-emerald-500 font-bold border border-emerald-500/20"
                   : isDepartmentAllowed("founder_legal")
-                  ? "text-slate-400 hover:bg-white/5 hover:text-slate-200"
-                  : "opacity-40 cursor-not-allowed text-slate-600"
+                  ? isDark
+                    ? "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  : "opacity-40 cursor-not-allowed text-slate-400"
               }`}
             >
               <div className="flex items-center gap-2">
@@ -1142,57 +1304,73 @@ export default function HelpdeskInbox() {
               </span>
             </button>
           </div>
-
-          {/* Sync status footer */}
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2.5 text-center text-[10px] text-slate-400">
-            <div className="font-semibold text-slate-300">PhotoOS Enterprise Mail</div>
-            <div className="text-slate-400">Connected to Resend Cloud</div>
-          </div>
         </nav>
 
         {/* ================================================================= */}
-        {/* PANE 2: THREAD LIST COLUMN (~380px fixed) */}
+        {/* PANE 2: THREAD LIST COLUMN (~380px on desktop, full-width on mobile) */}
         {/* ================================================================= */}
-        <aside className="flex w-[380px] shrink-0 flex-col border-r border-white/10 bg-slate-900/40">
+        <aside
+          className={`flex-col border-r transition-colors duration-200 ${
+            isDark ? "border-white/10 bg-slate-900/40" : "border-slate-200 bg-white"
+          } ${
+            mobileTab === "threads"
+              ? "flex w-full lg:w-[380px] shrink-0"
+              : "hidden lg:flex lg:w-[380px] shrink-0"
+          }`}
+        >
           {/* Header Search & Filters */}
-          <div className="border-b border-white/10 p-4">
+          <div className={`border-b p-3 sm:p-4 ${isDark ? "border-white/10" : "border-slate-200"}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-white">
+                <span className="text-xs font-bold uppercase tracking-wider">
                   {activeFolder === "sent"
-                    ? "Dispatched Mails"
+                    ? "Sent"
                     : activeFolder === "starred"
-                    ? "Starred Mails"
+                    ? "Starred"
                     : activeFolder === "trash"
-                    ? "Trash Bin"
+                    ? "Trash"
                     : activeDepartment === "all"
-                    ? "All Conversations"
-                    : `${DEPARTMENT_CONFIG[activeDepartment].label} Conversations`}
+                    ? "All Inboxes"
+                    : `${DEPARTMENT_CONFIG[activeDepartment].label}`}
                 </span>
-                <span className="rounded-full bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-400 border border-sky-500/20">
+                <span className="rounded-full bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-500 border border-sky-500/20">
                   {filteredThreads.length}
                 </span>
               </div>
-              <span className="text-[10px] font-mono text-slate-400">
-                {activeFolder.toUpperCase()}
-              </span>
+
+              {/* Mobile Compose shortcut */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsComposeOpen(true);
+                  setIsComposeMinimized(false);
+                }}
+                className="flex items-center gap-1 text-[11px] font-bold text-sky-500 lg:hidden hover:underline"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Compose</span>
+              </button>
             </div>
 
             {/* Search Input */}
-            <div className="relative mt-3">
+            <div className="relative mt-2.5">
               <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search subject, sender, or message..."
-                className="w-full rounded-xl border border-white/10 bg-white/5 py-1.5 pl-9 pr-8 text-xs text-white placeholder-slate-500 outline-none transition focus:border-sky-400 focus:bg-white/10"
+                className={`w-full rounded-xl border py-1.5 pl-9 pr-8 text-xs outline-none transition ${
+                  isDark
+                    ? "border-white/10 bg-white/5 text-white placeholder-slate-500 focus:border-sky-400 focus:bg-white/10"
+                    : "border-slate-200 bg-slate-50 text-slate-900 placeholder-slate-400 focus:border-sky-500 focus:bg-white"
+                }`}
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -1201,15 +1379,19 @@ export default function HelpdeskInbox() {
 
             {/* Status Filter Chips */}
             {activeFolder !== "trash" && (
-              <div className="mt-3 flex items-center gap-1.5">
+              <div className="mt-2.5 flex items-center gap-1.5 overflow-x-auto pb-0.5">
                 {(["all", "unread", "open", "resolved"] as TicketStatus[]).map((st) => (
                   <button
                     key={st}
                     onClick={() => setStatusFilter(st)}
-                    className={`rounded-lg px-2.5 py-1 text-[11px] font-medium capitalize transition ${
+                    className={`rounded-lg px-2.5 py-1 text-[11px] font-medium capitalize shrink-0 transition ${
                       statusFilter === st
-                        ? "bg-white/15 text-white font-semibold"
-                        : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                        ? isDark
+                          ? "bg-white/15 text-white font-semibold"
+                          : "bg-slate-900 text-white font-semibold"
+                        : isDark
+                        ? "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                        : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                     }`}
                   >
                     {st}
@@ -1220,19 +1402,19 @@ export default function HelpdeskInbox() {
           </div>
 
           {/* Thread Cards List */}
-          <div className="flex-1 overflow-y-auto divide-y divide-white/5">
+          <div className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-white/5">
             {loading ? (
               <div className="flex flex-col items-center justify-center p-12 text-center text-slate-400">
-                <RefreshCw className="h-7 w-7 text-sky-400 animate-spin mb-3" />
-                <p className="text-xs font-semibold text-white">Loading emails...</p>
-                <p className="mt-1 text-[11px] text-slate-400">
-                  Fetching live messages from Resend
-                </p>
+                <RefreshCw className="h-7 w-7 text-sky-500 animate-spin mb-3" />
+                <p className="text-xs font-semibold">Loading emails...</p>
+                <p className="mt-1 text-[11px] text-slate-400">Fetching live messages from Resend</p>
               </div>
             ) : filteredThreads.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-8 text-center text-slate-400">
-                <Inbox className="h-8 w-8 text-slate-600 mb-2" />
-                <p className="text-xs font-semibold text-slate-300">No conversations in this view</p>
+                <Inbox className="h-8 w-8 text-slate-400 mb-2" />
+                <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  No conversations in this view
+                </p>
                 <p className="mt-1 text-[11px] text-slate-400 max-w-xs">
                   {searchQuery
                     ? "No emails matched your search query."
@@ -1244,7 +1426,7 @@ export default function HelpdeskInbox() {
                     setIsComposeOpen(true);
                     setIsComposeMinimized(false);
                   }}
-                  className="mt-4 flex items-center gap-1.5 rounded-xl bg-sky-500/20 px-3 py-1.5 text-xs font-bold text-sky-400 border border-sky-400/30 hover:bg-sky-500/30 transition"
+                  className="mt-4 flex items-center gap-1.5 rounded-xl bg-sky-500/10 px-3 py-1.5 text-xs font-bold text-sky-500 border border-sky-400/30 hover:bg-sky-500/20 transition"
                 >
                   <PenSquare className="h-3.5 w-3.5" />
                   <span>Compose New Email</span>
@@ -1260,10 +1442,14 @@ export default function HelpdeskInbox() {
                   <div
                     key={thread.id}
                     onClick={() => handleSelectThread(thread)}
-                    className={`group relative flex cursor-pointer gap-3 p-3.5 transition ${
+                    className={`group relative flex cursor-pointer gap-3 p-3 sm:p-3.5 transition ${
                       isSelected
-                        ? "bg-sky-500/10 border-l-2 border-sky-400"
-                        : "hover:bg-white/[0.04]"
+                        ? isDark
+                          ? "bg-sky-500/10 border-l-2 border-sky-400"
+                          : "bg-sky-50/90 border-l-4 border-sky-600 shadow-xs"
+                        : isDark
+                        ? "hover:bg-white/[0.04]"
+                        : "hover:bg-slate-50/80"
                     } ${thread.unread ? "font-semibold" : ""}`}
                   >
                     {/* Star Button */}
@@ -1271,11 +1457,11 @@ export default function HelpdeskInbox() {
                       type="button"
                       onClick={(e) => handleToggleStar(thread.id, e)}
                       title={thread.starred ? "Unstar" : "Star"}
-                      className="mt-1 text-slate-500 hover:text-amber-400"
+                      className="mt-1 text-slate-400 hover:text-amber-500 shrink-0"
                     >
                       <Star
                         className={`h-4 w-4 ${
-                          thread.starred ? "text-amber-400 fill-amber-400" : ""
+                          thread.starred ? "text-amber-500 fill-amber-500" : ""
                         }`}
                       />
                     </button>
@@ -1288,7 +1474,7 @@ export default function HelpdeskInbox() {
                     {/* Card Content */}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-1">
-                        <span className="truncate text-xs font-semibold text-white">
+                        <span className={`truncate text-xs font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
                           {thread.customerName}
                         </span>
                         <span className="shrink-0 text-[10px] text-slate-400">
@@ -1310,7 +1496,13 @@ export default function HelpdeskInbox() {
                       <div className="mt-1 flex items-center justify-between gap-2">
                         <p
                           className={`truncate text-xs ${
-                            thread.unread ? "text-white font-bold" : "text-slate-300"
+                            thread.unread
+                              ? isDark
+                                ? "text-white font-bold"
+                                : "text-slate-950 font-bold"
+                              : isDark
+                              ? "text-slate-300"
+                              : "text-slate-700"
                           }`}
                         >
                           {thread.subject}
@@ -1334,56 +1526,93 @@ export default function HelpdeskInbox() {
         {/* ================================================================= */}
         {/* PANE 3: ACTIVE CONVERSATION & REPLY VIEW (flex-1) */}
         {/* ================================================================= */}
-        <main className="flex flex-1 flex-col overflow-hidden bg-slate-950">
+        <main
+          className={`flex-1 flex-col overflow-hidden transition-colors duration-200 ${
+            isDark ? "bg-slate-950" : "bg-slate-50/50"
+          } ${
+            mobileTab === "conversation"
+              ? "flex w-full"
+              : "hidden lg:flex"
+          }`}
+        >
           {selectedThread ? (
             <>
               {/* Conversation Top Header */}
-              <div className="flex items-center justify-between border-b border-white/10 bg-slate-900/60 p-4">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h2 className="truncate text-base font-bold text-white">
-                      {selectedThread.subject}
-                    </h2>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
-                        selectedThread.status === "resolved"
-                          ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                          : "bg-sky-500/20 text-sky-300 border border-sky-500/30"
-                      }`}
-                    >
-                      {selectedThread.status}
-                    </span>
-                  </div>
+              <div
+                className={`flex items-center justify-between border-b p-3 sm:p-4 transition-colors duration-200 ${
+                  isDark ? "border-white/10 bg-slate-900/60" : "border-slate-200 bg-white shadow-xs"
+                }`}
+              >
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                  {/* Mobile Back Button */}
+                  <button
+                    type="button"
+                    onClick={() => setMobileTab("threads")}
+                    className={`flex items-center gap-1 rounded-xl border p-2 text-xs font-semibold lg:hidden transition ${
+                      isDark
+                        ? "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+                        : "border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    }`}
+                    title="Back to thread list"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    <span className="hidden xs:inline">Back</span>
+                  </button>
 
-                  <div className="mt-1 flex items-center gap-3 text-xs text-slate-400">
-                    <span className="text-white font-medium">
-                      {selectedThread.customerName} &lt;{selectedThread.customerEmail}&gt;
-                    </span>
-                    <span>&bull;</span>
-                    <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-semibold text-sky-300">
-                      {selectedThread.customerPlan}
-                    </span>
-                    <span>&bull;</span>
-                    <span>{selectedThread.departmentEmail}</span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h2 className={`truncate text-sm sm:text-base font-bold ${isDark ? "text-white" : "text-slate-950"}`}>
+                        {selectedThread.subject}
+                      </h2>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[9px] sm:text-[10px] font-bold uppercase shrink-0 ${
+                          selectedThread.status === "resolved"
+                            ? "bg-emerald-500/20 text-emerald-500 border border-emerald-500/30"
+                            : "bg-sky-500/20 text-sky-500 border border-sky-500/30"
+                        }`}
+                      >
+                        {selectedThread.status}
+                      </span>
+                    </div>
+
+                    <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                      <span className={`font-medium ${isDark ? "text-white" : "text-slate-900"}`}>
+                        {selectedThread.customerName} &lt;{selectedThread.customerEmail}&gt;
+                      </span>
+                      <span className="hidden sm:inline">&bull;</span>
+                      <span className="hidden sm:inline-block rounded bg-sky-500/10 px-1.5 py-0.2 text-[10px] font-semibold text-sky-500">
+                        {selectedThread.customerPlan}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
                 {/* Actions: Transfer, Resolve, Star, Trash */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 shrink-0">
                   {/* Super Admin Transfer Dropdown */}
                   {isSuperAdmin && (
                     <div className="relative">
                       <button
                         type="button"
                         onClick={() => setTransferMenuOpen(!transferMenuOpen)}
-                        className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:bg-white/10 hover:text-white"
+                        className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-medium transition ${
+                          isDark
+                            ? "border-white/15 bg-white/5 text-slate-300 hover:bg-white/10"
+                            : "border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200"
+                        }`}
                       >
-                        <ArrowRightLeft className="h-3.5 w-3.5 text-sky-400" />
-                        <span>Transfer</span>
+                        <ArrowRightLeft className="h-3.5 w-3.5 text-sky-500" />
+                        <span className="hidden md:inline">Transfer</span>
                       </button>
 
                       {transferMenuOpen && (
-                        <div className="absolute right-0 top-10 z-50 w-56 rounded-2xl border border-white/15 bg-slate-900/95 p-1.5 shadow-2xl backdrop-blur-xl">
+                        <div
+                          className={`absolute right-0 top-10 z-50 w-56 rounded-2xl border p-1.5 shadow-2xl backdrop-blur-xl ${
+                            isDark
+                              ? "border-white/15 bg-slate-900/95 text-white"
+                              : "border-slate-200 bg-white/95 text-slate-900"
+                          }`}
+                        >
                           <div className="px-2.5 py-1 text-[10px] font-bold uppercase text-slate-400">
                             Re-route Department
                           </div>
@@ -1393,7 +1622,9 @@ export default function HelpdeskInbox() {
                                 key={dept}
                                 type="button"
                                 onClick={() => handleTransferDepartment(dept)}
-                                className="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left text-xs text-slate-200 hover:bg-white/10"
+                                className={`flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left text-xs transition ${
+                                  isDark ? "hover:bg-white/10" : "hover:bg-slate-100"
+                                }`}
                               >
                                 <span>{DEPARTMENT_CONFIG[dept].label}</span>
                                 <span className="text-[10px] text-slate-400">
@@ -1411,15 +1642,19 @@ export default function HelpdeskInbox() {
                   <button
                     type="button"
                     onClick={handleToggleStatus}
-                    className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:bg-white/10 hover:text-white"
+                    className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-medium transition ${
+                      isDark
+                        ? "border-white/15 bg-white/5 text-slate-300 hover:bg-white/10"
+                        : "border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    }`}
                   >
                     <CheckCircle2
                       className={`h-3.5 w-3.5 ${
-                        selectedThread.status === "resolved" ? "text-emerald-400" : "text-slate-400"
+                        selectedThread.status === "resolved" ? "text-emerald-500" : "text-slate-400"
                       }`}
                     />
-                    <span>
-                      {selectedThread.status === "resolved" ? "Mark Open" : "Mark Resolved"}
+                    <span className="hidden sm:inline">
+                      {selectedThread.status === "resolved" ? "Reopen" : "Resolve"}
                     </span>
                   </button>
 
@@ -1428,11 +1663,15 @@ export default function HelpdeskInbox() {
                     type="button"
                     onClick={() => handleToggleStar(selectedThread.id)}
                     title="Star thread"
-                    className="rounded-xl border border-white/15 bg-white/5 p-1.5 text-slate-300 hover:bg-white/10 hover:text-amber-400"
+                    className={`rounded-xl border p-1.5 transition ${
+                      isDark
+                        ? "border-white/15 bg-white/5 text-slate-300 hover:bg-white/10"
+                        : "border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    }`}
                   >
                     <Star
                       className={`h-4 w-4 ${
-                        selectedThread.starred ? "text-amber-400 fill-amber-400" : ""
+                        selectedThread.starred ? "text-amber-500 fill-amber-500" : "text-slate-400"
                       }`}
                     />
                   </button>
@@ -1442,7 +1681,11 @@ export default function HelpdeskInbox() {
                     type="button"
                     onClick={handleMoveToTrash}
                     title={selectedThread.folder === "trash" ? "Restore to Inbox" : "Move to Trash"}
-                    className="rounded-xl border border-white/15 bg-white/5 p-1.5 text-slate-300 hover:bg-rose-500/20 hover:text-rose-400"
+                    className={`rounded-xl border p-1.5 transition ${
+                      isDark
+                        ? "border-white/15 bg-white/5 text-slate-300 hover:bg-rose-500/20 hover:text-rose-400"
+                        : "border-slate-200 bg-slate-100 text-slate-700 hover:bg-rose-50 hover:text-rose-600"
+                    }`}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -1450,7 +1693,7 @@ export default function HelpdeskInbox() {
               </div>
 
               {/* Message Stream Scroll Area */}
-              <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
                 {selectedThread.messages.map((msg) => {
                   const isAgent = msg.senderType === "agent";
                   return (
@@ -1459,7 +1702,9 @@ export default function HelpdeskInbox() {
                       className={`flex flex-col ${isAgent ? "items-end" : "items-start"}`}
                     >
                       <div className="flex items-center gap-2 mb-1 text-[11px] text-slate-400">
-                        <span className="font-semibold text-slate-300">{msg.senderName}</span>
+                        <span className={`font-semibold ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                          {msg.senderName}
+                        </span>
                         <span>&bull;</span>
                         <span className="text-[10px] font-mono text-slate-400">{msg.departmentEmail}</span>
                         <span>&bull;</span>
@@ -1467,26 +1712,36 @@ export default function HelpdeskInbox() {
                       </div>
 
                       <div
-                        className={`max-w-2xl rounded-2xl p-4 text-xs leading-relaxed shadow-md ${
+                        className={`max-w-2xl rounded-2xl p-4 text-xs leading-relaxed shadow-sm ${
                           isAgent
                             ? "bg-gradient-to-r from-sky-600 to-blue-600 text-white"
-                            : "bg-slate-900/90 text-slate-200 border border-white/10"
+                            : isDark
+                            ? "bg-slate-900/90 text-slate-200 border border-white/10"
+                            : "bg-white text-slate-800 border border-slate-200 shadow-xs"
                         }`}
                       >
                         <p className="whitespace-pre-wrap">{msg.body}</p>
 
                         {/* Attachments rendering */}
                         {msg.attachments && msg.attachments.length > 0 && (
-                          <div className="mt-3 pt-3 border-t border-white/20 flex flex-wrap gap-2">
+                          <div
+                            className={`mt-3 pt-3 border-t flex flex-wrap gap-2 ${
+                              isAgent ? "border-white/20" : isDark ? "border-white/10" : "border-slate-200"
+                            }`}
+                          >
                             {msg.attachments.map((att, idx) => (
                               <div
                                 key={idx}
-                                className="flex items-center gap-2 rounded-xl bg-black/20 px-2.5 py-1 text-[11px]"
+                                className={`flex items-center gap-2 rounded-xl px-2.5 py-1 text-[11px] ${
+                                  isAgent
+                                    ? "bg-black/20 text-white"
+                                    : isDark
+                                    ? "bg-white/5 text-slate-200"
+                                    : "bg-slate-100 text-slate-700"
+                                }`}
                               >
                                 <FileIcon className="h-3.5 w-3.5" />
-                                <span className="font-medium truncate max-w-[160px]">
-                                  {att.name}
-                                </span>
+                                <span className="font-medium truncate max-w-[160px]">{att.name}</span>
                                 <span className="text-[10px] opacity-75">({att.size})</span>
                               </div>
                             ))}
@@ -1500,28 +1755,40 @@ export default function HelpdeskInbox() {
               </div>
 
               {/* Bottom Reply Area */}
-              <div className="border-t border-white/10 bg-slate-900/90 p-4">
+              <div
+                className={`border-t p-3 sm:p-4 transition-colors duration-200 ${
+                  isDark ? "border-white/10 bg-slate-900/90" : "border-slate-200 bg-white"
+                }`}
+              >
                 {/* Send From Identity Selector */}
-                <div className="mb-2 flex items-center justify-between text-xs">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs">
                   <div className="flex items-center gap-2">
                     <span className="text-slate-400">Replying As:</span>
                     <div className="relative">
                       <button
                         type="button"
                         onClick={() => setReplyFromDropdownOpen(!replyFromDropdownOpen)}
-                        className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1 text-xs font-semibold text-white hover:bg-white/10"
+                        className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${
+                          isDark
+                            ? "border-white/15 bg-white/5 text-white hover:bg-white/10"
+                            : "border-slate-200 bg-slate-100 text-slate-900 hover:bg-slate-200"
+                        }`}
                       >
-                        <span>
-                          {OFFICIAL_IDENTITIES.find((i) => i.key === replySendFrom)?.label}
-                        </span>
-                        <span className="text-sky-400 font-mono text-[11px]">
+                        <span>{OFFICIAL_IDENTITIES.find((i) => i.key === replySendFrom)?.label}</span>
+                        <span className="text-sky-500 font-mono text-[11px] hidden sm:inline">
                           &lt;{OFFICIAL_IDENTITIES.find((i) => i.key === replySendFrom)?.email}&gt;
                         </span>
                         <ChevronDown className="h-3 w-3 text-slate-400" />
                       </button>
 
                       {replyFromDropdownOpen && (
-                        <div className="absolute left-0 bottom-8 z-50 w-72 rounded-2xl border border-white/15 bg-slate-900/95 p-1.5 shadow-2xl backdrop-blur-xl">
+                        <div
+                          className={`absolute left-0 bottom-8 z-50 w-72 rounded-2xl border p-1.5 shadow-2xl backdrop-blur-xl ${
+                            isDark
+                              ? "border-white/15 bg-slate-900/95 text-white"
+                              : "border-slate-200 bg-white/95 text-slate-900"
+                          }`}
+                        >
                           <div className="px-2.5 py-1 text-[10px] font-bold uppercase text-slate-400">
                             Select Dispatch Identity
                           </div>
@@ -1533,13 +1800,15 @@ export default function HelpdeskInbox() {
                                 setReplySendFrom(id.key);
                                 setReplyFromDropdownOpen(false);
                               }}
-                              className="flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 text-left text-xs hover:bg-white/10"
+                              className={`flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 text-left text-xs transition ${
+                                isDark ? "hover:bg-white/10" : "hover:bg-slate-100"
+                              }`}
                             >
                               <div>
-                                <div className="font-semibold text-white">{id.label}</div>
+                                <div className="font-semibold">{id.label}</div>
                                 <div className="text-[10px] text-slate-400">{id.email}</div>
                               </div>
-                              {replySendFrom === id.key && <Check className="h-3.5 w-3.5 text-sky-400" />}
+                              {replySendFrom === id.key && <Check className="h-3.5 w-3.5 text-sky-500" />}
                             </button>
                           ))}
                         </div>
@@ -1552,14 +1821,20 @@ export default function HelpdeskInbox() {
                     <button
                       type="button"
                       onClick={() => setCannedMenuOpen(!cannedMenuOpen)}
-                      className="flex items-center gap-1 text-[11px] text-sky-400 hover:text-sky-300"
+                      className="flex items-center gap-1 text-[11px] text-sky-500 hover:underline"
                     >
                       <Sparkles className="h-3 w-3" />
                       <span>Quick Templates</span>
                     </button>
 
                     {cannedMenuOpen && (
-                      <div className="absolute right-0 bottom-8 z-50 w-72 rounded-2xl border border-white/15 bg-slate-900/95 p-1.5 shadow-2xl backdrop-blur-xl">
+                      <div
+                        className={`absolute right-0 bottom-8 z-50 w-72 rounded-2xl border p-1.5 shadow-2xl backdrop-blur-xl ${
+                          isDark
+                            ? "border-white/15 bg-slate-900/95 text-white"
+                            : "border-slate-200 bg-white/95 text-slate-900"
+                        }`}
+                      >
                         <div className="px-2.5 py-1 text-[10px] font-bold uppercase text-slate-400">
                           Insert Canned Response
                         </div>
@@ -1568,12 +1843,12 @@ export default function HelpdeskInbox() {
                             key={c.id}
                             type="button"
                             onClick={() => handleInsertCanned(c)}
-                            className="flex w-full flex-col rounded-xl px-2.5 py-1.5 text-left text-xs hover:bg-white/10"
+                            className={`flex w-full flex-col rounded-xl px-2.5 py-1.5 text-left text-xs transition ${
+                              isDark ? "hover:bg-white/10" : "hover:bg-slate-100"
+                            }`}
                           >
-                            <span className="font-semibold text-white">{c.title}</span>
-                            <span className="line-clamp-1 text-[10px] text-slate-400">
-                              {c.content}
-                            </span>
+                            <span className="font-semibold">{c.title}</span>
+                            <span className="line-clamp-1 text-[10px] text-slate-400">{c.content}</span>
                           </button>
                         ))}
                       </div>
@@ -1587,15 +1862,19 @@ export default function HelpdeskInbox() {
                     {attachments.map((att, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-2.5 py-1 text-xs text-slate-200"
+                        className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-xs ${
+                          isDark
+                            ? "border-white/15 bg-white/5 text-slate-200"
+                            : "border-slate-200 bg-slate-100 text-slate-700"
+                        }`}
                       >
-                        <FileIcon className="h-3.5 w-3.5 text-sky-400" />
+                        <FileIcon className="h-3.5 w-3.5 text-sky-500" />
                         <span className="font-medium truncate max-w-[140px]">{att.filename}</span>
                         <span className="text-[10px] text-slate-400">({att.size})</span>
                         <button
                           type="button"
                           onClick={() => handleRemoveAttachment(idx, false)}
-                          className="hover:text-rose-400"
+                          className="hover:text-rose-500"
                         >
                           <X className="h-3 w-3" />
                         </button>
@@ -1605,12 +1884,20 @@ export default function HelpdeskInbox() {
                 )}
 
                 {/* Reply Box */}
-                <div className="rounded-2xl border border-white/15 bg-slate-950/70 p-2">
-                  <div className="flex items-center gap-1 border-b border-white/10 pb-1.5 text-slate-400">
+                <div
+                  className={`rounded-2xl border p-2 transition-colors duration-200 ${
+                    isDark ? "border-white/15 bg-slate-950/70" : "border-slate-200 bg-slate-50"
+                  }`}
+                >
+                  <div
+                    className={`flex items-center gap-1 border-b pb-1.5 text-slate-400 ${
+                      isDark ? "border-white/10" : "border-slate-200"
+                    }`}
+                  >
                     <button
                       type="button"
                       onClick={() => handleFormatText(replyInputRef, "**", "**", setReplyText)}
-                      className="rounded p-1 hover:bg-white/10 hover:text-white"
+                      className={`rounded p-1 ${isDark ? "hover:bg-white/10 hover:text-white" : "hover:bg-slate-200 hover:text-slate-900"}`}
                       title="Bold"
                     >
                       <Bold className="h-3.5 w-3.5" />
@@ -1618,7 +1905,7 @@ export default function HelpdeskInbox() {
                     <button
                       type="button"
                       onClick={() => handleFormatText(replyInputRef, "_", "_", setReplyText)}
-                      className="rounded p-1 hover:bg-white/10 hover:text-white"
+                      className={`rounded p-1 ${isDark ? "hover:bg-white/10 hover:text-white" : "hover:bg-slate-200 hover:text-slate-900"}`}
                       title="Italic"
                     >
                       <Italic className="h-3.5 w-3.5" />
@@ -1626,7 +1913,7 @@ export default function HelpdeskInbox() {
                     <button
                       type="button"
                       onClick={() => handleFormatText(replyInputRef, "\n- ", "", setReplyText)}
-                      className="rounded p-1 hover:bg-white/10 hover:text-white"
+                      className={`rounded p-1 ${isDark ? "hover:bg-white/10 hover:text-white" : "hover:bg-slate-200 hover:text-slate-900"}`}
                       title="Bullet List"
                     >
                       <List className="h-3.5 w-3.5" />
@@ -1639,19 +1926,29 @@ export default function HelpdeskInbox() {
                     value={replyText}
                     onChange={(e) => setReplyText(e.target.value)}
                     placeholder={`Write a reply to ${selectedThread.customerEmail}...`}
-                    className="w-full resize-none bg-transparent p-2 text-xs text-white placeholder-slate-500 outline-none"
+                    className={`w-full resize-none bg-transparent p-2 text-xs outline-none ${
+                      isDark ? "text-white placeholder-slate-500" : "text-slate-900 placeholder-slate-400"
+                    }`}
                   />
 
-                  <div className="flex items-center justify-between pt-2 border-t border-white/10">
+                  <div
+                    className={`flex items-center justify-between pt-2 border-t ${
+                      isDark ? "border-white/10" : "border-slate-200"
+                    }`}
+                  >
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-2.5 py-1 text-xs text-slate-300 hover:bg-white/10 hover:text-white"
+                      className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-xs transition ${
+                        isDark
+                          ? "border-white/15 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white"
+                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
+                      }`}
                     >
-                      <Paperclip className="h-3.5 w-3.5 text-sky-400" />
+                      <Paperclip className="h-3.5 w-3.5 text-sky-500" />
                       <span>Attach file</span>
                       {attachments.length > 0 && (
-                        <span className="rounded-full bg-sky-500/20 px-1.5 text-[10px] font-bold text-sky-300">
+                        <span className="rounded-full bg-sky-500/20 px-1.5 text-[10px] font-bold text-sky-500">
                           {attachments.length}
                         </span>
                       )}
@@ -1661,7 +1958,7 @@ export default function HelpdeskInbox() {
                       type="button"
                       disabled={sendingReply || !replyText.trim()}
                       onClick={handleSendReply}
-                      className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 px-4 py-1.5 text-xs font-bold text-white shadow-md shadow-sky-950 transition hover:brightness-110 disabled:opacity-50"
+                      className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 px-4 py-1.5 text-xs font-bold text-white shadow-md shadow-sky-950/30 transition hover:brightness-110 disabled:opacity-50"
                     >
                       {sendingReply ? (
                         <>
@@ -1681,8 +1978,10 @@ export default function HelpdeskInbox() {
             </>
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center p-8 text-center text-slate-400">
-              <Mail className="h-12 w-12 text-slate-700 mb-3" />
-              <h3 className="text-sm font-bold text-white">No active conversation selected</h3>
+              <Mail className="h-12 w-12 text-slate-400 mb-3" />
+              <h3 className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
+                No active conversation selected
+              </h3>
               <p className="mt-1 text-xs text-slate-400 max-w-sm">
                 Select a thread from the list or click &apos;Compose Email&apos; to dispatch a new message to a client or team member.
               </p>
@@ -1692,26 +1991,36 @@ export default function HelpdeskInbox() {
       </div>
 
       {/* ===================================================================== */}
-      {/* 3. GMAIL FLOATING COMPOSE WINDOW (DOCKABLE & EXPANDABLE) */}
+      {/* 3. GMAIL FLOATING COMPOSE WINDOW (RESPONSIVE & DOCKABLE) */}
+      {/* Mobile: Fullscreen modal */}
+      {/* Desktop: Docked floating window at bottom-right */}
       {/* ===================================================================== */}
       {isComposeOpen && (
         <div
-          className={`fixed z-50 bg-slate-900 border border-slate-700 shadow-2xl transition-all duration-200 flex flex-col ${
+          className={`fixed z-50 border shadow-2xl transition-all duration-200 flex flex-col ${
+            isDark
+              ? "bg-slate-900 border-slate-700 text-white"
+              : "bg-white border-slate-300 text-slate-900"
+          } ${
             isComposeMinimized
-              ? "bottom-0 right-8 w-72 h-11 rounded-t-xl overflow-hidden"
+              ? "bottom-0 right-4 sm:right-8 w-72 h-11 rounded-t-xl overflow-hidden"
               : isComposeMaximized
-              ? "inset-6 rounded-2xl overflow-hidden"
-              : "bottom-0 right-8 w-[600px] max-h-[85vh] rounded-t-2xl overflow-hidden"
+              ? "inset-2 sm:inset-6 rounded-2xl overflow-hidden"
+              : "inset-0 sm:inset-auto sm:bottom-0 sm:right-8 sm:w-[580px] sm:max-h-[85vh] rounded-none sm:rounded-t-2xl overflow-hidden"
           }`}
         >
           {/* Compose Header Bar */}
-          <div className="flex h-11 shrink-0 items-center justify-between border-b border-white/10 bg-slate-950 px-4">
+          <div
+            className={`flex h-11 shrink-0 items-center justify-between border-b px-4 ${
+              isDark ? "border-white/10 bg-slate-950 text-white" : "border-slate-200 bg-slate-100 text-slate-900"
+            }`}
+          >
             <div
               className="flex flex-1 cursor-pointer items-center gap-2"
               onClick={() => setIsComposeMinimized(!isComposeMinimized)}
             >
-              <PenSquare className="h-4 w-4 text-sky-400" />
-              <span className="text-xs font-bold text-white truncate">
+              <PenSquare className="h-4 w-4 text-sky-500" />
+              <span className="text-xs font-bold truncate">
                 {composeSubject ? composeSubject : "New Message"}
               </span>
             </div>
@@ -1722,7 +2031,7 @@ export default function HelpdeskInbox() {
                 type="button"
                 onClick={() => setIsComposeMinimized(!isComposeMinimized)}
                 title={isComposeMinimized ? "Expand" : "Minimize"}
-                className="rounded p-1 hover:bg-white/10 hover:text-white"
+                className="hidden sm:inline-block rounded p-1 hover:bg-slate-500/10 hover:text-white"
               >
                 <Minus className="h-3.5 w-3.5" />
               </button>
@@ -1733,7 +2042,7 @@ export default function HelpdeskInbox() {
                   setIsComposeMinimized(false);
                 }}
                 title={isComposeMaximized ? "Restore" : "Maximize"}
-                className="rounded p-1 hover:bg-white/10 hover:text-white"
+                className="hidden sm:inline-block rounded p-1 hover:bg-slate-500/10 hover:text-white"
               >
                 {isComposeMaximized ? (
                   <Minimize2 className="h-3.5 w-3.5" />
@@ -1745,7 +2054,7 @@ export default function HelpdeskInbox() {
                 type="button"
                 onClick={() => setIsComposeOpen(false)}
                 title="Close"
-                className="rounded p-1 hover:bg-white/10 hover:text-white"
+                className="rounded p-1 hover:bg-slate-500/10 hover:text-white"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -1754,30 +2063,48 @@ export default function HelpdeskInbox() {
 
           {/* Compose Form Body (Hidden if minimized) */}
           {!isComposeMinimized && (
-            <div className="flex flex-1 flex-col overflow-y-auto bg-slate-900/95 p-4 space-y-3">
+            <div
+              className={`flex flex-1 flex-col overflow-y-auto p-4 space-y-3 ${
+                isDark ? "bg-slate-900/95" : "bg-white"
+              }`}
+            >
               {/* "From / Send As" Selector */}
-              <div className="flex items-center justify-between border-b border-white/10 pb-2">
+              <div
+                className={`flex items-center justify-between border-b pb-2 ${
+                  isDark ? "border-white/10" : "border-slate-200"
+                }`}
+              >
                 <span className="text-xs font-semibold text-slate-400 w-16">From:</span>
                 <div className="relative flex-1">
                   <button
                     type="button"
                     onClick={() => setComposeFromDropdownOpen(!composeFromDropdownOpen)}
-                    className="flex w-full items-center justify-between rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white hover:bg-white/10"
+                    className={`flex w-full items-center justify-between rounded-xl border px-3 py-1.5 text-xs transition ${
+                      isDark
+                        ? "border-white/15 bg-white/5 text-white hover:bg-white/10"
+                        : "border-slate-200 bg-slate-50 text-slate-900 hover:bg-slate-100"
+                    }`}
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-sky-400">
+                    <div className="flex items-center gap-2 truncate">
+                      <span className="font-bold text-sky-500">
                         {OFFICIAL_IDENTITIES.find((i) => i.key === composeFrom)?.label}
                       </span>
-                      <span className="font-mono text-slate-400 text-[11px]">
+                      <span className="font-mono text-slate-400 text-[11px] truncate">
                         &lt;{OFFICIAL_IDENTITIES.find((i) => i.key === composeFrom)?.email}&gt;
                       </span>
                     </div>
-                    <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                    <ChevronDown className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                   </button>
 
                   {/* Dropdown Menu */}
                   {composeFromDropdownOpen && (
-                    <div className="absolute left-0 top-10 z-50 w-full rounded-2xl border border-white/15 bg-slate-950 p-2 shadow-2xl backdrop-blur-xl">
+                    <div
+                      className={`absolute left-0 top-10 z-50 w-full rounded-2xl border p-2 shadow-2xl backdrop-blur-xl ${
+                        isDark
+                          ? "border-white/15 bg-slate-950 text-white"
+                          : "border-slate-200 bg-white text-slate-900"
+                      }`}
+                    >
                       <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                         Choose Dispatch Identity
                       </div>
@@ -1791,16 +2118,18 @@ export default function HelpdeskInbox() {
                           }}
                           className={`flex w-full items-center justify-between rounded-xl p-2.5 text-left text-xs transition ${
                             composeFrom === id.key
-                              ? "bg-sky-500/20 text-white font-semibold"
-                              : "text-slate-300 hover:bg-white/5"
+                              ? "bg-sky-500/20 font-semibold"
+                              : isDark
+                              ? "hover:bg-white/5"
+                              : "hover:bg-slate-100"
                           }`}
                         >
                           <div>
-                            <div className="font-semibold text-white">{id.label}</div>
-                            <div className="text-[11px] font-mono text-sky-400">{id.email}</div>
+                            <div className="font-semibold">{id.label}</div>
+                            <div className="text-[11px] font-mono text-sky-500">{id.email}</div>
                             <div className="text-[10px] text-slate-400 mt-0.5">{id.desc}</div>
                           </div>
-                          {composeFrom === id.key && <Check className="h-4 w-4 text-sky-400" />}
+                          {composeFrom === id.key && <Check className="h-4 w-4 text-sky-500" />}
                         </button>
                       ))}
                     </div>
@@ -1809,21 +2138,27 @@ export default function HelpdeskInbox() {
               </div>
 
               {/* "To" Field with CC/BCC triggers */}
-              <div className="flex items-center border-b border-white/10 pb-2">
+              <div
+                className={`flex items-center border-b pb-2 ${
+                  isDark ? "border-white/10" : "border-slate-200"
+                }`}
+              >
                 <span className="text-xs font-semibold text-slate-400 w-16">To:</span>
                 <input
                   type="text"
                   value={composeTo}
                   onChange={(e) => setComposeTo(e.target.value)}
                   placeholder="Recipient email(s), comma separated"
-                  className="flex-1 bg-transparent text-xs text-white placeholder-slate-500 outline-none"
+                  className={`flex-1 bg-transparent text-xs outline-none ${
+                    isDark ? "text-white placeholder-slate-500" : "text-slate-900 placeholder-slate-400"
+                  }`}
                 />
                 <div className="flex items-center gap-1.5 text-xs text-slate-400">
                   {!showCc && (
                     <button
                       type="button"
                       onClick={() => setShowCc(true)}
-                      className="hover:text-white px-1.5 py-0.5 rounded hover:bg-white/10"
+                      className="hover:text-sky-500 px-1.5 py-0.5 rounded"
                     >
                       Cc
                     </button>
@@ -1832,7 +2167,7 @@ export default function HelpdeskInbox() {
                     <button
                       type="button"
                       onClick={() => setShowBcc(true)}
-                      className="hover:text-white px-1.5 py-0.5 rounded hover:bg-white/10"
+                      className="hover:text-sky-500 px-1.5 py-0.5 rounded"
                     >
                       Bcc
                     </button>
@@ -1842,14 +2177,20 @@ export default function HelpdeskInbox() {
 
               {/* "Cc" Line (if active) */}
               {showCc && (
-                <div className="flex items-center border-b border-white/10 pb-2 animate-in fade-in">
+                <div
+                  className={`flex items-center border-b pb-2 animate-in fade-in ${
+                    isDark ? "border-white/10" : "border-slate-200"
+                  }`}
+                >
                   <span className="text-xs font-semibold text-slate-400 w-16">Cc:</span>
                   <input
                     type="text"
                     value={composeCc}
                     onChange={(e) => setComposeCc(e.target.value)}
                     placeholder="Carbon copy recipients"
-                    className="flex-1 bg-transparent text-xs text-white placeholder-slate-500 outline-none"
+                    className={`flex-1 bg-transparent text-xs outline-none ${
+                      isDark ? "text-white placeholder-slate-500" : "text-slate-900 placeholder-slate-400"
+                    }`}
                   />
                   <button
                     type="button"
@@ -1857,7 +2198,7 @@ export default function HelpdeskInbox() {
                       setShowCc(false);
                       setComposeCc("");
                     }}
-                    className="text-slate-500 hover:text-white"
+                    className="text-slate-400 hover:text-slate-600"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -1866,14 +2207,20 @@ export default function HelpdeskInbox() {
 
               {/* "Bcc" Line (if active) */}
               {showBcc && (
-                <div className="flex items-center border-b border-white/10 pb-2 animate-in fade-in">
+                <div
+                  className={`flex items-center border-b pb-2 animate-in fade-in ${
+                    isDark ? "border-white/10" : "border-slate-200"
+                  }`}
+                >
                   <span className="text-xs font-semibold text-slate-400 w-16">Bcc:</span>
                   <input
                     type="text"
                     value={composeBcc}
                     onChange={(e) => setComposeBcc(e.target.value)}
                     placeholder="Blind copy recipients"
-                    className="flex-1 bg-transparent text-xs text-white placeholder-slate-500 outline-none"
+                    className={`flex-1 bg-transparent text-xs outline-none ${
+                      isDark ? "text-white placeholder-slate-500" : "text-slate-900 placeholder-slate-400"
+                    }`}
                   />
                   <button
                     type="button"
@@ -1881,7 +2228,7 @@ export default function HelpdeskInbox() {
                       setShowBcc(false);
                       setComposeBcc("");
                     }}
-                    className="text-slate-500 hover:text-white"
+                    className="text-slate-400 hover:text-slate-600"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -1889,24 +2236,34 @@ export default function HelpdeskInbox() {
               )}
 
               {/* Subject Field */}
-              <div className="flex items-center border-b border-white/10 pb-2">
+              <div
+                className={`flex items-center border-b pb-2 ${
+                  isDark ? "border-white/10" : "border-slate-200"
+                }`}
+              >
                 <span className="text-xs font-semibold text-slate-400 w-16">Subject:</span>
                 <input
                   type="text"
                   value={composeSubject}
                   onChange={(e) => setComposeSubject(e.target.value)}
                   placeholder="Email subject line"
-                  className="flex-1 bg-transparent text-xs font-semibold text-white placeholder-slate-500 outline-none"
+                  className={`flex-1 bg-transparent text-xs font-semibold outline-none ${
+                    isDark ? "text-white placeholder-slate-500" : "text-slate-900 placeholder-slate-400"
+                  }`}
                 />
               </div>
 
               {/* Formatting Toolbar */}
-              <div className="flex items-center justify-between border-b border-white/10 pb-1.5 text-slate-400">
+              <div
+                className={`flex items-center justify-between border-b pb-1.5 text-slate-400 ${
+                  isDark ? "border-white/10" : "border-slate-200"
+                }`}
+              >
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={() => handleFormatText(composeBodyRef, "**", "**", setComposeBody)}
-                    className="rounded p-1 hover:bg-white/10 hover:text-white"
+                    className="rounded p-1 hover:text-sky-500"
                     title="Bold"
                   >
                     <Bold className="h-3.5 w-3.5" />
@@ -1914,7 +2271,7 @@ export default function HelpdeskInbox() {
                   <button
                     type="button"
                     onClick={() => handleFormatText(composeBodyRef, "_", "_", setComposeBody)}
-                    className="rounded p-1 hover:bg-white/10 hover:text-white"
+                    className="rounded p-1 hover:text-sky-500"
                     title="Italic"
                   >
                     <Italic className="h-3.5 w-3.5" />
@@ -1922,7 +2279,7 @@ export default function HelpdeskInbox() {
                   <button
                     type="button"
                     onClick={() => handleFormatText(composeBodyRef, "\n- ", "", setComposeBody)}
-                    className="rounded p-1 hover:bg-white/10 hover:text-white"
+                    className="rounded p-1 hover:text-sky-500"
                     title="Bullet List"
                   >
                     <List className="h-3.5 w-3.5" />
@@ -1934,14 +2291,20 @@ export default function HelpdeskInbox() {
                   <button
                     type="button"
                     onClick={() => setComposeCannedOpen(!composeCannedOpen)}
-                    className="flex items-center gap-1 text-[11px] text-sky-400 hover:text-sky-300"
+                    className="flex items-center gap-1 text-[11px] text-sky-500 hover:underline"
                   >
                     <Sparkles className="h-3 w-3" />
                     <span>Templates</span>
                   </button>
 
                   {composeCannedOpen && (
-                    <div className="absolute right-0 top-6 z-50 w-72 rounded-2xl border border-white/15 bg-slate-950 p-2 shadow-2xl backdrop-blur-xl">
+                    <div
+                      className={`absolute right-0 top-6 z-50 w-72 rounded-2xl border p-2 shadow-2xl backdrop-blur-xl ${
+                        isDark
+                          ? "border-white/15 bg-slate-950 text-white"
+                          : "border-slate-200 bg-white text-slate-900"
+                      }`}
+                    >
                       <div className="px-2.5 py-1 text-[10px] font-bold uppercase text-slate-400">
                         Insert Studio Template
                       </div>
@@ -1950,12 +2313,12 @@ export default function HelpdeskInbox() {
                           key={c.id}
                           type="button"
                           onClick={() => handleInsertComposeCanned(c)}
-                          className="flex w-full flex-col rounded-xl px-2.5 py-1.5 text-left text-xs hover:bg-white/10"
+                          className={`flex w-full flex-col rounded-xl px-2.5 py-1.5 text-left text-xs transition ${
+                            isDark ? "hover:bg-white/10" : "hover:bg-slate-100"
+                          }`}
                         >
-                          <span className="font-semibold text-white">{c.title}</span>
-                          <span className="line-clamp-1 text-[10px] text-slate-400">
-                            {c.content}
-                          </span>
+                          <span className="font-semibold">{c.title}</span>
+                          <span className="line-clamp-1 text-[10px] text-slate-400">{c.content}</span>
                         </button>
                       ))}
                     </div>
@@ -1966,28 +2329,38 @@ export default function HelpdeskInbox() {
               {/* Message Body Area */}
               <textarea
                 ref={composeBodyRef}
-                rows={isComposeMaximized ? 18 : 9}
+                rows={isComposeMaximized ? 18 : 8}
                 value={composeBody}
                 onChange={(e) => setComposeBody(e.target.value)}
                 placeholder="Compose your message here..."
-                className="w-full resize-none bg-transparent text-xs leading-relaxed text-white placeholder-slate-500 outline-none"
+                className={`w-full resize-none bg-transparent text-xs leading-relaxed outline-none ${
+                  isDark ? "text-white placeholder-slate-500" : "text-slate-900 placeholder-slate-400"
+                }`}
               />
 
               {/* Attachments preview */}
               {composeAttachments.length > 0 && (
-                <div className="flex flex-wrap gap-2 pt-2 border-t border-white/10">
+                <div
+                  className={`flex flex-wrap gap-2 pt-2 border-t ${
+                    isDark ? "border-white/10" : "border-slate-200"
+                  }`}
+                >
                   {composeAttachments.map((att, idx) => (
                     <div
                       key={idx}
-                      className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-2.5 py-1 text-xs text-slate-200"
+                      className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-xs ${
+                        isDark
+                          ? "border-white/15 bg-white/5 text-slate-200"
+                          : "border-slate-200 bg-slate-100 text-slate-700"
+                      }`}
                     >
-                      <FileIcon className="h-3.5 w-3.5 text-sky-400" />
+                      <FileIcon className="h-3.5 w-3.5 text-sky-500" />
                       <span className="font-medium truncate max-w-[150px]">{att.filename}</span>
                       <span className="text-[10px] text-slate-400">({att.size})</span>
                       <button
                         type="button"
                         onClick={() => handleRemoveAttachment(idx, true)}
-                        className="hover:text-rose-400"
+                        className="hover:text-rose-500"
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -1997,14 +2370,18 @@ export default function HelpdeskInbox() {
               )}
 
               {/* Bottom Actions Row */}
-              <div className="flex items-center justify-between pt-3 border-t border-white/10">
+              <div
+                className={`flex items-center justify-between pt-3 border-t ${
+                  isDark ? "border-white/10" : "border-slate-200"
+                }`}
+              >
                 <div className="flex items-center gap-2">
                   {/* Primary Send Button */}
                   <button
                     type="button"
                     disabled={isSendingCompose || !composeTo.trim() || !composeSubject.trim()}
                     onClick={handleSendCompose}
-                    className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 px-5 py-2 text-xs font-bold text-white shadow-lg shadow-sky-950 transition hover:brightness-110 disabled:opacity-50"
+                    className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 px-5 py-2 text-xs font-bold text-white shadow-lg shadow-sky-950/40 transition hover:brightness-110 disabled:opacity-50"
                   >
                     {isSendingCompose ? (
                       <>
@@ -2024,12 +2401,16 @@ export default function HelpdeskInbox() {
                     type="button"
                     onClick={() => composeFileInputRef.current?.click()}
                     title="Attach files"
-                    className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-slate-300 hover:bg-white/10 hover:text-white"
+                    className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition ${
+                      isDark
+                        ? "border-white/15 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white"
+                        : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                    }`}
                   >
-                    <Paperclip className="h-4 w-4 text-sky-400" />
+                    <Paperclip className="h-4 w-4 text-sky-500" />
                     <span>Attach</span>
                     {composeAttachments.length > 0 && (
-                      <span className="rounded-full bg-sky-500/20 px-1.5 text-[10px] font-bold text-sky-300">
+                      <span className="rounded-full bg-sky-500/20 px-1.5 text-[10px] font-bold text-sky-500">
                         {composeAttachments.length}
                       </span>
                     )}
@@ -2049,7 +2430,7 @@ export default function HelpdeskInbox() {
                     }
                   }}
                   title="Discard Draft"
-                  className="rounded-xl p-2 text-slate-400 hover:bg-white/10 hover:text-rose-400"
+                  className="rounded-xl p-2 text-slate-400 hover:bg-slate-500/10 hover:text-rose-500"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
