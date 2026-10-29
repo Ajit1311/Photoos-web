@@ -125,6 +125,34 @@ export default function ClientAccessGalleryPage() {
     try {
       setLoading(true);
 
+      // 1. Try public gallery API endpoint (bypasses RLS for QR guest scans with service_role)
+      try {
+        const res = await fetch(`/api/gallery/${encodeURIComponent(eventId)}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success) {
+            if (json.event) setEvent(json.event as EventData);
+            if (json.studio) setStudio(json.studio as StudioData);
+            if (Array.isArray(json.photos)) {
+              setPhotos(json.photos);
+
+              const favs = new Set<string>();
+              const sels = new Set<string>();
+              json.photos.forEach((p: GalleryPhoto) => {
+                if (p.isFavorite) favs.add(p.id);
+                if (p.isSelected) sels.add(p.id);
+              });
+              setFavoriteIds(favs);
+              setSelectedIds(sels);
+              return;
+            }
+          }
+        }
+      } catch (apiErr) {
+        console.warn("[ClientAccessGallery] API fetch notice:", apiErr);
+      }
+
+      // 2. Direct client fallback
       const { data: eventData } = await supabase
         .from("events")
         .select("id, name, shoot_date, venue, studio_id")

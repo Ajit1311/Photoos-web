@@ -715,7 +715,22 @@ class GalleryService {
       console.warn("[getPhotos] DB fallback notice:", dbErr);
     }
 
-    // 3. Resilient empty array for newly created events
+    // 3. Fallback to public gallery API endpoint (for QR guest scans / public access)
+    try {
+      if (typeof window !== "undefined") {
+        const res = await fetch(`/api/gallery/${encodeURIComponent(eventId)}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.photos) && json.photos.length > 0) {
+            return json.photos;
+          }
+        }
+      }
+    } catch (apiErr) {
+      console.warn("[getPhotos] Public gallery API fallback notice:", apiErr);
+    }
+
+    // 4. Resilient empty array for newly created events
     return [];
   }
 
