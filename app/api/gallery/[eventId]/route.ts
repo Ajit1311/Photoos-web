@@ -49,7 +49,7 @@ export async function GET(
     // First try querying as event_id
     const { data: directEvent } = await supabaseAdmin
       .from("events")
-      .select("id, name, shoot_date, venue, studio_id")
+      .select("id, name, shoot_date, venue, studio_id, metadata")
       .eq("id", targetId)
       .maybeSingle();
 
@@ -68,22 +68,51 @@ export async function GET(
         resolvedEventId = gallRecord.event_id;
         const { data: linkedEvent } = await supabaseAdmin
           .from("events")
-          .select("id, name, shoot_date, venue, studio_id")
+          .select("id, name, shoot_date, venue, studio_id, metadata")
           .eq("id", resolvedEventId)
           .maybeSingle();
         event = linkedEvent;
       }
     }
 
-    // 2. Resolve Studio Details
+    // 2. Resolve Studio Details and Workspace Settings
     let studio: any = null;
+    let allowDownloads = false;
+    let lockDownloadsUntilPayment = false;
+
     if (event?.studio_id) {
-      const { data: studioData } = await supabaseAdmin
-        .from("studios")
-        .select("id, name, brand_name")
-        .eq("id", event.studio_id)
-        .maybeSingle();
+      const [{ data: studioData }, { data: settingsData }] = await Promise.all([
+        supabaseAdmin
+          .from("studios")
+          .select("id, name, brand_name")
+          .eq("id", event.studio_id)
+          .maybeSingle(),
+        supabaseAdmin
+          .from("workspace_settings")
+          .select("key, value")
+          .eq("studio_id", event.studio_id)
+          .in("key", ["client_downloads", "allow_downloads", "download_protection"]),
+      ]);
       studio = studioData;
+
+      // Event-level setting takes precedence, then workspace setting
+      const eventMeta = (event.metadata || {}) as any;
+      if (typeof eventMeta.allowDownload === "boolean") {
+        allowDownloads = eventMeta.allowDownload;
+      } else {
+        const clientDownloadsSetting = (settingsData || []).find(
+          (s) => s.key === "client_downloads" || s.key === "allow_downloads"
+        );
+        if (clientDownloadsSetting?.value && typeof (clientDownloadsSetting.value as any).enabled === "boolean") {
+          allowDownloads = Boolean((clientDownloadsSetting.value as any).enabled);
+        } else {
+          allowDownloads = false; // Default: hidden unless turned ON in settings
+        }
+      }
+
+      if (typeof eventMeta.lockDownloadsUntilPayment === "boolean") {
+        lockDownloadsUntilPayment = eventMeta.lockDownloadsUntilPayment;
+      }
     }
 
     // 3. Find Galleries for this event
@@ -185,6 +214,8 @@ export async function GET(
         success: true,
         event,
         studio,
+        allowDownloads,
+        lockDownloadsUntilPayment,
         photos,
         count: photos.length,
       },

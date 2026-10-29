@@ -154,6 +154,10 @@ const DEFAULT_SETTINGS:
     enabled: false,
   },
 
+  client_downloads: {
+    enabled: false,
+  },
+
 };
 
 
@@ -2777,6 +2781,34 @@ export default function SettingsPage() {
                     "client_workspace_access",
                     "Allow configured clients to use supported client workspace features.",
                     true,
+                  )
+              }
+            />
+
+            <InteractiveSettingRow
+              title="Guest & client photo downloads"
+              description="Allow guests and clients to download high-resolution photos from the QR scan live gallery and client portal."
+              category="studio"
+              settingKey="client_downloads"
+              icon={Download}
+              enabled={
+                Boolean(
+                  getWorkspaceSetting(
+                    "client_downloads",
+                  ).enabled,
+                )
+              }
+              saving={
+                savingSetting ===
+                "client_downloads"
+              }
+              onToggle={
+                () =>
+                  void toggleWorkspaceSetting(
+                    "studio",
+                    "client_downloads",
+                    "Allow guests and clients to download photos from the QR gallery and client access portal.",
+                    false,
                   )
               }
             />

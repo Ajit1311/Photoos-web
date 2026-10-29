@@ -107,6 +107,11 @@ export default function GuestLiveEventPage() {
   const [submittingComment, setSubmittingComment] = useState(false);
   const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
 
+  // Download Security & Settings
+  const [allowDownloads, setAllowDownloads] = useState<boolean>(false);
+  const [lockDownloadsUntilPayment, setLockDownloadsUntilPayment] = useState<boolean>(false);
+  const [downloadLockNotice, setDownloadLockNotice] = useState<string | null>(null);
+
   // Load Event & Studio Context
   const loadEventContext = useCallback(async () => {
     if (!eventId || !studioId) return;
@@ -122,6 +127,19 @@ export default function GuestLiveEventPage() {
           if (json.success) {
             if (json.event) setEvent(json.event as EventDetails);
             if (json.studio) setStudio(json.studio as StudioDetails);
+
+            const canDownload = Boolean(
+              json.allowDownloads ??
+              json.event?.metadata?.allowDownload ??
+              false
+            );
+            setAllowDownloads(canDownload);
+            if (typeof json.lockDownloadsUntilPayment === "boolean") {
+              setLockDownloadsUntilPayment(json.lockDownloadsUntilPayment);
+            } else if (typeof json.event?.metadata?.lockDownloadsUntilPayment === "boolean") {
+              setLockDownloadsUntilPayment(json.event.metadata.lockDownloadsUntilPayment);
+            }
+
             if (Array.isArray(json.photos)) {
               setAllPhotos(json.photos);
 
@@ -142,10 +160,10 @@ export default function GuestLiveEventPage() {
       }
 
       // 2. Direct client fallback
-      const [eventRes, studioRes, photosRes] = await Promise.all([
+      const [eventRes, studioRes, photosRes, settingsRes] = await Promise.all([
         supabase
           .from("events")
-          .select("id, name, shoot_date, venue, studio_id")
+          .select("id, name, shoot_date, venue, studio_id, metadata")
           .eq("id", eventId)
           .maybeSingle(),
         supabase
@@ -154,10 +172,31 @@ export default function GuestLiveEventPage() {
           .eq("id", studioId)
           .maybeSingle(),
         galleryService.getPhotos(eventId).catch(() => []),
+        supabase
+          .from("workspace_settings")
+          .select("key, value")
+          .eq("studio_id", studioId)
+          .in("key", ["client_downloads", "allow_downloads"]),
       ]);
 
       if (eventRes.data) {
         setEvent(eventRes.data as EventDetails);
+        const eventMeta = (eventRes.data.metadata || {}) as any;
+        if (typeof eventMeta.allowDownload === "boolean") {
+          setAllowDownloads(eventMeta.allowDownload);
+        } else {
+          const clientSetting = (settingsRes.data || []).find(
+            (s: any) => s.key === "client_downloads" || s.key === "allow_downloads"
+          );
+          if (clientSetting?.value && typeof (clientSetting.value as any).enabled === "boolean") {
+            setAllowDownloads(Boolean((clientSetting.value as any).enabled));
+          } else {
+            setAllowDownloads(false);
+          }
+        }
+        if (typeof eventMeta.lockDownloadsUntilPayment === "boolean") {
+          setLockDownloadsUntilPayment(eventMeta.lockDownloadsUntilPayment);
+        }
       }
       if (studioRes.data) {
         setStudio(studioRes.data as StudioDetails);
@@ -399,6 +438,25 @@ export default function GuestLiveEventPage() {
 
   // Download Single Photo
   const handleDownload = (photo: GalleryPhoto) => {
+    // If downloads are turned off in settings, block download
+    if (!allowDownloads) {
+      return;
+    }
+
+    // If download is locked until payment is cleared
+    if (lockDownloadsUntilPayment) {
+      if (role === "bride_groom") {
+        setDownloadLockNotice(
+          "पेमेंट प्रलंबित आहे: कृपया स्टुडिओचे उर्वरित पेमेंट पूर्ण करा जेणेकरून ओरिजिनल HD फोटो डाऊनलोड सुरू होईल."
+        );
+      } else {
+        setDownloadLockNotice(
+          "पाहुण्यांसाठी थेट डाऊनलोड सध्या लॉक आहे. कृपया वधू किंवा वराशी (Bride & Groom) संपर्क साधा."
+        );
+      }
+      return;
+    }
+
     const url = photo.originalUrl || photo.thumbnailUrl;
     if (!url) return;
     const link = document.createElement("a");
@@ -942,7 +1000,10 @@ export default function GuestLiveEventPage() {
                         src={displayUrl}
                         alt={photo.fileName}
                         loading="lazy"
-                        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                        draggable={false}
+                        onContextMenu={(e) => e.preventDefault()}
+                        className="h-full w-full object-cover transition duration-300 select-none group-hover:scale-105"
+                        style={{ WebkitTouchCallout: "none" }}
                       />
 
                       {/* Top Badges */}
@@ -1003,17 +1064,19 @@ export default function GuestLiveEventPage() {
                           </button>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDownload(photo);
-                          }}
-                          className="rounded-full bg-black/50 p-1.5 text-white backdrop-blur-sm hover:bg-black/70"
-                          title="Download"
-                        >
-                          <Download className="h-3.5 w-3.5" />
-                        </button>
+                        {allowDownloads && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDownload(photo);
+                            }}
+                            className="rounded-full bg-black/50 p-1.5 text-white backdrop-blur-sm hover:bg-black/70"
+                            title="Download"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -1039,7 +1102,10 @@ export default function GuestLiveEventPage() {
             <img
               src={previewPhoto.originalUrl || previewPhoto.thumbnailUrl}
               alt={previewPhoto.fileName}
-              className="max-h-[72vh] w-auto max-w-full rounded-2xl object-contain shadow-2xl"
+              draggable={false}
+              onContextMenu={(e) => e.preventDefault()}
+              className="max-h-[72vh] w-auto max-w-full rounded-2xl object-contain shadow-2xl select-none"
+              style={{ WebkitTouchCallout: "none" }}
             />
 
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
@@ -1074,14 +1140,16 @@ export default function GuestLiveEventPage() {
                 <span>Comments</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => handleDownload(previewPhoto)}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-[#0A3F61] px-4 py-2 text-xs font-semibold text-white shadow hover:bg-[#08334f]"
-              >
-                <Download className="h-4 w-4" />
-                <span>Download HD</span>
-              </button>
+              {allowDownloads && (
+                <button
+                  type="button"
+                  onClick={() => handleDownload(previewPhoto)}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#0A3F61] px-4 py-2 text-xs font-semibold text-white shadow hover:bg-[#08334f]"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Download HD</span>
+                </button>
+              )}
 
               <button
                 type="button"
@@ -1152,6 +1220,29 @@ export default function GuestLiveEventPage() {
                 <Send className="h-4 w-4" />
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* DOWNLOAD LOCK NOTICE POPUP */}
+      {downloadLockNotice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-sm rounded-3xl border border-white/20 bg-slate-900 p-6 text-center shadow-2xl">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-400">
+              <ShieldCheck className="h-7 w-7" />
+            </div>
+            <h3 className="mt-4 text-lg font-bold text-white">
+              {role === "bride_groom" ? "Payment Required" : "Download Locked"}
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-300">
+              {downloadLockNotice}
+            </p>
+            <button
+              type="button"
+              onClick={() => setDownloadLockNotice(null)}
+              className="mt-6 w-full rounded-xl bg-[#0A3F61] py-3 text-sm font-semibold text-white shadow hover:bg-[#08334f]"
+            >
+              समजले (Close)
+            </button>
           </div>
         </div>
       )}
