@@ -25,9 +25,9 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.supabase.co https://*.firebaseapp.com https://apis.google.com",
-      "connect-src 'self' http://localhost:* http://127.0.0.1:* https://*.supabase.co wss://*.supabase.co https://*.r2.cloudflarestorage.com https://*.firebaseapp.com https://*.googleapis.com https://identitytoolkit.googleapis.com",
-      "img-src 'self' data: blob: http://localhost:* http://127.0.0.1:* https://*.supabase.co https://*.r2.cloudflarestorage.com https://*.googleusercontent.com",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.supabase.co https://*.firebaseapp.com https://apis.google.com https://cdn.jsdelivr.net",
+      "connect-src 'self' http://localhost:* http://127.0.0.1:* https://*.supabase.co wss://*.supabase.co https://*.r2.cloudflarestorage.com https://*.firebaseapp.com https://*.googleapis.com https://identitytoolkit.googleapis.com https://cdn.jsdelivr.net",
+      "img-src 'self' data: blob: http://localhost:* http://127.0.0.1:* https://*.supabase.co https://*.r2.cloudflarestorage.com https://*.googleusercontent.com https://images.unsplash.com https://cdn.jsdelivr.net",
       "style-src 'self' 'unsafe-inline'",
       "font-src 'self' data:",
       "frame-ancestors 'none'",

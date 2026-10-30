@@ -607,7 +607,12 @@ export default function LegalCompliancePage() {
 
         const corporateMode =
           params.get("mode") === "corporate" ||
-          (requestedNext && requestedNext.includes("corporate"));
+          (requestedNext && requestedNext.includes("corporate")) ||
+          (typeof window !== "undefined" && (
+            window.location.hostname.startsWith("corp.") ||
+            window.location.hostname.startsWith("corporate.") ||
+            localStorage.getItem("photoos_login_mode") === "corporate"
+          ));
 
         const safeNext =
           requestedNext &&
@@ -1088,21 +1093,6 @@ export default function LegalCompliancePage() {
 
   async function handleAccept() {
 
-    if (
-      accessMode === "studio" &&
-      !studioId &&
-      !nextPath.includes("/onboarding/studio")
-    ) {
-
-      setError(
-        "Unable to resolve your studio workspace.",
-      );
-
-      return;
-
-    }
-
-
     if (!allReviewed) {
 
       setError(
@@ -1193,8 +1183,14 @@ export default function LegalCompliancePage() {
 
 
       const isCorporateMode =
+        accessMode === "corporate" ||
         nextPath.includes("corporate") ||
-        (typeof window !== "undefined" && window.location.search.includes("mode=corporate"));
+        (typeof window !== "undefined" && (
+          window.location.search.includes("mode=corporate") ||
+          window.location.hostname.startsWith("corp.") ||
+          window.location.hostname.startsWith("corporate.") ||
+          localStorage.getItem("photoos_login_mode") === "corporate"
+        ));
 
       const currentUser = await getCurrentUser();
       if (!currentUser && !isCorporateMode) {
@@ -1275,8 +1271,15 @@ export default function LegalCompliancePage() {
         }
       }
 
+      let effectiveNext = nextPath;
+      if (isCorporateMode) {
+        effectiveNext = nextPath.includes("corporate") ? nextPath : "/corporate/onboarding";
+      } else if (!studioId && !nextPath.includes("/onboarding/studio")) {
+        effectiveNext = "/onboarding/studio";
+      }
+
       router.replace(
-        nextPath,
+        effectiveNext,
       );
 
     } catch (

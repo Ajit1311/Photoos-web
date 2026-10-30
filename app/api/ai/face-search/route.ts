@@ -14,9 +14,9 @@ export const maxDuration = 30;
 const faceSearchSchema = z.object({
   image: z.string().optional(),
   descriptor: z.array(z.number()).optional(),
-  eventId: z.string().uuid("Invalid event ID format.").optional(),
-  galleryId: z.string().uuid("Invalid gallery ID format.").optional(),
-  studioId: z.string().uuid("Invalid studio ID format.").optional(),
+  eventId: z.string().optional(),
+  galleryId: z.string().optional(),
+  studioId: z.string().optional(),
   guestPhone: z.string().optional(),
   consentGranted: z.boolean().default(true),
   indexedAssets: z
@@ -128,6 +128,21 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Validate that the event exists and resolve studioId
+    if (resolvedEventId.startsWith("ev_corp_") || resolvedEventId.startsWith("corp_")) {
+      return NextResponse.json(
+        {
+          success: true,
+          matchedAssetIds: [],
+          count: 0,
+          matches: [],
+          hasIndexedFaces: false,
+          isCorporate: true,
+          message: "Corporate event resolved. Matching via client AI engine.",
+        },
+        { status: 200, headers: corsHeaders }
+      );
+    }
+
     let resolvedStudioId = studioId;
     const { data: eventData, error: eventError } = await supabaseAdmin
       .from("events")

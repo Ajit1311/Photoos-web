@@ -241,45 +241,61 @@ export default function CorporateEventDetailsPage() {
     setUploadProgress(10);
     setUploadMessage(`Processing ${files.length} high-resolution photos...`);
 
-    const newPhotos: CorporatePhoto[] = [];
+    const BATCH_SIZE = 5;
+    let allPhotosList: CorporatePhoto[] = photos;
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const dataUrl = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target?.result as string);
-        reader.readAsDataURL(file);
+    try {
+      for (let i = 0; i < files.length; i += BATCH_SIZE) {
+        const batch = files.slice(i, i + BATCH_SIZE);
+        const formData = new FormData();
+        formData.set("eventId", eventId);
+        formData.set("companyId", company.id);
+        batch.forEach((f) => formData.append("photos", f));
+
+        setUploadMessage(
+          `Uploading & indexing photos (${i + 1} to ${Math.min(i + batch.length, files.length)} of ${files.length})...`
+        );
+
+        const res = await fetch("/api/corporate/photos", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.success && Array.isArray(data?.photos)) {
+            allPhotosList = data.photos;
+            setPhotos(data.photos);
+          }
+        }
+
+        const prog = Math.min(95, Math.round(((i + batch.length) / files.length) * 85) + 10);
+        setUploadProgress(prog);
+      }
+
+      setUploadMessage("Indexing faces & updating live attendee gallery...");
+
+      // Update event metadata
+      const totalFaces = allPhotosList.reduce((acc, p) => acc + (p.ai_faces_detected || 1), 0);
+      await updateCorporateEvent(company.id, eventId, {
+        photos_count: allPhotosList.length,
+        ai_faces_indexed: totalFaces,
+        cover_image_url: allPhotosList[0]?.url,
       });
 
-      newPhotos.push({
-        id: `cphoto_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        event_id: eventId,
-        name: file.name,
-        url: dataUrl,
-        thumbnail_url: dataUrl,
-        size_bytes: file.size,
-        ai_faces_detected: Math.floor(1 + Math.random() * 4),
-        uploaded_at: new Date().toISOString(),
-      });
-
-      const prog = Math.min(90, Math.round(((i + 1) / files.length) * 85) + 10);
-      setUploadProgress(prog);
+      // Refresh event
+      const freshEvent = await getCorporateEvent(company.id, eventId);
+      if (freshEvent) setEvent(freshEvent);
+    } catch (uploadErr) {
+      console.error("[CorporateEvent] Upload error:", uploadErr);
+    } finally {
+      setUploadProgress(100);
+      setTimeout(() => {
+        setUploading(false);
+        setUploadProgress(0);
+        setUploadMessage(null);
+      }, 600);
     }
-
-    setUploadMessage("Indexing faces & updating live attendee gallery...");
-    const updatedList = await saveCorporatePhotos(company.id, eventId, newPhotos);
-    setPhotos(updatedList);
-
-    // Refresh event
-    const freshEvent = await getCorporateEvent(company.id, eventId);
-    if (freshEvent) setEvent(freshEvent);
-
-    setUploadProgress(100);
-    setTimeout(() => {
-      setUploading(false);
-      setUploadProgress(0);
-      setUploadMessage(null);
-    }, 600);
   };
 
   // Handle Delete Photo

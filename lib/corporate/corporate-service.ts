@@ -215,6 +215,12 @@ export async function createCorporateEvent(
   if (typeof window !== "undefined") {
     try {
       window.localStorage.setItem(`${STORAGE_KEY_EVENTS}_${companyId}`, JSON.stringify(updatedEvents));
+      // Sync to cloud storage in background
+      fetch("/api/corporate/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newEvent),
+      }).catch((e) => console.warn("[corporate-service] Cloud event sync notice:", e));
     } catch {
       // ignore
     }
@@ -226,7 +232,21 @@ export async function createCorporateEvent(
 // Get single corporate event
 export async function getCorporateEvent(companyId: string, eventId: string): Promise<CorporateEvent | null> {
   const events = await getCorporateEvents(companyId);
-  return events.find((e) => e.id === eventId) || null;
+  const found = events.find((e) => e.id === eventId);
+  if (found) return found;
+
+  // Try fetching from cloud storage
+  try {
+    const res = await fetch(`/api/corporate/events?eventId=${encodeURIComponent(eventId)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.success && data?.event) {
+        return data.event as CorporateEvent;
+      }
+    }
+  } catch {}
+
+  return null;
 }
 
 // Update corporate event
@@ -283,6 +303,20 @@ const STORAGE_KEY_PHOTOS_PREFIX = "photoos_corporate_photos_";
 
 // Get corporate photos for an event
 export async function getCorporatePhotos(eventId: string): Promise<CorporatePhoto[]> {
+  // Try cloud storage API first so all devices see the photos
+  try {
+    const res = await fetch(`/api/corporate/photos?eventId=${encodeURIComponent(eventId)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.success && Array.isArray(data?.photos) && data.photos.length > 0) {
+        return data.photos as CorporatePhoto[];
+      }
+    }
+  } catch (err) {
+    console.warn("[corporate-service] Cloud photos fetch notice:", err);
+  }
+
+  // Fallback to local storage
   if (typeof window !== "undefined") {
     try {
       const stored = window.localStorage.getItem(`${STORAGE_KEY_PHOTOS_PREFIX}${eventId}`);
@@ -330,6 +364,15 @@ export async function deleteCorporatePhoto(
   eventId: string,
   photoId: string
 ): Promise<boolean> {
+  // Call cloud storage API to delete
+  try {
+    await fetch(`/api/corporate/photos?eventId=${encodeURIComponent(eventId)}&photoId=${encodeURIComponent(photoId)}`, {
+      method: "DELETE",
+    });
+  } catch (e) {
+    console.warn("[corporate-service] Cloud photo delete notice:", e);
+  }
+
   const existing = await getCorporatePhotos(eventId);
   const remaining = existing.filter((p) => p.id !== photoId);
 

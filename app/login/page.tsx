@@ -21,14 +21,26 @@ function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const isCorporate = searchParams.get("mode") === "corporate";
+  const isCorporate =
+    searchParams.get("mode") === "corporate" ||
+    (typeof window !== "undefined" && localStorage.getItem("photoos_login_mode") === "corporate" && !searchParams.get("planId"));
 
   const handleToggleMode = (mode: "studio" | "corporate") => {
     const p = new URLSearchParams(searchParams.toString());
     if (mode === "corporate") {
       p.set("mode", "corporate");
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("photoos_login_mode", "corporate");
+        } catch {}
+      }
     } else {
       p.delete("mode");
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("photoos_login_mode", "studio");
+        } catch {}
+      }
     }
     const qs = p.toString();
     router.replace(`/login${qs ? `?${qs}` : ""}`);

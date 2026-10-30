@@ -42,6 +42,94 @@ export async function GET(
 
     const supabaseAdmin = getServerSupabase();
 
+    // 0. Corporate Event Handling
+    if (targetId.startsWith("ev_corp_") || targetId.startsWith("corp_")) {
+      try {
+        let corpEventData: any = null;
+        let corpPhotos: any[] = [];
+
+        // Load corporate event manifest from Supabase Storage
+        try {
+          const { data: evData } = await supabaseAdmin.storage
+            .from("assets")
+            .download(`corporate/${targetId}/event.json`);
+          if (evData) {
+            corpEventData = JSON.parse(await evData.text());
+          }
+        } catch {}
+
+        // Load corporate photos manifest from Supabase Storage
+        try {
+          const { data: phData } = await supabaseAdmin.storage
+            .from("assets")
+            .download(`corporate/${targetId}/photos.json`);
+          if (phData) {
+            const parsed = JSON.parse(await phData.text());
+            if (Array.isArray(parsed)) corpPhotos = parsed;
+          }
+        } catch {}
+
+        const evName = corpEventData?.name || "Corporate Event";
+        const compName = corpEventData?.company_name || "Corporate Office";
+
+        const formattedPhotos = corpPhotos.map((p, idx) => ({
+          id: p.id || `cp_${idx}`,
+          eventId: targetId,
+          fileName: p.name || `photo_${idx + 1}.jpg`,
+          thumbnailUrl: p.thumbnail_url || p.url,
+          originalUrl: p.url || p.thumbnail_url,
+          width: 1920,
+          height: 1080,
+          fileSize: p.size_bytes || 204800,
+          mimeType: "image/jpeg",
+          uploadedBy: compName,
+          uploadedAt: p.uploaded_at || new Date().toISOString(),
+          status: "ready",
+          visibility: "visible",
+          rating: 0,
+          likes: 0,
+          comments: 0,
+          isFavorite: false,
+          isSelected: false,
+          aiProcessed: true,
+          captureDate: corpEventData?.date,
+          location: corpEventData?.location,
+        }));
+
+        return NextResponse.json(
+          {
+            success: true,
+            event: {
+              id: targetId,
+              name: evName,
+              shoot_date: corpEventData?.date || new Date().toISOString().slice(0, 10),
+              venue: corpEventData?.location || "Office Headquarters",
+              studio_id: corpEventData?.company_id || "corporate",
+            },
+            studio: {
+              id: corpEventData?.company_id || "corporate",
+              name: compName,
+              brand_name: compName,
+              contact_phone: null,
+            },
+            allowDownloads: true,
+            lockDownloadsUntilPayment: false,
+            photos: formattedPhotos,
+            count: formattedPhotos.length,
+          },
+          {
+            status: 200,
+            headers: {
+              ...corsHeaders,
+              "Cache-Control": "public, max-age=10, s-maxage=10, stale-while-revalidate=60",
+            },
+          }
+        );
+      } catch (corpErr) {
+        console.warn("[GalleryRoute] Corporate handler notice:", corpErr);
+      }
+    }
+
     // 1. Resolve Event Details
     let event: any = null;
     let resolvedEventId = targetId;
