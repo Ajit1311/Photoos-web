@@ -1,0 +1,275 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import {
+  ArrowRight,
+  ArrowUpRight,
+  Building2,
+  CalendarDays,
+  CheckCircle2,
+  Clock,
+  Download,
+  Eye,
+  ExternalLink,
+  Image as ImageIcon,
+  Plus,
+  QrCode,
+  ScanFace,
+  ShieldCheck,
+  Sparkles,
+  TrendingUp,
+  Upload,
+  Users,
+} from "lucide-react";
+import { CorporateShell } from "@/components/corporate/CorporateShell";
+import {
+  getCorporateCompany,
+  getCorporateEvents,
+  type CorporateCompany,
+  type CorporateEvent,
+} from "@/lib/corporate/corporate-service";
+
+export default function CorporateDashboardPage() {
+  const [company, setCompany] = useState<CorporateCompany | null>(null);
+  const [events, setEvents] = useState<CorporateEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const comp = await getCorporateCompany();
+        setCompany(comp);
+        const evs = await getCorporateEvents(comp.id);
+        setEvents(evs);
+      } catch (err) {
+        console.error("[CorporateDashboard] Load error:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    void loadData();
+  }, []);
+
+  const totalPhotos = events.reduce((acc, ev) => acc + (ev.photos_count || 0), 0);
+  const totalFaces = events.reduce((acc, ev) => acc + (ev.ai_faces_indexed || 0), 0);
+
+  return (
+    <CorporateShell>
+      <div className="space-y-8">
+        {/* Executive Header Banner */}
+        <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 p-6 sm:p-8 text-white shadow-xl dark:border-slate-800">
+          <div className="absolute top-0 right-0 -mr-16 -mt-16 h-64 w-64 rounded-full bg-sky-500/10 blur-3xl pointer-events-none" />
+
+          <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-sky-500/15 px-3 py-1 text-xs font-semibold text-sky-300">
+                  <Sparkles className="h-3 w-3 text-sky-400" />
+                  Enterprise Portal
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-300">
+                  <Clock className="h-3 w-3 text-emerald-400" />
+                  {company?.subscription?.days_remaining ?? 7} Days Free Trial Active
+                </span>
+              </div>
+
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                {company?.name || "Corporate Office Dashboard"}
+              </h1>
+              <p className="mt-1 text-xs sm:text-sm text-slate-300 max-w-xl">
+                Manage your office events, generate reception Standee QRs, and let employees instantly discover their candid photos with AI selfie matching.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                href="/corporate/standee-qr"
+                className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-xs font-semibold text-white backdrop-blur hover:bg-white/20 transition-all"
+              >
+                <QrCode className="h-4 w-4" />
+                Standee QR Poster
+              </Link>
+
+              <Link
+                href="/corporate/events/new"
+                className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-5 py-2.5 text-xs font-bold text-slate-950 shadow-lg shadow-sky-500/25 hover:bg-sky-400 transition-all"
+              >
+                <Plus className="h-4 w-4" />
+                Create Corporate Event
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Enterprise Metrics Grid */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
+              <span className="text-xs font-medium">Corporate Events</span>
+              <CalendarDays className="h-5 w-5 text-sky-600 dark:text-sky-400" />
+            </div>
+            <p className="mt-3 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+              {events.length}
+            </p>
+            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+              Townhalls & Celebrations
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
+              <span className="text-xs font-medium">Uploaded Event Photos</span>
+              <ImageIcon className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+            </div>
+            <p className="mt-3 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+              {totalPhotos.toLocaleString()}
+            </p>
+            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+              High-resolution event media
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
+              <span className="text-xs font-medium">AI Faces Indexed</span>
+              <ScanFace className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <p className="mt-3 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+              {totalFaces.toLocaleString()}
+            </p>
+            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+              Ready for instant matching
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
+              <span className="text-xs font-medium">Employee Engagement</span>
+              <TrendingUp className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <p className="mt-3 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+              98.4%
+            </p>
+            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+              Selfie search satisfaction
+            </p>
+          </div>
+        </div>
+
+        {/* Corporate Events List */}
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 overflow-hidden">
+          <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                Company Events & Live Galleries
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Click any event to manage uploaded photos, view AI face indexing, or download standee posters.
+              </p>
+            </div>
+            <Link
+              href="/corporate/events/new"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add Event
+            </Link>
+          </div>
+
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            {events.map((ev) => (
+              <div
+                key={ev.id}
+                className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors"
+              >
+                <div className="flex items-start sm:items-center gap-4">
+                  <div className="h-16 w-20 rounded-xl bg-slate-100 dark:bg-slate-800 overflow-hidden shrink-0 relative border border-slate-200 dark:border-slate-700">
+                    {ev.cover_image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={ev.cover_image_url}
+                        alt={ev.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-slate-400">
+                        <CalendarDays className="h-6 w-6" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-800 dark:bg-sky-950 dark:text-sky-300">
+                        {ev.event_type}
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        {ev.date}
+                      </span>
+                    </div>
+                    <h3 className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
+                      {ev.name}
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      📍 {ev.location} · {ev.photos_count} photos · {ev.ai_faces_indexed} AI faces
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-end sm:self-center">
+                  <Link
+                    href={`/corporate/standee-qr?eventId=${ev.id}`}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 shadow-sm"
+                  >
+                    <QrCode className="h-3.5 w-3.5 text-indigo-500" />
+                    Standee QR
+                  </Link>
+
+                  <Link
+                    href={`/gallery/${ev.id}/access`}
+                    target="_blank"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 shadow-sm"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 text-emerald-500" />
+                    Employee View
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 3-Step Guide for Office Reception / HR */}
+        <div className="rounded-2xl border border-indigo-100 bg-gradient-to-r from-sky-50/50 via-indigo-50/30 to-purple-50/40 p-6 dark:border-indigo-900/40 dark:from-slate-900 dark:via-indigo-950/20 dark:to-slate-900">
+          <div className="flex items-center gap-2 text-indigo-900 dark:text-indigo-300 mb-3">
+            <Sparkles className="h-4 w-4" />
+            <h3 className="text-sm font-bold uppercase tracking-wider">
+              How PhotoOS Works For Your Office Events
+            </h3>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-4 text-xs text-slate-600 dark:text-slate-400">
+            <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3.5 dark:border-slate-800 dark:bg-slate-800/60">
+              <span className="font-bold text-sky-600 dark:text-sky-400">Step 1: Upload Photos</span>
+              <p className="mt-1">
+                Upload your photographer's DSLR captures or phone albums after the event. AI automatically indexes every face.
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3.5 dark:border-slate-800 dark:bg-slate-800/60">
+              <span className="font-bold text-indigo-600 dark:text-indigo-400">Step 2: Print Standee QR</span>
+              <p className="mt-1">
+                Download your high-res office standee poster with company branding and place it in the office cafeteria or reception.
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3.5 dark:border-slate-800 dark:bg-slate-800/60">
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">Step 3: Instant Employee Delivery</span>
+              <p className="mt-1">
+                Employees scan QR, take a selfie, and get all their event moments in 3 seconds directly on their smartphone.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </CorporateShell>
+  );
+}
