@@ -13,9 +13,9 @@ let companySettingsState = {
   logo_url: "/logo.png",
   country: "India",
   state: "Maharashtra",
-  city: "Pune",
-  address: "Senapati Bapat Marg, Pune, Maharashtra 411038, India",
-  postal_code: "411038",
+  city: "Gadhinglaj",
+  address: "Gadhinglaj, Kolhapur, Maharashtra 416502, India",
+  postal_code: "416502",
   tax_id: "27AABCP1234F1Z8",
   timezone: "Asia/Kolkata",
   currency: "INR",
@@ -1454,7 +1454,11 @@ export async function POST(
     const newPassword = body.password as string;
     // Mark must_change_password as false for the session
     const authHeader = req.headers.get("Authorization") || "";
-    platformLiveStore.updatePassword("adskartmedia11@gmail.com");
+    const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+    const { validateAdminSession } = await import("@/lib/auth/admin-2fa.service");
+    const session = validateAdminSession(token);
+    const targetUser = session ? session.userId : "adskartmedia11@gmail.com";
+    platformLiveStore.updatePassword(targetUser, newPassword);
 
     return NextResponse.json({
       success: true,

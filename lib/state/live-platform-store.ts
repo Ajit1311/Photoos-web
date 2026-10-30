@@ -33,6 +33,8 @@ export interface AdminEmployeeItem {
   updated_at: string;
   last_activity_at: string | null;
   user_id: string;
+  password?: string;
+  temporary_password?: string;
   must_change_password: boolean;
   last_login_at: string | null;
   password_changed_at: string | null;
@@ -52,14 +54,14 @@ class PlatformLiveStore {
     display_name: "PhotoOS Platform",
     brand_name: "PhotoOS Studio & Cloud",
     email: "support@photoos.in",
-    phone: "+91 96896 89142",
+    phone: "+91 96995 99142",
     website: "https://photoos.in",
     logo_url: "/logo.png",
     country: "India",
     state: "Maharashtra",
-    city: "Pune",
-    address: "Senapati Bapat Marg, Pune, Maharashtra 411038, India",
-    postal_code: "411038",
+    city: "Gadhinglaj",
+    address: "Gadhinglaj, Kolhapur, Maharashtra 416502, India",
+    postal_code: "416502",
     tax_id: "27AABCP1234F1Z8",
     timezone: "Asia/Kolkata",
     currency: "INR",
@@ -212,6 +214,31 @@ class PlatformLiveStore {
           code: "super_admin",
           name: "Super Administrator (Founder)",
           description: "Full master access across platform",
+          status: "active",
+        },
+      ],
+    },
+    {
+      platform_admin_id: "adm_parashuram_naik_1311",
+      profile_id: "usr_parashuram_naik_1311",
+      display_name: "Parashuram Naik",
+      email: "parashuramnaik1311@gmail.com",
+      employee_code: "ADM-101",
+      status: "active",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      last_activity_at: new Date().toISOString(),
+      user_id: "parashuramnaik1311@gmail.com",
+      temporary_password: "PhotoOS#665186",
+      must_change_password: false,
+      last_login_at: new Date().toISOString(),
+      password_changed_at: null,
+      roles: [
+        {
+          id: "role_admin",
+          code: "admin",
+          name: "Administrator (Operations)",
+          description: "Operations Console Administrator",
           status: "active",
         },
       ],
@@ -452,7 +479,7 @@ class PlatformLiveStore {
             
             <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0; line-height: 1.5;">
               This email was sent by <strong>PhotoOS Team</strong> (<a href="mailto:team@photoos.in" style="color: #64748b;">team@photoos.in</a>)<br />
-              PhotoOS SaaS Technologies Private Limited &bull; Senapati Bapat Marg, Pune 411038
+              PhotoOS SaaS Technologies Private Limited &bull; Gadhinglaj, Kolhapur, Maharashtra 416502
             </p>
           </div>
         `,
@@ -496,6 +523,7 @@ class PlatformLiveStore {
       updated_at: new Date().toISOString(),
       last_activity_at: null,
       user_id: cleanEmail,
+      temporary_password: tempPassword,
       must_change_password: true,
       last_login_at: null,
       password_changed_at: null,
@@ -510,7 +538,18 @@ class PlatformLiveStore {
       ],
     };
 
-    this.employees.push(newEmp);
+    const existingIdx = this.employees.findIndex(
+      (e) => e.email.toLowerCase() === cleanEmail || e.user_id.toLowerCase() === cleanEmail
+    );
+    if (existingIdx !== -1) {
+      this.employees[existingIdx] = {
+        ...this.employees[existingIdx],
+        ...newEmp,
+        temporary_password: tempPassword,
+      };
+    } else {
+      this.employees.push(newEmp);
+    }
 
     // Automated Resend Invitation & Greeting Email from team@photoos.in
     await this.sendWelcomeCredentialsEmail(newEmp, tempPassword);
@@ -524,16 +563,21 @@ class PlatformLiveStore {
   /**
    * Resets temporary password status upon first login
    */
-  public updatePassword(userIdOrEmail: string) {
+  public updatePassword(userIdOrEmail: string, newPassword?: string) {
+    const clean = userIdOrEmail.trim().toLowerCase();
     const emp = this.employees.find(
       (e) =>
-        e.user_id === userIdOrEmail ||
-        e.email === userIdOrEmail ||
+        e.user_id.toLowerCase() === clean ||
+        e.email.toLowerCase() === clean ||
         e.platform_admin_id === userIdOrEmail
     );
     if (emp) {
       emp.must_change_password = false;
       emp.password_changed_at = new Date().toISOString();
+      if (newPassword) {
+        emp.password = newPassword;
+      }
+      delete emp.temporary_password;
       return true;
     }
     return false;

@@ -36,7 +36,7 @@ export const LEGAL_CONFIG = {
   grievanceOfficerDesignation: "Grievance Officer & Data Protection Lead",
   grievanceOfficerEmail: "[grievance@photoos.in]", // [CONFIRM WITH LAWYER]
   grievanceOfficerPhone: "[+91 22 4567 8900]", // [CONFIRM WITH LAWYER]
-  grievanceAddress: "[Grievance Redressal Cell, PhotoOS Technologies, Senapati Bapat Marg, Mumbai, Maharashtra 400013, India]", // [CONFIRM WITH LAWYER]
+  grievanceAddress: "Grievance Redressal Cell, PhotoOS Technologies, Gadhinglaj, Kolhapur, Maharashtra 416502, India",
 
   // Data Protection Officer (DPDP Act 2023 Section 8 & Rules)
   dpoName: "[DR. SANJAY KULKARNI]", // [CONFIRM WITH LAWYER]
