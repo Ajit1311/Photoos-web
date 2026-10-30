@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -25,9 +25,12 @@ import {
   type CorporateCompany,
 } from "@/lib/corporate/corporate-service";
 
-export default function CorporateOnboardingPage() {
+function CorporateOnboardingContent() {
   const router = useRouter();
-  const [currentStep, setCurrentStep] = useState<1 | 2>(1);
+  const searchParams = useSearchParams();
+  const [currentStep, setCurrentStep] = useState<1 | 2>(
+    searchParams.get("step") === "compliance" ? 2 : 1
+  );
   const [loading, setLoading] = useState(false);
   const [company, setCompany] = useState<CorporateCompany | null>(null);
 
@@ -406,5 +409,22 @@ export default function CorporateOnboardingPage() {
         PhotoOS Enterprise Onboarding &bull; Secure & Confidential
       </footer>
     </div>
+  );
+}
+
+export default function CorporateOnboardingPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
+          <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm">
+            <Loader2 className="h-5 w-5 animate-spin text-[#0A3F61]" />
+            <span>Loading Enterprise Onboarding...</span>
+          </div>
+        </div>
+      }
+    >
+      <CorporateOnboardingContent />
+    </Suspense>
   );
 }

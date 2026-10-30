@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import {
   ArrowRight,
   Building2,
   CheckCircle2,
+  Eye,
+  EyeOff,
   KeyRound,
   Loader2,
+  LockKeyhole,
   Mail,
   ShieldCheck,
   Sparkles,
@@ -17,12 +19,14 @@ import {
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { getCorporateCompany, saveCorporateCompany } from "@/lib/corporate/corporate-service";
 
-export default function CorporateLoginPage() {
+function CorporateLoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const [email, setEmail] = useState("");
-  const [step, setStep] = useState<"email" | "otp">("email");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [step, setStep] = useState<"credentials" | "otp">("credentials");
   const [otp, setOtp] = useState("");
   const [generatedOtp, setGeneratedOtp] = useState("");
   const [loading, setLoading] = useState(false);
@@ -38,12 +42,17 @@ export default function CorporateLoginPage() {
     return () => clearInterval(timer);
   }, [step, countdown]);
 
-  // 1. Send OTP
-  const handleSendOtp = async (e?: React.FormEvent) => {
+  // 1. Submit Email + Password -> Generate & Send OTP
+  const handleCredentialsSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const cleanEmail = email.trim().toLowerCase();
     if (!cleanEmail || !cleanEmail.includes("@")) {
       setError("Please enter a valid work email address.");
+      return;
+    }
+
+    if (!password || password.length < 6) {
+      setError("Please enter a password with at least 6 characters.");
       return;
     }
 
@@ -61,7 +70,7 @@ export default function CorporateLoginPage() {
     }
 
     try {
-      // 1. Dispatch real email via PhotoOS Resend API
+      // Dispatch real email via PhotoOS Resend API
       const res = await fetch("/api/email/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -94,7 +103,7 @@ export default function CorporateLoginPage() {
     }
   };
 
-  // 2. Verify OTP
+  // 2. Verify OTP -> Navigate to Legal Compliance -> Dashboard
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (otp.length < 4) {
@@ -125,9 +134,9 @@ export default function CorporateLoginPage() {
         name: current.name || email.split("@")[1]?.split(".")[0]?.toUpperCase() + " Corp" || "Corporate Office",
       });
 
-      // Navigate
+      // Flow: If compliance not yet accepted -> go to legal compliance onboarding page!
       if (!updated.compliance_accepted) {
-        router.push("/corporate/onboarding");
+        router.push("/corporate/onboarding?step=compliance");
       } else {
         router.push("/corporate/dashboard");
       }
@@ -165,7 +174,7 @@ export default function CorporateLoginPage() {
             <div className="text-center mb-6">
               <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 mb-3">
                 <Sparkles className="h-3 w-3 text-[#EF8619]" />
-                Corporate Office Edition · 7-Day Free Trial
+                Corporate Office Edition &bull; 7-Day Free Trial
               </div>
               
               <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
@@ -173,8 +182,8 @@ export default function CorporateLoginPage() {
               </h1>
               
               <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
-                {step === "email"
-                  ? "Enter your company work email to access your corporate events portal."
+                {step === "credentials"
+                  ? "Enter your company work email and password to continue."
                   : `Enter the 6-digit verification code sent to ${email}`}
               </p>
             </div>
@@ -201,8 +210,8 @@ export default function CorporateLoginPage() {
               </div>
             )}
 
-            {step === "email" ? (
-              <form onSubmit={handleSendOtp} className="space-y-4">
+            {step === "credentials" ? (
+              <form onSubmit={handleCredentialsSubmit} className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Company Work Email
@@ -219,8 +228,35 @@ export default function CorporateLoginPage() {
                       className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 placeholder-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white focus:border-[#0A3F61] focus:outline-none focus:ring-1 focus:ring-[#0A3F61]"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      Password
+                    </label>
+                  </div>
+                  <div className="relative">
+                    <LockKeyhole className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter your corporate password"
+                      required
+                      minLength={6}
+                      className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-10 text-sm text-slate-900 placeholder-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white focus:border-[#0A3F61] focus:outline-none focus:ring-1 focus:ring-[#0A3F61]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                   <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                    Includes 7 days complimentary enterprise trial. No credit card required.
+                    Includes 7-day complimentary enterprise trial.
                   </p>
                 </div>
 
@@ -232,11 +268,11 @@ export default function CorporateLoginPage() {
                   {loading ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Sending Verification Code...
+                      Authenticating & Sending OTP...
                     </>
                   ) : (
                     <>
-                      Continue with OTP
+                      Continue
                       <ArrowRight className="h-4 w-4" />
                     </>
                   )}
@@ -268,7 +304,7 @@ export default function CorporateLoginPage() {
                     <button
                       type="button"
                       disabled={countdown > 0 || loading}
-                      onClick={() => void handleSendOtp()}
+                      onClick={() => void handleCredentialsSubmit()}
                       className="text-[#0A3F61] dark:text-sky-400 font-semibold hover:underline disabled:opacity-40"
                     >
                       Resend Code
@@ -288,7 +324,7 @@ export default function CorporateLoginPage() {
                     </>
                   ) : (
                     <>
-                      Verify & Access Dashboard
+                      Verify OTP & Continue
                       <ArrowRight className="h-4 w-4" />
                     </>
                   )}
@@ -296,10 +332,10 @@ export default function CorporateLoginPage() {
 
                 <button
                   type="button"
-                  onClick={() => setStep("email")}
+                  onClick={() => setStep("credentials")}
                   className="w-full text-center text-xs text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
                 >
-                  Change Email Address
+                  Back to Email & Password
                 </button>
               </form>
             )}
@@ -320,5 +356,22 @@ export default function CorporateLoginPage() {
         © {new Date().getFullYear()} PhotoOS &bull; Corporate Office Portal
       </footer>
     </div>
+  );
+}
+
+export default function CorporateLoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
+          <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm">
+            <Loader2 className="h-5 w-5 animate-spin text-[#0A3F61]" />
+            <span>Loading PhotoOS Login...</span>
+          </div>
+        </div>
+      }
+    >
+      <CorporateLoginContent />
+    </Suspense>
   );
 }
