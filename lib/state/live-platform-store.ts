@@ -471,10 +471,17 @@ class PlatformLiveStore {
     const tempPassword = `PhotoOS#${Math.floor(100000 + Math.random() * 900000)}`;
 
     const roleNameMap: Record<string, string> = {
-      support: "Support Specialist",
+      admin: "Administrator (Operations)",
+      software_developer: "Software Developer (Engineering)",
+      developer: "Software Developer (Engineering)",
+      hr: "Human Resources (HR)",
       marketing: "Marketing Specialist",
-      billing: "Billing & Accounts Specialist",
-      admin: "Administrator",
+      accountant: "Accountant (Finance & Billing)",
+      billing: "Accountant (Finance & Billing)",
+      qa_tester: "QA Tester (Quality Assurance)",
+      qa: "QA Tester (Quality Assurance)",
+      sales: "Sales (Studio Acquisition)",
+      support: "Customer Support Specialist",
     };
     const roleName = roleNameMap[roleCode] || "Platform Staff";
 

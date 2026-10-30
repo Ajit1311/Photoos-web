@@ -646,19 +646,67 @@ export async function GET(
         status: "active",
       },
       {
-        id: "perm_inbox",
-        code: "inbox:*",
-        name: "Department Inbox Access",
-        description: "Read and reply to support, billing, and marketing emails",
-        module: "Support",
+        id: "perm_admin",
+        code: "admin:*",
+        name: "Platform Operations & Administration",
+        description: "Manage studios, employee accounts, and system configuration",
+        module: "Administration",
         status: "active",
       },
       {
-        id: "perm_leads",
-        code: "leads:*",
-        name: "Leads & Guest Captures",
-        description: "View and follow up with QR scan leads and demo inquiries",
+        id: "perm_dev",
+        code: "dev:*",
+        name: "Software & Engineering Logs",
+        description: "Access system health, software features, and server monitoring",
+        module: "Engineering",
+        status: "active",
+      },
+      {
+        id: "perm_hr",
+        code: "hr:*",
+        name: "Employee & People Management",
+        description: "Manage admin employees, roles, and internal communications",
+        module: "Human Resources",
+        status: "active",
+      },
+      {
+        id: "perm_marketing",
+        code: "marketing:*",
+        name: "Marketing & Growth Campaigns",
+        description: "Manage marketing campaigns, QR guest leads, and growth analytics",
         module: "Marketing",
+        status: "active",
+      },
+      {
+        id: "perm_accounting",
+        code: "accounting:*",
+        name: "Finance, Billing & Taxes",
+        description: "Access revenue ledgers, invoices, GST, and payouts",
+        module: "Accounting",
+        status: "active",
+      },
+      {
+        id: "perm_qa",
+        code: "qa:*",
+        name: "Quality Assurance & Diagnostics",
+        description: "App diagnostics, test verification, and audit logs",
+        module: "Quality Assurance",
+        status: "active",
+      },
+      {
+        id: "perm_sales",
+        code: "sales:*",
+        name: "Sales & Studio Acquisition",
+        description: "Manage studio onboarding, sales leads, and conversions",
+        module: "Sales",
+        status: "active",
+      },
+      {
+        id: "perm_support",
+        code: "support:*",
+        name: "Helpdesk & Customer Support",
+        description: "Read and reply to support inboxes, tickets, and studio queries",
+        module: "Support",
         status: "active",
       },
     ];
@@ -667,29 +715,83 @@ export async function GET(
       {
         id: "role_super_admin",
         code: "super_admin",
-        name: "Super Admin",
+        name: "Super Admin (Founder)",
         description: "Master access across all platform departments",
         is_system: true,
         status: "active",
         permissions,
       },
       {
-        id: "role_support",
-        code: "support",
-        name: "Support Specialist",
-        description: "Access to Support Desk, Tickets and Inboxes",
-        is_system: true,
+        id: "role_admin",
+        code: "admin",
+        name: "Administrator (Operations)",
+        description: "Platform operations, studio approvals, system configurations & access administration",
+        is_system: false,
         status: "active",
-        permissions: permissions.filter((p) => p.module === "Support"),
+        permissions: permissions.filter((p) => p.module === "Administration" || p.module === "System"),
+      },
+      {
+        id: "role_software_developer",
+        code: "software_developer",
+        name: "Software Developer (Engineering)",
+        description: "Engineering, core systems, AI pipeline, microservices & technical infrastructure",
+        is_system: false,
+        status: "active",
+        permissions: permissions.filter((p) => p.module === "Engineering" || p.module === "System"),
+      },
+      {
+        id: "role_hr",
+        code: "hr",
+        name: "Human Resources (HR)",
+        description: "Personnel management, employee onboarding, roles & internal communication",
+        is_system: false,
+        status: "active",
+        permissions: permissions.filter((p) => p.module === "Human Resources" || p.module === "Administration"),
       },
       {
         id: "role_marketing",
         code: "marketing",
         name: "Marketing Specialist",
-        description: "Access to Marketing Inbox, Campaigns, and QR Leads",
-        is_system: true,
+        description: "Growth analytics, promotional campaigns, social channels & QR scan leads",
+        is_system: false,
         status: "active",
-        permissions: permissions.filter((p) => p.module === "Marketing" || p.module === "Support"),
+        permissions: permissions.filter((p) => p.module === "Marketing"),
+      },
+      {
+        id: "role_accountant",
+        code: "accountant",
+        name: "Accountant (Finance & Billing)",
+        description: "Financial ledgers, invoices, payment gateways, GST & subscriptions",
+        is_system: false,
+        status: "active",
+        permissions: permissions.filter((p) => p.module === "Accounting"),
+      },
+      {
+        id: "role_qa_tester",
+        code: "qa_tester",
+        name: "QA Tester (Quality Assurance)",
+        description: "Platform reliability testing, bug verification, system audit & error logs",
+        is_system: false,
+        status: "active",
+        permissions: permissions.filter((p) => p.module === "Quality Assurance" || p.module === "Engineering"),
+      },
+      {
+        id: "role_sales",
+        code: "sales",
+        name: "Sales (Studio Acquisition)",
+        description: "Studio onboarding, enterprise demos, marketplace listings & leads",
+        is_system: false,
+        status: "active",
+        permissions: permissions.filter((p) => p.module === "Sales" || p.module === "Marketing"),
+      },
+      {
+        id: "role_support",
+        code: "support",
+        name: "Customer Support Specialist",
+        description: "Studio support desk, ticketing, customer issues & department inbox",
+        is_system: false,
+        status: "active",
+        permissions: permissions.filter((p) => p.module === "Support"),
       },
     ];
 
@@ -1246,7 +1348,7 @@ export async function POST(
   if (endpoint === "platform-admin-employee") {
     const displayName = (body.display_name as string) || "Admin Staff";
     const email = (body.email as string) || "adskartmedia11@gmail.com";
-    const roleCode = (body.role_code as string) || "support";
+    const roleCode = (body.role_code as string) || "admin";
 
     const { employee, temporaryPassword } = await platformLiveStore.createEmployee(
       displayName,
@@ -1256,6 +1358,16 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
+      data: {
+        sent: true,
+        email: employee.email,
+        user_id: employee.user_id,
+        employee,
+        credentials: {
+          user_id: employee.user_id,
+          temporary_password: temporaryPassword,
+        },
+      },
       employee: {
         success: true,
         platform_admin_id: employee.platform_admin_id,
@@ -1276,14 +1388,63 @@ export async function POST(
   if (endpoint === "platform-admin-send-invite") {
     const adminId = (body.platform_admin_id as string) || "";
     const tempPass = (body.temporary_password as string) || "PhotoOS#2026";
-    const emp = platformLiveStore.employees.find((e) => e.platform_admin_id === adminId);
+    const bodyEmail = ((body.email as string) || "").trim().toLowerCase();
+    const bodyName = ((body.display_name as string) || "").trim();
+    const bodyRole = ((body.role_code as string) || "admin").trim();
 
-    if (emp) {
-      await platformLiveStore.sendWelcomeCredentialsEmail(emp, tempPass);
+    let emp = platformLiveStore.employees.find(
+      (e) =>
+        (adminId && (e.platform_admin_id === adminId || e.user_id === adminId)) ||
+        (bodyEmail && e.email === bodyEmail)
+    );
+
+    if (!emp && bodyEmail) {
+      emp = {
+        platform_admin_id: adminId || `adm_${Date.now()}`,
+        profile_id: `usr_${Date.now()}`,
+        display_name: bodyName || "PhotoOS Staff",
+        email: bodyEmail,
+        employee_code: `ADM-${Math.floor(100 + Math.random() * 900)}`,
+        status: "active",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        last_activity_at: null,
+        user_id: bodyEmail,
+        must_change_password: true,
+        last_login_at: null,
+        password_changed_at: null,
+        roles: [
+          {
+            id: `role_${bodyRole}`,
+            code: bodyRole,
+            name: bodyRole,
+            description: `Assigned ${bodyRole} duties`,
+            status: "active",
+          },
+        ],
+      };
+      platformLiveStore.employees.push(emp);
     }
+
+    const targetEmail = emp ? emp.email : (bodyEmail || "adskartmedia11@gmail.com");
+    const targetName = emp ? emp.display_name : (bodyName || "Team Member");
+
+    await platformLiveStore.sendWelcomeCredentialsEmail(
+      emp || {
+        display_name: targetName,
+        email: targetEmail,
+        roles: [{ name: bodyRole }],
+      },
+      tempPass
+    );
 
     return NextResponse.json({
       success: true,
+      data: {
+        sent: true,
+        email: targetEmail,
+        user_id: emp ? emp.user_id : targetEmail,
+      },
       message: "Credentials and welcome instructions sent via team@photoos.in.",
     });
   }

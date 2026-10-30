@@ -35,6 +35,9 @@ type Credentials = {
   platform_admin_id: string;
   user_id: string;
   temporary_password: string;
+  email?: string;
+  display_name?: string;
+  role_code?: string;
 };
 
 const STATUS_OPTIONS = ["all", "active", "inactive"];
@@ -112,6 +115,11 @@ export default function AdminEmployeesPage() {
       await sendPlatformAdminEmployeeInvite(
         credentials.platform_admin_id,
         credentials.temporary_password,
+        {
+          email: credentials.email || credentials.user_id,
+          display_name: credentials.display_name,
+          role_code: credentials.role_code,
+        },
       );
 
       setInviteSent(true);
@@ -264,10 +272,13 @@ export default function AdminEmployeesPage() {
         user_id: result.credentials.user_id,
         temporary_password:
           result.credentials.temporary_password,
+        email: email.trim().toLowerCase(),
+        display_name: displayName.trim(),
+        role_code: roleCode,
       });
       setDisplayName("");
       setEmail("");
-      setRoleCode("support");
+      setRoleCode(availableRoles[0]?.code || "admin");
 
       await loadData();
     } catch (err) {

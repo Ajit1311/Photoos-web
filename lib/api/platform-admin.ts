@@ -1579,6 +1579,11 @@ export async function deletePlatformAdminEmployee(
 export async function sendPlatformAdminEmployeeInvite(
   platformAdminId: string,
   temporaryPassword: string,
+  extra?: {
+    email?: string;
+    display_name?: string;
+    role_code?: string;
+  },
 ): Promise<{
   sent: boolean;
   email: string;
@@ -1592,19 +1597,30 @@ export async function sendPlatformAdminEmployeeInvite(
         email: string;
         user_id: string;
       };
+      message?: string;
+      error?: string;
     }>("platform-admin-send-invite", {
       method: "POST",
       body: JSON.stringify({
         platform_admin_id: platformAdminId,
         temporary_password: temporaryPassword,
+        email: extra?.email,
+        display_name: extra?.display_name,
+        role_code: extra?.role_code,
       }),
     });
 
-  if (!result.success || !result.data) {
-    throw new Error("Unable to send employee credentials.");
+  if (result.success === false) {
+    throw new Error(result.error || result.message || "Unable to send employee credentials.");
   }
 
-  return result.data;
+  return (
+    result.data ?? {
+      sent: true,
+      email: extra?.email ?? "",
+      user_id: platformAdminId,
+    }
+  );
 }
 
 export async function getPlatformAdminAccessControl(): Promise<
