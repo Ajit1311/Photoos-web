@@ -803,7 +803,10 @@ export async function sendChatMessage(
   }
 
   // Generate optimistic id as last resort so UI never blocks
-  return `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const randomSuffix = typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID().slice(0, 8)
+    : Date.now().toString(36);
+  return `msg_${Date.now()}_${randomSuffix}`;
 }
 
 /* -------------------------------------------------------------------------- */

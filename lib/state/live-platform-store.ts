@@ -245,85 +245,33 @@ class PlatformLiveStore {
     },
   ];
 
-  public qrLeads: QrLead[] = [
-    {
-      id: "qr_lead_01",
-      name: "Sandeep More",
-      phone: "9822014890",
-      studio_id: "std_gmark_photoos_01",
-      event_id: "evt_pune_wedding_01",
-      role: "guest",
-      source: "Event QR Scan (Guest Capture)",
-      status: "new",
-      notes: "Scanned event QR code at wedding entry for photo facial recognition match.",
-      created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-    },
-    {
-      id: "qr_lead_02",
-      name: "Pooja Kulkarni",
-      phone: "9764512399",
-      studio_id: "std_gmark_photoos_01",
-      event_id: "evt_pune_wedding_01",
-      role: "guest",
-      source: "Event QR Scan (Guest Capture)",
-      status: "new",
-      notes: "Scanned event QR code and registered selfie for AI face matching.",
-      created_at: new Date(Date.now() - 3600000 * 5).toISOString(),
-    },
-  ];
+  public qrLeads: QrLead[] = [];
 
-  public notifications: AdminNotificationItem[] = [
-    {
-      id: "notif_qr_01",
-      title: "📸 New QR Scan Lead: Sandeep More",
-      message: "Sandeep More (9822014890) registered through event QR scan for AI Photo Matching.",
-      category: "LEAD",
-      read_at: null,
-      created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-    },
-    {
-      id: "notif_qr_02",
-      title: "📸 New QR Scan Lead: Pooja Kulkarni",
-      message: "Pooja Kulkarni (9764512399) scanned the event QR code.",
-      category: "LEAD",
-      read_at: null,
-      created_at: new Date(Date.now() - 3600000 * 5).toISOString(),
-    },
-    {
-      id: "notif_sys_01",
-      title: "⚡ Free Trial Active: G Mark Software Studio",
-      message: "Studio is enjoying 7-day Pro Studio Free Trial (active trial).",
-      category: "SUBSCRIPTION",
-      read_at: null,
-      created_at: "2026-10-25T00:00:00.000Z",
-    },
-  ];
+  public notifications: AdminNotificationItem[] = [];
 
-  public supportTickets = [
-    {
-      id: "tkt_live_01",
-      studio_id: "std_gmark_photoos_01",
-      created_by: "usr_parashram_naik",
-      assigned_to: "Super Admin",
-      ticket_type: "support",
-      category: "system",
-      priority: "normal",
-      status: "open",
-      subject: "Resend Email & Cloudflare Routing Activation",
-      description: "Cloudflare email routing and Resend API connected successfully for domain photoos.in.",
-      subscription_id: "sub_trial_gmark_01",
-      payment_id: null,
-      refund_status: "not_applicable",
-      refund_amount: null,
-      refund_currency: null,
-      refund_transaction_id: null,
-      refund_processed_at: null,
-      admin_notes: "Live Resend key and domain routing verified.",
-      metadata: { domain: "photoos.in", destination: "adskartmedia11@gmail.com" },
-      created_at: "2026-10-29T10:00:00.000Z",
-      updated_at: new Date().toISOString(),
-    },
-  ];
+  public supportTickets: Array<{
+    id: string;
+    studio_id: string;
+    created_by: string;
+    assigned_to: string;
+    ticket_type: string;
+    category: string;
+    priority: string;
+    status: string;
+    subject: string;
+    description: string;
+    subscription_id: string | null;
+    payment_id: string | null;
+    refund_status: string;
+    refund_amount: number | null;
+    refund_currency: string | null;
+    refund_transaction_id: string | null;
+    refund_processed_at: string | null;
+    admin_notes: string;
+    metadata: Record<string, unknown>;
+    created_at: string;
+    updated_at: string;
+  }> = [];
 
   /**
    * Registers a newly captured QR Scan lead, triggers an Admin Notification,
@@ -495,7 +443,7 @@ class PlatformLiveStore {
    */
   public async createEmployee(displayName: string, email: string, roleCode: string) {
     const cleanEmail = email.trim().toLowerCase();
-    const tempPassword = `PhotoOS#${Math.floor(100000 + Math.random() * 900000)}`;
+    const tempPassword = `PhotoOS#${Date.now().toString().slice(-6)}`;
 
     const roleNameMap: Record<string, string> = {
       admin: "Administrator (Operations)",
@@ -517,7 +465,7 @@ class PlatformLiveStore {
       profile_id: `usr_${Date.now()}`,
       display_name: displayName.trim(),
       email: cleanEmail,
-      employee_code: `ADM-${Math.floor(100 + Math.random() * 900)}`,
+      employee_code: `ADM-${Date.now().toString().slice(-4)}`,
       status: "active",
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),

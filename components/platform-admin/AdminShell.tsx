@@ -55,6 +55,7 @@ import {
   ImageIcon,
   Sun,
   Moon,
+  RefreshCw,
 } from "lucide-react";
 
 import { useTheme } from "next-themes";
@@ -62,7 +63,15 @@ import { useTheme } from "next-themes";
 import {
   getPlatformAdminSession,
   logoutPlatformAdmin,
+  type PlatformAdminSession,
 } from "@/lib/api/platform-admin-auth";
+
+import {
+  filterNavSectionsForRole,
+  normalizeRoleCode,
+  ROLE_DEFINITIONS,
+  type OpsRoleCode,
+} from "@/lib/permissions/ops-rbac";
 
 import {
   getPlatformAdminNotificationCount,
@@ -544,6 +553,18 @@ export default function AdminShell({
   const [adminUserId, setAdminUserId] =
     useState("PX-ADMIN-000001");
 
+  const [sessionData, setSessionData] =
+    useState<PlatformAdminSession | null>(null);
+
+  const [actualRole, setActualRole] =
+    useState<OpsRoleCode>("super_admin");
+
+  const [activeRole, setActiveRole] =
+    useState<OpsRoleCode>("super_admin");
+
+  const [roleSwitcherOpen, setRoleSwitcherOpen] =
+    useState(false);
+
   const [notificationOpen, setNotificationOpen] =
     useState(false);
 
@@ -586,9 +607,22 @@ export default function AdminShell({
           await getPlatformAdminSession();
 
         if (!cancelled && session) {
+          setSessionData(session);
           if (session.user_id) {
             setAdminUserId(session.user_id);
           }
+          const norm = normalizeRoleCode(session.role_code);
+          setActualRole(norm);
+
+          let resolved = norm;
+          if (typeof window !== "undefined") {
+            const preview = window.sessionStorage.getItem("photoos_preview_role");
+            if (preview && norm === "super_admin") {
+              resolved = normalizeRoleCode(preview);
+            }
+          }
+          setActiveRole(resolved);
+
           if (session.must_change_password && pathname !== "/ops-console/change-password") {
             router.replace("/ops-console/change-password");
           }
@@ -605,6 +639,43 @@ export default function AdminShell({
     };
   }, []);
 
+  // Listen for role switcher preview events
+  useEffect(() => {
+    const handleRoleChanged = () => {
+      if (typeof window !== "undefined") {
+        const preview = window.sessionStorage.getItem("photoos_preview_role");
+        if (preview && actualRole === "super_admin") {
+          setActiveRole(normalizeRoleCode(preview));
+        } else {
+          setActiveRole(actualRole);
+        }
+      }
+    };
+
+    window.addEventListener("photoos_role_changed", handleRoleChanged);
+    return () => {
+      window.removeEventListener("photoos_role_changed", handleRoleChanged);
+    };
+  }, [actualRole]);
+
+  const handleSelectRole = (targetRole: OpsRoleCode) => {
+    setRoleSwitcherOpen(false);
+    if (typeof window !== "undefined") {
+      if (targetRole === actualRole) {
+        window.sessionStorage.removeItem("photoos_preview_role");
+      } else {
+        window.sessionStorage.setItem("photoos_preview_role", targetRole);
+      }
+      setActiveRole(targetRole);
+      window.dispatchEvent(new Event("photoos_role_changed"));
+    }
+  };
+
+  // Dynamically filter navigation sections based on active role
+  const visibleSections = useMemo(() => {
+    return filterNavSectionsForRole(navSections, activeRole);
+  }, [activeRole]);
+
   const searchResults = useMemo(() => {
     const term =
       search.trim().toLowerCase();
@@ -613,7 +684,7 @@ export default function AdminShell({
       return [];
     }
 
-    return navSections
+    return visibleSections
       .flatMap((section) => section.items)
       .filter((item) =>
         item.label
@@ -621,7 +692,7 @@ export default function AdminShell({
           .includes(term),
       )
       .slice(0, 7);
-  }, [search]);
+  }, [search, visibleSections]);
 
   const loadNotifications = async () => {
     try {
@@ -841,8 +912,8 @@ export default function AdminShell({
             </Link>
           </div>
 
-          {/* Main navigation groups */}
-          {navSections
+          {/* Main navigation groups filtered by active role */}
+          {visibleSections
             .filter(
               (section) =>
                 section.label !== "Overview",
@@ -1065,13 +1136,18 @@ export default function AdminShell({
         <div className="border-t border-white/10 p-3">
           {!collapsed ? (
             <div className="mb-2 rounded-xl bg-white/5 px-3 py-2">
-              <div className="text-[10px] uppercase tracking-wider text-slate-500">
-                Environment
+              <div className="flex items-center justify-between">
+                <div className="text-[10px] uppercase tracking-wider text-slate-400">
+                  Active Role
+                </div>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300">
+                  {ROLE_DEFINITIONS[activeRole].badgeLabel}
+                </span>
               </div>
 
-              <div className="mt-1 flex items-center gap-2 text-xs text-slate-300">
-                <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                Local Platform
+              <div className="mt-1 flex items-center gap-2 text-xs text-slate-300 truncate">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 shrink-0" />
+                <span className="truncate">{ROLE_DEFINITIONS[activeRole].name.split("(")[0].trim()}</span>
               </div>
             </div>
           ) : null}
@@ -1108,6 +1184,29 @@ export default function AdminShell({
             : "lg:pl-[272px]",
         ].join(" ")}
       >
+        {activeRole !== actualRole && (
+          <div className="sticky top-0 z-40 flex items-center justify-between border-b border-amber-300 bg-amber-50 px-4 py-2 text-xs text-amber-900 shadow-sm">
+            <div className="flex items-center gap-2">
+              <Eye className="h-4 w-4 text-amber-600 shrink-0" />
+              <span>
+                <strong>Testing Role Preview:</strong> You are viewing the console as{" "}
+                <span className="font-semibold">{ROLE_DEFINITIONS[activeRole].name}</span>{" "}
+                <span className="rounded bg-amber-200/80 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-900">
+                  {ROLE_DEFINITIONS[activeRole].badgeLabel}
+                </span>
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleSelectRole("super_admin")}
+              className="inline-flex items-center gap-1 rounded-lg bg-amber-200/90 px-2.5 py-1 font-semibold text-amber-950 hover:bg-amber-300 transition"
+            >
+              <RefreshCw className="h-3 w-3" />
+              Return to Super Admin Master View
+            </button>
+          </div>
+        )}
+
         <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
           <div className="flex h-[76px] items-center gap-3 px-4 sm:px-6 lg:px-8">
             <button
@@ -1321,6 +1420,63 @@ export default function AdminShell({
                 ) : null}
               </div>
 
+              {/* Role Indicator & Founder Preview Switcher */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setRoleSwitcherOpen((prev) => !prev)}
+                  className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+                  title={actualRole === "super_admin" ? "Switch role view to test employee access" : ROLE_DEFINITIONS[activeRole].name}
+                >
+                  <ShieldCheck className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                  <span className="hidden sm:inline text-slate-500">Role:</span>
+                  <span className="max-w-[120px] sm:max-w-[150px] truncate text-indigo-700 font-bold">
+                    {ROLE_DEFINITIONS[activeRole].name.split("(")[0].trim()}
+                  </span>
+                  {actualRole === "super_admin" && (
+                    <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                  )}
+                </button>
+
+                {actualRole === "super_admin" && roleSwitcherOpen && (
+                  <div className="absolute right-0 top-11 z-50 w-72 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl">
+                    <div className="border-b border-slate-100 px-3 py-2">
+                      <div className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                        Role-Based Access
+                      </div>
+                      <div className="mt-0.5 text-[11px] text-slate-500">
+                        Switch view to test department permissions
+                      </div>
+                    </div>
+                    <div className="max-h-72 overflow-y-auto py-1">
+                      {(Object.keys(ROLE_DEFINITIONS) as OpsRoleCode[]).map((rKey) => {
+                        const rDef = ROLE_DEFINITIONS[rKey];
+                        const isSelected = activeRole === rKey;
+                        return (
+                          <button
+                            key={rKey}
+                            type="button"
+                            onClick={() => handleSelectRole(rKey)}
+                            className={[
+                              "w-full flex items-center justify-between px-3 py-2 text-left rounded-xl text-xs transition",
+                              isSelected
+                                ? "bg-indigo-50 text-indigo-700 font-semibold"
+                                : "hover:bg-slate-50 text-slate-700",
+                            ].join(" ")}
+                          >
+                            <div>
+                              <div className="font-medium">{rDef.name}</div>
+                              <div className="text-[10px] text-slate-400">{rDef.department}</div>
+                            </div>
+                            {isSelected && <BadgeCheck className="h-4 w-4 text-indigo-600 shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <Link
                 href="/ops-console/chat"
                 className="rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition"
@@ -1363,15 +1519,15 @@ export default function AdminShell({
                   className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2 py-1.5 hover:bg-slate-50"
                 >
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0A3F61] text-xs font-bold text-white">
-                    SA
+                    {activeRole === "super_admin" ? "SA" : activeRole.slice(0, 2).toUpperCase()}
                   </div>
 
                   <div className="hidden text-left xl:block">
-                    <div className="text-xs font-semibold text-slate-900">
-                      Super Admin
+                    <div className="text-xs font-semibold text-slate-900 truncate max-w-[130px]">
+                      {sessionData?.display_name || (activeRole === "super_admin" ? "Founder & CEO" : "Operations Staff")}
                     </div>
-                    <div className="text-[10px] text-slate-400">
-                      {adminUserId}
+                    <div className="text-[10px] text-slate-400 truncate max-w-[130px]">
+                      {ROLE_DEFINITIONS[activeRole].badgeLabel}
                     </div>
                   </div>
 
@@ -1379,13 +1535,16 @@ export default function AdminShell({
                 </button>
 
                 {profileOpen ? (
-                  <div className="absolute right-0 top-12 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                  <div className="absolute right-0 top-12 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl z-50">
                     <div className="border-b border-slate-100 px-3 py-3">
-                      <div className="text-sm font-semibold">
-                        Super Admin
+                      <div className="text-sm font-semibold text-slate-900 truncate">
+                        {sessionData?.display_name || "Super Admin (Founder & CEO)"}
                       </div>
-                      <div className="mt-1 text-xs text-slate-400">
-                        {adminUserId}
+                      <div className="mt-0.5 text-xs font-semibold text-indigo-600 truncate">
+                        {ROLE_DEFINITIONS[activeRole].name}
+                      </div>
+                      <div className="mt-1 text-[11px] text-slate-400 truncate font-mono">
+                        {sessionData?.email || adminUserId}
                       </div>
                     </div>
 

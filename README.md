@@ -1,4 +1,32 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PhotoOS Web Application
+
+PhotoOS is an advanced, production-grade SaaS operating system designed for professional photography studios, client galleries, AI facial recognition delivery, and an integrated marketplace.
+
+---
+
+## No Mock Data Policy
+
+This project strictly enforces a **Zero Tolerance for Fake/Mock Data** policy:
+
+1. **Production Realism**:
+   - Application code must never contain hardcoded arrays of fake users, studios, reviews, bookings, notifications, or messages.
+   - External placeholder image hosts (`picsum.photos`, `placeholder.com`, `unsplash.com`, `pravatar.cc`) are blocked in CI. Images must be real assets stored in Cloudflare R2 / Supabase Storage, or render neutral CSS/SVG placeholders.
+   - Fake stats, sample chart curves, and fake delays simulating API success are strictly prohibited.
+2. **Empty States**:
+   - Accounts without data display real zeros (`0`), dashes (`-`), or standardized empty states with clear calls-to-action (e.g. "Create your first booking").
+3. **Development Seed Data**:
+   - If test fixtures are needed during local development, use the standalone script:
+     ```bash
+     npx tsx scripts/seed-dev.ts --confirm-dev-seed
+     ```
+   - This script refuses to run if `NODE_ENV === "production"` or against the production Supabase project.
+4. **Automated Verification**:
+   - Run the automated no-mock checker before commits:
+     ```bash
+     npm run check:no-mock
+     ```
+
+---
 
 ## Getting Started
 
@@ -16,21 +44,10 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Build and Checks
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run check:no-mock   # Validates zero mock/placeholder data
+npm run lint            # Runs ESLint checks
+npm run build           # Compiles production Next.js build
+```

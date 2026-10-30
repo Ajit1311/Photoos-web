@@ -57,22 +57,15 @@ export interface EmailResponse {
  * Dispatch an email via Resend API
  */
 export async function sendEmailWithResend(payload: SendEmailPayload): Promise<EmailResponse> {
-  const apiKey =
-    process.env.RESEND_API_KEY ||
-    process.env.NEXT_PUBLIC_RESEND_API_KEY ||
-    Buffer.from("cmVfTVJZNWlVYldfS0wxdk55WHV0MWNBWUQzaXNmU251YlZH", "base64").toString("utf-8");
+  const apiKey = process.env.RESEND_API_KEY;
 
   const sender = PHOTOOS_SENDERS[payload.department] || PHOTOOS_SENDERS.noreply;
 
   if (!apiKey) {
-    console.warn("[Resend] RESEND_API_KEY is not configured in environment. Simulating dispatch:", {
-      from: sender,
-      to: payload.to,
-      subject: payload.subject,
-    });
+    console.warn("[Resend] RESEND_API_KEY is not configured in environment.");
     return {
-      success: true,
-      id: `sim_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      success: false,
+      error: "RESEND_API_KEY is not configured in environment variables.",
     };
   }
 

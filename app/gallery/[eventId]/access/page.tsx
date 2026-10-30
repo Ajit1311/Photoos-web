@@ -140,20 +140,7 @@ export default function ClientAccessGalleryPage() {
   const [downloadLockNotice, setDownloadLockNotice] = useState<string | null>(null);
 
   // Live Wishes in Chat Tab
-  const [wishes, setWishes] = useState<GuestWish[]>([
-    {
-      id: "w-1",
-      sender: "Amit & Sneha",
-      message: "Congratulations to the wonderful couple! Wishing you a lifetime of joy and togetherness! ❤️🎉",
-      timestamp: "10 mins ago",
-    },
-    {
-      id: "w-2",
-      sender: "Rohan Deshmukh",
-      message: "Grand celebration and stunning photos! Outstanding photography team! 📸✨",
-      timestamp: "25 mins ago",
-    },
-  ]);
+  const [wishes, setWishes] = useState<GuestWish[]>([]);
   const [newWishMessage, setNewWishMessage] = useState("");
 
   // Load Event, Studio, and Photos

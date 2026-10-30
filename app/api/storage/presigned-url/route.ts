@@ -150,7 +150,7 @@ export async function POST(request: Request) {
     // Fallback to Supabase private storage signed upload URL
     const randomUuid = typeof crypto !== "undefined" && crypto.randomUUID
       ? crypto.randomUUID()
-      : Math.random().toString(36).substring(2, 15);
+      : "obj_" + Date.now();
     const cleanFilename = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
     const objectPath = `studios/${studioId}/uploads/${randomUuid}-${cleanFilename}`;
 

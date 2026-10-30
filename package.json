@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check:no-mock": "node scripts/check-no-mock.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1157.0",

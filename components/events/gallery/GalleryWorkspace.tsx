@@ -135,9 +135,13 @@ export default function GalleryWorkspace() {
         <div className="xl:col-span-4">
 
           <div className="sticky top-6">
-
-            <PhotoDetails />
-
+            <PhotoDetails
+              photo={
+                selectedIds.length > 0
+                  ? items.find((p) => p.id === selectedIds[0]) || null
+                  : null
+              }
+            />
           </div>
 
         </div>

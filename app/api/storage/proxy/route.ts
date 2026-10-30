@@ -34,7 +34,6 @@ export async function GET(req: NextRequest) {
       host.endsWith(".r2.cloudflarestorage.com") ||
       host === "photoos-e7ae5.firebasestorage.app" ||
       host.endsWith(".googleusercontent.com") ||
-      host === "images.unsplash.com" ||
       (process.env.NODE_ENV !== "production" && (host === "localhost" || host === "127.0.0.1"));
 
     if (!isAllowedHost) {

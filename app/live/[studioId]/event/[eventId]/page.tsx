@@ -130,14 +130,7 @@ export default function GuestLiveEventPage() {
   const [downloadLockNotice, setDownloadLockNotice] = useState<string | null>(null);
 
   // Live Wishes
-  const [wishes, setWishes] = useState<GuestWish[]>([
-    {
-      id: "w-1",
-      sender: "Family Friends",
-      message: "Heartiest congratulations to the bride and groom! Beautiful memories! ❤️🎉",
-      timestamp: "5 mins ago",
-    },
-  ]);
+  const [wishes, setWishes] = useState<GuestWish[]>([]);
   const [newWishMessage, setNewWishMessage] = useState("");
 
   // Load Event Data & Photos

@@ -102,24 +102,15 @@ export default function StudioClientChat({
         guestPhone: studioPhone || "Client",
         role: "bride_groom_message",
       }),
-    });
-
-    // Simulated studio acknowledgement
-    setTimeout(() => {
+    }).finally(() => {
       setSending(false);
-      const ackMsg: ChatMessage = {
-        id: `studio-ack-${Date.now()}`,
-        sender: "studio",
-        senderName: studioName,
-        text: "Thank you for your message! Our editing and coordination team has received your note and will review it shortly. You can also reach our lead photographer directly on WhatsApp above.",
-        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      };
-      setMessages((prev) => [...prev, ackMsg]);
-    }, 1200);
+    });
   };
 
   const openStudioWhatsApp = () => {
-    const phone = studioPhone ? studioPhone.replace(/\D/g, "") : "919822012345";
+    if (!studioPhone) return;
+    const phone = studioPhone.replace(/\D/g, "");
+    if (!phone) return;
     const formattedPhone = phone.startsWith("91") ? phone : `91${phone}`;
     const text = encodeURIComponent(
       `Hello ${studioName},\nThis is ${clientName} from "${eventName}". I am messaging from our PhotoOS client portal regarding our gallery.`

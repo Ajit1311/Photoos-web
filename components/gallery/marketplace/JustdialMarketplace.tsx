@@ -93,11 +93,14 @@ export default function JustdialMarketplace({
   const handleCall = (phone?: string | null) => {
     if (!phone) return;
     const clean = phone.replace(/\D/g, "");
+    if (!clean) return;
     window.open(`tel:${clean}`, "_self");
   };
 
   const handleWhatsApp = (studio: MarketplaceStudio) => {
-    const phone = studio.phone ? studio.phone.replace(/\D/g, "") : "919822012345";
+    if (!studio.phone) return;
+    const phone = studio.phone.replace(/\D/g, "");
+    if (!phone) return;
     const formattedPhone = phone.startsWith("91") ? phone : `91${phone}`;
     const text = encodeURIComponent(
       `Hello ${studio.brand_name || studio.name},\nI saw your profile on PhotoOS Marketplace and would like to inquire about availability and package pricing for an upcoming event.`
@@ -109,8 +112,8 @@ export default function JustdialMarketplace({
     e.preventDefault();
     if (!quoteModalStudio) return;
 
-    const phone = quoteModalStudio.phone ? quoteModalStudio.phone.replace(/\D/g, "") : "919822012345";
-    const formattedPhone = phone.startsWith("91") ? phone : `91${phone}`;
+    const rawPhone = quoteModalStudio.phone ? quoteModalStudio.phone.replace(/\D/g, "") : "";
+    const formattedPhone = rawPhone.length > 0 ? (rawPhone.startsWith("91") ? rawPhone : `91${rawPhone}`) : "";
     const message = encodeURIComponent(
       `*New Quote Request via PhotoOS Marketplace*\n\n` +
       `Studio: ${quoteModalStudio.brand_name || quoteModalStudio.name}\n` +
@@ -134,7 +137,9 @@ export default function JustdialMarketplace({
 
     setQuoteSubmitted(true);
     setTimeout(() => {
-      window.open(`https://wa.me/${formattedPhone}?text=${message}`, "_blank");
+      if (formattedPhone) {
+        window.open(`https://wa.me/${formattedPhone}?text=${message}`, "_blank");
+      }
       setQuoteModalStudio(null);
       setQuoteSubmitted(false);
       setQuoteName("");
@@ -285,19 +290,25 @@ export default function JustdialMarketplace({
 
                       {/* Ratings & Price */}
                       <div className="mt-2.5 flex items-center gap-3 text-xs">
-                        <div className="flex items-center gap-1 rounded-lg bg-emerald-600/30 px-2 py-0.5 text-emerald-300 font-bold">
-                          <Star className="h-3 w-3 fill-emerald-400 text-emerald-400" />
-                          <span>{studio.rating.toFixed(1)}</span>
-                          <span className="text-[10px] text-emerald-400/80 font-normal">
-                            ({studio.review_count})
-                          </span>
-                        </div>
-                        <div className="text-slate-300">
-                          <span className="text-slate-400 text-[11px]">Starts from </span>
-                          <span className="font-extrabold text-white">
-                            ₹{studio.starting_price.toLocaleString("en-IN")}
-                          </span>
-                        </div>
+                        {studio.rating > 0 ? (
+                          <div className="flex items-center gap-1 rounded-lg bg-emerald-600/30 px-2 py-0.5 text-emerald-300 font-bold">
+                            <Star className="h-3 w-3 fill-emerald-400 text-emerald-400" />
+                            <span>{studio.rating.toFixed(1)}</span>
+                            {studio.review_count > 0 && (
+                              <span className="text-[10px] text-emerald-400/80 font-normal">
+                                ({studio.review_count})
+                              </span>
+                            )}
+                          </div>
+                        ) : null}
+                        {studio.starting_price > 0 ? (
+                          <div className="text-slate-300">
+                            <span className="text-slate-400 text-[11px]">Starts from </span>
+                            <span className="font-extrabold text-white">
+                              ₹{studio.starting_price.toLocaleString("en-IN")}
+                            </span>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   </div>

@@ -238,7 +238,10 @@ export async function createClient(
 
   // 2. Direct Supabase DB insert fallback
   try {
-    const clientCode = `CLI_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+    const randomPart = typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID().slice(0, 8).toUpperCase()
+      : Date.now().toString(36).toUpperCase();
+    const clientCode = `CLI_${randomPart}`;
     const { data: newClient, error: dbError } = await supabase
       .from("clients")
       .insert({

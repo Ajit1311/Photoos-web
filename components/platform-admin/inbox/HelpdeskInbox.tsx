@@ -57,7 +57,9 @@ import {
   USER_PROFILES,
   DEPARTMENT_CONFIG,
   CANNED_RESPONSES,
-} from "@/lib/inbox/mock-data";
+} from "@/lib/inbox/helpdesk-config";
+
+import { getPlatformAdminSession } from "@/lib/api/platform-admin-auth";
 
 interface LocalAttachment {
   filename: string;
@@ -221,6 +223,45 @@ export default function HelpdeskInbox() {
 
   useEffect(() => {
     void fetchLiveEmails();
+
+    async function syncActiveRole() {
+      try {
+        const sess = await getPlatformAdminSession();
+        if (sess) {
+          let role = sess.role_code;
+          if (typeof window !== "undefined") {
+            const preview = window.sessionStorage.getItem("photoos_preview_role");
+            if (preview && sess.role_code === "super_admin") {
+              role = preview;
+            }
+          }
+          if (role === "marketing") {
+            const p = USER_PROFILES.find((u) => u.allowedDepartment === "marketing");
+            if (p) handleUserChange(p);
+          } else if (role === "accountant") {
+            const p = USER_PROFILES.find((u) => u.allowedDepartment === "billing");
+            if (p) handleUserChange(p);
+          } else if (role === "support") {
+            const p = USER_PROFILES.find((u) => u.allowedDepartment === "support");
+            if (p) handleUserChange(p);
+          } else if (role === "super_admin") {
+            handleUserChange(USER_PROFILES[0]);
+          }
+        }
+      } catch {
+        // Fallback to default
+      }
+    }
+
+    void syncActiveRole();
+
+    const handleRoleChanged = () => {
+      void syncActiveRole();
+    };
+    window.addEventListener("photoos_role_changed", handleRoleChanged);
+    return () => {
+      window.removeEventListener("photoos_role_changed", handleRoleChanged);
+    };
   }, []);
 
   // When switching user role, auto-adjust allowed department

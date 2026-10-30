@@ -219,7 +219,10 @@ export async function createEvent(
       nextEventNumber = 1;
     }
 
-    const eventCode = `EVT-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    const randomSuffix = typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID().slice(0, 6).toUpperCase()
+      : Date.now().toString(36).toUpperCase();
+    const eventCode = `EVT-${Date.now().toString(36).toUpperCase()}-${randomSuffix}`;
 
     // Try scheduled status first, then draft if rejected
     const candidateStatuses = ["scheduled", "draft"] as const;

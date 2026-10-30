@@ -232,7 +232,10 @@ export async function createProject(
 
   // 2. Direct Supabase DB insert fallback
   try {
-    const projectCode = `PRJ_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+    const randomPart = typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID().slice(0, 8).toUpperCase()
+      : Date.now().toString(36).toUpperCase();
+    const projectCode = `PRJ_${randomPart}`;
     const { data: newProject, error: dbError } = await supabase
       .from("projects")
       .insert({

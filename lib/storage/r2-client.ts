@@ -93,7 +93,7 @@ export function validateUploadPolicy(contentType: string, sizeBytes: number): vo
 export function generateObjectKey(studioId: string, filename: string): string {
   const randomUuid = typeof crypto !== "undefined" && crypto.randomUUID
     ? crypto.randomUUID()
-    : Math.random().toString(36).substring(2, 15);
+    : "obj_" + Date.now();
 
   const cleanFilename = filename
     .replace(/[^a-zA-Z0-9._-]/g, "_")

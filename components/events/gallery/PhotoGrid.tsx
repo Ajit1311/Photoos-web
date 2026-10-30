@@ -22,12 +22,15 @@ interface PhotoGridProps {
   onSelectionChange: (
     ids: string[],
   ) => void;
+
+  galleryId?: string;
 }
 
 export default function PhotoGrid({
   photos,
   selectedIds,
   onSelectionChange,
+  galleryId,
 }: PhotoGridProps) {
   const [
     isAiFiltered,
@@ -67,10 +70,17 @@ export default function PhotoGrid({
     setIsProcessing(true);
 
     try {
+      const currentPhoto = photos.find((p) => p.id === assetId);
+      const effectiveGalleryId =
+        galleryId ||
+        (currentPhoto as any)?.gallery_id ||
+        (currentPhoto as any)?.event_id ||
+        "";
+
       const result =
         await toggleGalleryPhotoFavorite(
           assetId,
-          "demo-gallery-id",
+          effectiveGalleryId,
         );
 
       if (!result.success) {

@@ -8,6 +8,11 @@ export type PlatformAdminSession = {
   profile_id: string;
   session_id: string;
   user_id: string;
+  display_name?: string;
+  email?: string;
+  role_code?: string;
+  role_name?: string;
+  permissions?: string[];
   status: string;
   must_change_password: boolean;
   last_login_at: string | null;

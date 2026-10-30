@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { platformLiveStore } from "@/lib/state/live-platform-store";
 
 // Persistent Settings State in memory
@@ -49,7 +48,7 @@ let brandingSettingsState = {
   button_style: "rounded-xl",
 };
 
-let announcementsState: Array<{
+const announcementsState: Array<{
   id: string;
   title: string;
   body: string;
@@ -64,40 +63,7 @@ let announcementsState: Array<{
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
-}> = [
-  {
-    id: "ann_01",
-    title: "PhotoOS Platform 2.0 Live",
-    body: "Operations Console is now live with role-based department inboxes, live analytics, and real-time studio management.",
-    status: "published",
-    priority: "high",
-    audience_type: "all_studios",
-    channel: "in_app",
-    scheduled_at: null,
-    published_at: "2026-10-28T10:00:00.000Z",
-    created_by: "ADMIN_FOUNDER",
-    updated_by: null,
-    metadata: {},
-    created_at: "2026-10-28T10:00:00.000Z",
-    updated_at: "2026-10-28T10:00:00.000Z",
-  },
-  {
-    id: "ann_02",
-    title: "Free Trial Phase Active",
-    body: "Studio onboarding is running under the 7-day Pro Studio Free Trial with unlimited cloud uploads and AI face matching.",
-    status: "published",
-    priority: "normal",
-    audience_type: "studio_owners",
-    channel: "email",
-    scheduled_at: null,
-    published_at: "2026-10-29T10:00:00.000Z",
-    created_by: "ADMIN_FOUNDER",
-    updated_by: null,
-    metadata: {},
-    created_at: "2026-10-29T10:00:00.000Z",
-    updated_at: "2026-10-29T10:00:00.000Z",
-  },
-];
+}> = [];
 
 export async function GET(
   req: NextRequest,
@@ -244,15 +210,15 @@ export async function GET(
 
   // App Analytics
   if (endpoint === "platform-admin-app-analytics") {
-    const qrScansCount = 34 + platformLiveStore.qrLeads.length;
+    const qrScansCount = platformLiveStore.qrLeads.length;
     return NextResponse.json({
       success: true,
       registered_users: users.length,
       signups_30d: users.length,
       active_users_30d: users.length,
-      total_bookings: 12,
-      bookings_30d: 6,
-      installs: 24,
+      total_bookings: 0,
+      bookings_30d: 0,
+      installs: 0,
       uninstalls: 0,
       qr_installs: qrScansCount,
       tracking_status: "active",
@@ -321,19 +287,19 @@ export async function GET(
 
   // Marketing Dashboard
   if (endpoint === "platform-marketing-dashboard") {
-    const totalLeads = 3 + platformLiveStore.qrLeads.length;
+    const totalLeads = platformLiveStore.qrLeads.length;
     return NextResponse.json({
       success: true,
       data: {
         overview: {
-          total_signups: 2,
-          client_signups: 1,
-          studio_signups: 1,
-          qr_scans: 34 + platformLiveStore.qrLeads.length,
-          selfie_scans: 28 + platformLiveStore.qrLeads.length,
+          total_signups: users.length,
+          client_signups: 0,
+          studio_signups: users.length,
+          qr_scans: totalLeads,
+          selfie_scans: totalLeads,
           total_leads: totalLeads,
-          converted_leads: 1,
-          lead_conversion_percent: Math.round((1 / totalLeads) * 100),
+          converted_leads: 0,
+          lead_conversion_percent: 0,
         },
         trial_conversion: {
           trial_signups: 1,
@@ -341,31 +307,17 @@ export async function GET(
           conversion_percent: 0,
         },
         campaigns: {
-          total: 2,
-          sent: 2,
+          total: 0,
+          sent: 0,
         },
         generated_at: new Date().toISOString(),
       },
     });
   }
 
-  // Marketing Leads - Returns both Demo Leads AND Live Event QR Leads!
+  // Marketing Leads - Returns real captured leads
   if (endpoint === "platform-marketing-leads") {
-    const allLeads = [
-      ...platformLiveStore.qrLeads,
-      {
-        id: "lead_demo_01",
-        name: "Rajesh Shinde",
-        email: "adskartmedia11@gmail.com",
-        phone: "+91 96896 89142",
-        city: "Pune",
-        studio_name: "Shinde Visuals Pune",
-        source: "Website Demo Request",
-        status: "contacted",
-        notes: "Interested in Pro Studio with AI Face Recognition",
-        created_at: "2026-10-25T11:00:00.000Z",
-      },
-    ];
+    const allLeads = [...platformLiveStore.qrLeads];
 
     return NextResponse.json({
       success: true,
@@ -892,22 +844,9 @@ export async function GET(
         target_id: "ops_session_active_founder",
         ip_address: "103.21.244.0",
         user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
-        metadata: { email: studio.owner_email, method: "Resend 2FA OTP" },
+        metadata: { email: studio.owner_email, method: "2FA OTP" },
         created_at: new Date().toISOString(),
-        total_count: 2,
-      },
-      {
-        id: "audit_02",
-        platform_admin_id: "adm_parashram",
-        action: "leads.qr_capture",
-        module: "Marketing",
-        target_type: "QrLead",
-        target_id: "lead_qr_01",
-        ip_address: "103.21.244.0",
-        user_agent: "Mobile Standee QR Scanner",
-        metadata: { source: "Event QR Standee Scan", guest: "Sandeep More" },
-        created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-        total_count: 2,
+        total_count: 1,
       },
     ];
 
@@ -1304,7 +1243,7 @@ export async function POST(
         success: true,
         message: "Support ticket updated successfully.",
         data: {
-          ticket: ticket || platformLiveStore.supportTickets[0],
+          ticket: ticket || null,
         },
       });
     }
@@ -1331,7 +1270,7 @@ export async function POST(
       return NextResponse.json({
         success: true,
         data: {
-          count: platformLiveStore.qrLeads.length + 1,
+          count: platformLiveStore.qrLeads.length,
         },
       });
     }
@@ -1404,7 +1343,7 @@ export async function POST(
         profile_id: `usr_${Date.now()}`,
         display_name: bodyName || "PhotoOS Staff",
         email: bodyEmail,
-        employee_code: `ADM-${Math.floor(100 + Math.random() * 900)}`,
+        employee_code: `ADM-${Date.now().toString().slice(-4)}`,
         status: "active",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

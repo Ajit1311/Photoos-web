@@ -93,7 +93,7 @@ export async function validateAdminCredentials(
         profile_id: `usr_${Date.now()}`,
         display_name: cleanUser.split("@")[0].replace(/[._]/g, " "),
         email: cleanEmail,
-        employee_code: `ADM-${Math.floor(100 + Math.random() * 900)}`,
+        employee_code: `ADM-${Date.now().toString().slice(-4)}`,
         status: "active",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -141,8 +141,14 @@ export async function initiateAdminLogin(
     };
   }
 
-  // Generate 6-digit OTP (e.g. 749204)
-  const otpNumber = Math.floor(100000 + Math.random() * 900000);
+  // Generate 6-digit OTP using crypto
+  const otpArray = new Uint32Array(1);
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    crypto.getRandomValues(otpArray);
+  } else {
+    otpArray[0] = Date.now();
+  }
+  const otpNumber = 100000 + (otpArray[0] % 900000);
   const otpString = String(otpNumber);
 
   // Create Stateless HMAC-Signed Challenge
