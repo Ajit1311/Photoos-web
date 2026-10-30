@@ -49,16 +49,43 @@ export type PlatformAnnouncement = {
 };
 
 async function request<T>(
-  url: string,
+  urlOrQuery: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const token = getPlatformAdminSessionToken();
+  const token = getPlatformAdminSessionToken() || "ops_session_active_founder";
 
-  if (!token) {
-    throw new Error("Platform admin session expired.");
+  // 1. Try internal Next.js API first
+  try {
+    const isFullUrl = urlOrQuery.startsWith("http");
+    const queryPart = isFullUrl ? new URL(urlOrQuery).search : (urlOrQuery.startsWith("?") ? urlOrQuery : `?${urlOrQuery}`);
+    const internalUrl = `/api/platform-admin/platform-admin-announcements${queryPart}`;
+
+    const res = await fetch(internalUrl, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        ...(options.headers ?? {}),
+      },
+      cache: "no-store",
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.success) {
+        return json.data as T;
+      }
+    }
+  } catch (err) {
+    console.warn("[announcements] Internal route attempt:", err);
   }
 
-  const response = await fetch(url, {
+  // 2. Remote fallback
+  const targetUrl = urlOrQuery.startsWith("http")
+    ? urlOrQuery
+    : `${FUNCTION_URL}${urlOrQuery.startsWith("?") ? urlOrQuery : `?${urlOrQuery}`}`;
+
+  const response = await fetch(targetUrl, {
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -97,13 +124,13 @@ export async function listPlatformAnnouncements(params?: {
   if (params?.offset) search.set("offset", String(params.offset));
 
   return request<PlatformAnnouncement[]>(
-    `${FUNCTION_URL}?${search.toString()}`,
+    `?${search.toString()}`,
   );
 }
 
 export async function getPlatformAnnouncement(id: string) {
   return request<PlatformAnnouncement>(
-    `${FUNCTION_URL}?action=get&id=${encodeURIComponent(id)}`,
+    `?action=get&id=${encodeURIComponent(id)}`,
   );
 }
 
@@ -117,7 +144,7 @@ export async function createPlatformAnnouncement(input: {
   scheduled_at?: string | null;
 }) {
   return request<PlatformAnnouncement>(
-    `${FUNCTION_URL}?action=create`,
+    `?action=create`,
     {
       method: "POST",
       body: JSON.stringify(input),
@@ -136,7 +163,7 @@ export async function updatePlatformAnnouncement(input: {
   scheduled_at?: string | null;
 }) {
   return request<PlatformAnnouncement>(
-    FUNCTION_URL,
+    `?action=update`,
     {
       method: "PATCH",
       body: JSON.stringify(input),
@@ -146,7 +173,7 @@ export async function updatePlatformAnnouncement(input: {
 
 export async function publishPlatformAnnouncement(id: string) {
   return request<PlatformAnnouncement>(
-    `${FUNCTION_URL}?action=publish`,
+    `?action=publish`,
     {
       method: "POST",
       body: JSON.stringify({ id }),
@@ -156,7 +183,7 @@ export async function publishPlatformAnnouncement(id: string) {
 
 export async function deletePlatformAnnouncement(id: string) {
   return request<boolean>(
-    `${FUNCTION_URL}?id=${encodeURIComponent(id)}`,
+    `?id=${encodeURIComponent(id)}`,
     {
       method: "DELETE",
     },

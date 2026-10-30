@@ -4,19 +4,19 @@ import { platformLiveStore } from "@/lib/state/live-platform-store";
 
 // Persistent Settings State in memory
 let companySettingsState = {
-  legal_name: "G Mark Software Private Limited",
-  display_name: "PhotoOS Cloud Platform",
-  brand_name: "PhotoOS Studio Pune",
-  email: "adskartmedia11@gmail.com",
+  legal_name: "PhotoOS SaaS Technologies Private Limited",
+  display_name: "PhotoOS Platform",
+  brand_name: "PhotoOS Studio & Cloud",
+  email: "support@photoos.in",
   phone: "+91 96896 89142",
   website: "https://photoos.in",
   logo_url: "/logo.png",
   country: "India",
   state: "Maharashtra",
   city: "Pune",
-  address: "Pune, Maharashtra, India",
+  address: "Senapati Bapat Marg, Pune, Maharashtra 411038, India",
   postal_code: "411038",
-  tax_id: "27AABCG1234F1Z5",
+  tax_id: "27AABCP1234F1Z8",
   timezone: "Asia/Kolkata",
   currency: "INR",
 };
@@ -49,6 +49,56 @@ let brandingSettingsState = {
   button_style: "rounded-xl",
 };
 
+let announcementsState: Array<{
+  id: string;
+  title: string;
+  body: string;
+  status: string;
+  priority: string;
+  audience_type: string;
+  channel: string;
+  scheduled_at: string | null;
+  published_at: string | null;
+  created_by: string;
+  updated_by: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}> = [
+  {
+    id: "ann_01",
+    title: "PhotoOS Platform 2.0 Live",
+    body: "Operations Console is now live with role-based department inboxes, live analytics, and real-time studio management.",
+    status: "published",
+    priority: "high",
+    audience_type: "all_studios",
+    channel: "in_app",
+    scheduled_at: null,
+    published_at: "2026-10-28T10:00:00.000Z",
+    created_by: "ADMIN_FOUNDER",
+    updated_by: null,
+    metadata: {},
+    created_at: "2026-10-28T10:00:00.000Z",
+    updated_at: "2026-10-28T10:00:00.000Z",
+  },
+  {
+    id: "ann_02",
+    title: "Free Trial Phase Active",
+    body: "Studio onboarding is running under the 7-day Pro Studio Free Trial with unlimited cloud uploads and AI face matching.",
+    status: "published",
+    priority: "normal",
+    audience_type: "studio_owners",
+    channel: "email",
+    scheduled_at: null,
+    published_at: "2026-10-29T10:00:00.000Z",
+    created_by: "ADMIN_FOUNDER",
+    updated_by: null,
+    metadata: {},
+    created_at: "2026-10-29T10:00:00.000Z",
+    updated_at: "2026-10-29T10:00:00.000Z",
+  },
+];
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ slug: string[] }> }
@@ -76,6 +126,11 @@ export async function GET(
 
   // Free Trials - The 1 Studio in Free Trial
   if (endpoint === "platform-admin-free-trials") {
+    const now = Date.now();
+    const endMs = new Date(studio.trial_end_at).getTime();
+    const remainingSec = Math.max(0, Math.floor((endMs - now) / 1000));
+    const daysRemaining = Math.max(1, Math.ceil(remainingSec / 86400));
+
     const trialItem = {
       subscription_id: studio.subscription_id,
       studio_id: studio.studio_id,
@@ -88,10 +143,11 @@ export async function GET(
       plan_code: studio.plan_code,
       plan_name: studio.plan_name,
       status: "trial",
-      trial_days: studio.trial_days,
+      trial_days: studio.trial_days ?? 7,
       trial_start_at: studio.trial_start_at,
       trial_end_at: studio.trial_end_at,
-      days_remaining: 10,
+      days_remaining: daysRemaining,
+      remaining_seconds: remainingSec,
       created_at: studio.trial_start_at,
     };
 
@@ -391,13 +447,29 @@ export async function GET(
 
   // Marketing Growth Analytics
   if (endpoint === "platform-marketing-growth-analytics") {
+    const from = searchParams.get("from") || "2026-10-01";
+    const to = searchParams.get("to") || "2026-10-30";
+    const qrCount = platformLiveStore.qrLeads.length;
+
     return NextResponse.json({
       success: true,
       data: {
+        period: { from, to },
         growth_rate: "+42%",
         total_impressions: 18400,
         unique_visitors: 4210,
         signup_rate: "5.8%",
+        funnel: {
+          qr_scans: qrCount,
+          selfie_scans: 14,
+          signups: 2,
+          converted_leads: 1,
+        },
+        trial_conversion: {
+          trials: 1,
+          converted: 0,
+          conversion_percent: 0,
+        },
         signup_trend: [
           { date: "2026-10-25", total: 1, studio: 1, client: 0 },
           { date: "2026-10-26", total: 1, studio: 0, client: 1 },
@@ -407,19 +479,21 @@ export async function GET(
           { type: "client", count: 1 },
         ],
         social_sources: [
-          { source: "QR Standee Scan", leads: platformLiveStore.qrLeads.length, converted: 1 },
-          { source: "Website Demo", leads: 1, converted: 1 },
+          { source: "QR Standee Scan", leads: qrCount, converted: 1 },
+          { source: "Direct Studio Demo", leads: 1, converted: 1 },
         ],
         campaign_performance: [
           {
-            campaign: "Diwali Special Studio Activation",
+            campaign_id: "camp_diwali_01",
+            title: "Diwali Special Studio Activation",
             status: "Completed",
             recipients: 148,
             sent: 148,
             failed: 0,
-            delivery: "100%",
+            delivery_percent: 100,
           },
         ],
+        generated_at: new Date().toISOString(),
       },
     });
   }
@@ -510,17 +584,58 @@ export async function GET(
 
   // Administration: Notifications (includes live QR scan alerts)
   if (endpoint === "platform-admin-notifications") {
+    const action = searchParams.get("action") || "list";
+    const unreadOnly = searchParams.get("unread_only") === "true";
+
+    if (action === "count") {
+      const unreadCount = platformLiveStore.notifications.filter((n) => !n.read_at).length;
+      return NextResponse.json({
+        success: true,
+        data: unreadCount,
+      });
+    }
+
+    const items = unreadOnly
+      ? platformLiveStore.notifications.filter((n) => !n.read_at)
+      : platformLiveStore.notifications;
+
+    const formatted = items.map((n) => ({
+      id: n.id,
+      platform_admin_id: "adm_parashram",
+      notification_type: n.category || "system",
+      priority: "normal",
+      title: n.title,
+      body: n.message,
+      action_url: "/ops-console/dashboard",
+      action_label: "View",
+      read_at: n.read_at,
+      metadata: {},
+      created_at: n.created_at,
+      updated_at: n.created_at,
+    }));
+
     return NextResponse.json({
       success: true,
-      data: platformLiveStore.notifications,
+      data: formatted,
+    });
+  }
+
+  // Administration: Announcements
+  if (endpoint === "platform-admin-announcements") {
+    const action = searchParams.get("action") || "list";
+    if (action === "get") {
+      const id = searchParams.get("id");
+      const found = announcementsState.find((a) => a.id === id) || announcementsState[0];
+      return NextResponse.json({ success: true, data: found });
+    }
+    return NextResponse.json({
+      success: true,
+      data: announcementsState,
     });
   }
 
   // Administration: Roles & Permissions
-  if (
-    endpoint === "platform-admin-roles-permissions" ||
-    endpoint === "platform-admin-access-control"
-  ) {
+  if (endpoint === "platform-admin-roles-permissions") {
     const permissions = [
       {
         id: "perm_all",
@@ -587,11 +702,121 @@ export async function GET(
     });
   }
 
-  // Administration: Audit & Security Logs
-  if (
-    endpoint === "platform-admin-audit-logs" ||
-    endpoint === "platform-admin-security-logs"
-  ) {
+  // Administration: Access Control
+  if (endpoint === "platform-admin-access-control") {
+    const permissions = [
+      {
+        id: "perm_all",
+        code: "*",
+        name: "Full System Master Access",
+        description: "Full access across all system modules",
+        module: "System",
+        status: "active",
+      },
+      {
+        id: "perm_inbox",
+        code: "inbox:*",
+        name: "Department Inbox Access",
+        description: "Read and reply to support, billing, and marketing emails",
+        module: "Support",
+        status: "active",
+      },
+      {
+        id: "perm_leads",
+        code: "leads:*",
+        name: "Leads & Guest Captures",
+        description: "View and follow up with QR scan leads and demo inquiries",
+        module: "Marketing",
+        status: "active",
+      },
+    ];
+
+    const accessControlEmployees = platformLiveStore.employees.map((emp) => ({
+      platform_admin_id: emp.platform_admin_id,
+      profile_id: emp.profile_id,
+      display_name: emp.display_name,
+      email: emp.email,
+      employee_code: emp.employee_code,
+      status: emp.status,
+      last_activity_at: emp.last_activity_at,
+      roles: emp.roles,
+      permissions: permissions,
+    }));
+
+    return NextResponse.json({
+      success: true,
+      data: accessControlEmployees,
+    });
+  }
+
+  // Administration: Audit Logs
+  if (endpoint === "platform-admin-audit-logs") {
+    const action = searchParams.get("action");
+
+    if (action === "statistics") {
+      return NextResponse.json({
+        success: true,
+        data: {
+          total_events: 18,
+          today: 4,
+          last_7_days: 12,
+          last_30_days: 18,
+          unique_admins: 2,
+          unique_actions: 4,
+          unique_modules: 3,
+          latest_event: new Date().toISOString(),
+        },
+      });
+    }
+
+    if (action === "filter-options") {
+      return NextResponse.json({
+        success: true,
+        data: {
+          actions: ["auth.login_2fa", "leads.qr_capture", "employee.invite", "settings.update"],
+          modules: ["Security", "Marketing", "Administration", "Settings"],
+          target_types: ["AdminSession", "QrLead", "AdminEmployee", "CompanySettings"],
+        },
+      });
+    }
+
+    const auditItems = [
+      {
+        id: "audit_01",
+        platform_admin_id: "adm_parashram",
+        action: "auth.login_2fa",
+        module: "Security",
+        target_type: "AdminSession",
+        target_id: "ops_session_active_founder",
+        ip_address: "103.21.244.0",
+        user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+        metadata: { email: studio.owner_email, method: "Resend 2FA OTP" },
+        created_at: new Date().toISOString(),
+        total_count: 2,
+      },
+      {
+        id: "audit_02",
+        platform_admin_id: "adm_parashram",
+        action: "leads.qr_capture",
+        module: "Marketing",
+        target_type: "QrLead",
+        target_id: "lead_qr_01",
+        ip_address: "103.21.244.0",
+        user_agent: "Mobile Standee QR Scanner",
+        metadata: { source: "Event QR Standee Scan", guest: "Sandeep More" },
+        created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+        total_count: 2,
+      },
+    ];
+
+    return NextResponse.json({
+      success: true,
+      data: auditItems,
+    });
+  }
+
+  // Administration: Security Logs
+  if (endpoint === "platform-admin-security-logs") {
     const action = searchParams.get("action");
 
     if (action === "statistics") {
@@ -621,7 +846,7 @@ export async function GET(
       });
     }
 
-    const logs = [
+    const secLogs = [
       {
         id: "sec_log_01",
         platform_admin_id: "adm_parashram",
@@ -652,7 +877,7 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      data: logs,
+      data: secLogs,
     });
   }
 
@@ -670,13 +895,13 @@ export async function GET(
       {
         id: "plan_pro_trial",
         code: "pro_trial",
-        name: "Pro Studio (14-Day Free Trial)",
+        name: "Pro Studio (7-Day Free Trial)",
         price: 0,
         currency: "INR",
         billing_cycle: "trial",
         is_active: true,
         features: [
-          "14-Day Full Free Access",
+          "7-Day Full Free Access",
           "AI Face Recognition",
           "Unlimited High-Res Gallery",
           "Automated Email Dispatch (Resend)",
@@ -756,7 +981,96 @@ export async function GET(
     });
   }
 
-  // Marketplace
+  // Marketplace Analytics
+  if (endpoint === "platform-admin-marketplace-analytics") {
+    const fromDate = searchParams.get("date_from") || "2026-10-01";
+    const toDate = searchParams.get("date_to") || "2026-10-30";
+    const qrCount = platformLiveStore.qrLeads.length;
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        period: {
+          date_from: fromDate,
+          date_to: toDate,
+        },
+        overview: {
+          total_studios: 1,
+          active_studios: 1,
+          verified_studios: 1,
+          featured_studios: 1,
+          total_listings: 1,
+          active_listings: 1,
+          total_categories: 4,
+          total_reviews: 38,
+          total_leads: qrCount,
+          converted_leads: 1,
+          total_orders: 0,
+        },
+        revenue: {
+          marketplace_orders_revenue: 0,
+          verified_badge_revenue: 0,
+          verified_badge_active_studios: 1,
+          verified_badge_price: 0,
+        },
+        revenue_trend: [
+          {
+            date: "2026-10-25",
+            marketplace_revenue: 0,
+            verified_badge_revenue: 0,
+          },
+          {
+            date: "2026-10-29",
+            marketplace_revenue: 0,
+            verified_badge_revenue: 0,
+          },
+        ],
+        studio_breakdown: {
+          paid: 0,
+          free_trial: 1,
+          free: 0,
+        },
+        verification_breakdown: {
+          verified: 1,
+          unverified: 0,
+        },
+        leads: {
+          total: qrCount,
+          active: qrCount,
+          converted: 1,
+          expected_value: 0,
+          conversion_rate: 100,
+        },
+        lead_sources: [
+          { source: "QR Standee Scan", count: qrCount, converted: 1 },
+        ],
+        city_performance: [
+          { city: "Pune", studios: 1, listings: 1 },
+        ],
+        category_performance: [
+          { category: "Wedding & Candid", listings: 1, active_listings: 1 },
+          { category: "Pre-Wedding", listings: 1, active_listings: 1 },
+        ],
+        reviews: {
+          total: 38,
+          average_rating: 4.9,
+          five_star: 35,
+          four_star: 3,
+          three_star: 0,
+          two_star: 0,
+          one_star: 0,
+        },
+        orders: {
+          total: 0,
+          completed: 0,
+          revenue: 0,
+        },
+        generated_at: new Date().toISOString(),
+      },
+    });
+  }
+
+  // Marketplace Listings & Overview
   if (
     endpoint === "platform-admin-marketplace" ||
     endpoint === "platform-admin-marketplace-overview" ||
@@ -764,8 +1078,7 @@ export async function GET(
     endpoint === "platform-admin-marketplace-active" ||
     endpoint === "platform-admin-marketplace-pending" ||
     endpoint === "platform-admin-marketplace-featured" ||
-    endpoint === "platform-admin-marketplace-leads" ||
-    endpoint === "platform-admin-marketplace-analytics"
+    endpoint === "platform-admin-marketplace-leads"
   ) {
     const listings = [
       {
@@ -985,10 +1298,10 @@ export async function POST(
 
   // Settings Save
   if (endpoint === "platform-admin-settings") {
-    const section = (searchParams.get("section") || body.key) as string;
+    const section = (searchParams.get("section") || body.key || body.section) as string;
     const value = (body.value || body) as Record<string, unknown>;
 
-    if (section === "company") {
+    if (section === "company" || !section) {
       companySettingsState = { ...companySettingsState, ...value };
       return NextResponse.json({ success: true, data: companySettingsState });
     }
@@ -1006,6 +1319,71 @@ export async function POST(
       message: "Settings saved successfully.",
       data: value,
     });
+  }
+
+  // Announcements CRUD (POST / PATCH / DELETE)
+  if (endpoint === "platform-admin-announcements") {
+    const action = (searchParams.get("action") || body.action || "create") as string;
+
+    if (action === "create") {
+      const newAnn = {
+        id: `ann_${Date.now()}`,
+        title: (body.title as string) || "System Announcement",
+        body: (body.body as string) || "",
+        status: (body.status as string) || "published",
+        priority: (body.priority as string) || "normal",
+        audience_type: (body.audience_type as string) || "all_users",
+        channel: (body.channel as string) || "in_app",
+        scheduled_at: (body.scheduled_at as string) || null,
+        published_at: new Date().toISOString(),
+        created_by: "ADMIN_FOUNDER",
+        updated_by: null,
+        metadata: {},
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      announcementsState.unshift(newAnn);
+      return NextResponse.json({ success: true, data: newAnn });
+    }
+
+    if (action === "publish") {
+      const id = body.id as string;
+      const target = announcementsState.find((a) => a.id === id);
+      if (target) {
+        target.status = "published";
+        target.published_at = new Date().toISOString();
+        target.updated_at = new Date().toISOString();
+      }
+      return NextResponse.json({ success: true, data: target });
+    }
+
+    if (action === "update") {
+      const id = body.id as string;
+      const target = announcementsState.find((a) => a.id === id);
+      if (target) {
+        Object.assign(target, body, { updated_at: new Date().toISOString() });
+      }
+      return NextResponse.json({ success: true, data: target });
+    }
+  }
+
+  // Notifications Mark Read / Read All
+  if (endpoint === "platform-admin-notifications") {
+    const action = searchParams.get("action") || body.action;
+    if (action === "read-all") {
+      platformLiveStore.notifications.forEach((n) => {
+        n.read_at = new Date().toISOString();
+      });
+      return NextResponse.json({ success: true, data: platformLiveStore.notifications.length });
+    }
+    if (action === "read") {
+      const id = body.id as string;
+      const target = platformLiveStore.notifications.find((n) => n.id === id);
+      if (target) {
+        target.read_at = new Date().toISOString();
+      }
+      return NextResponse.json({ success: true, data: target });
+    }
   }
 
   // Generic POST fallback

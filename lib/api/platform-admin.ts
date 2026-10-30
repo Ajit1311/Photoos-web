@@ -4905,6 +4905,29 @@ export async function getPlatformMarketingGrowthAnalytics(params?: {
     query.set("to", params.to);
   }
 
+  // 1. Try internal Next.js API first
+  try {
+    const internalRes = await fetch(
+      `/api/platform-admin/platform-marketing-growth-analytics?${query.toString()}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
+      },
+    );
+    if (internalRes.ok) {
+      const internalPayload = await internalRes.json();
+      if (internalPayload?.success) {
+        return internalPayload as PlatformMarketingGrowthAnalyticsResponse;
+      }
+    }
+  } catch (err) {
+    console.warn("[getPlatformMarketingGrowthAnalytics] Internal route attempt:", err);
+  }
+
   const response = await fetch(
     `${baseUrl}/platform-marketing-growth-analytics?${query.toString()}`,
     {

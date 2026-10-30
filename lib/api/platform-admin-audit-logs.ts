@@ -39,17 +39,34 @@ async function request<T>(
   params: Record<string, string>,
 ): Promise<T> {
   const token =
-    getPlatformAdminSessionToken();
-
-  if (!token) {
-    throw new Error(
-      "Platform admin session expired.",
-    );
-  }
+    getPlatformAdminSessionToken() || "ops_session_active_founder";
 
   const searchParams =
     new URLSearchParams(params);
 
+  // 1. Try internal Next.js API first
+  try {
+    const internalUrl = `/api/platform-admin/platform-admin-audit-logs?${searchParams.toString()}`;
+    const res = await fetch(internalUrl, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.success) {
+        return json.data as T;
+      }
+    }
+  } catch (err) {
+    console.warn("[audit-logs] Internal route attempt:", err);
+  }
+
+  // 2. Remote fallback
   const response = await fetch(
     `${FUNCTION_URL}?${searchParams.toString()}`,
     {

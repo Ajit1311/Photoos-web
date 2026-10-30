@@ -718,15 +718,19 @@ function DetailRow({
   )
 }
 
-function formatRemaining(seconds: number) {
-  const safe = Math.max(0, Math.floor(seconds))
-  const days = Math.floor(safe / 86400)
-  const hours = Math.floor((safe % 86400) / 3600)
-  const minutes = Math.floor((safe % 3600) / 60)
+function formatRemaining(seconds: number | undefined | null) {
+  const num = Number(seconds);
+  if (!seconds || Number.isNaN(num) || num <= 0) {
+    return "0d 0h 0m";
+  }
+  const safe = Math.max(0, Math.floor(num));
+  const days = Math.floor(safe / 86400);
+  const hours = Math.floor((safe % 86400) / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
 
   if (days > 0) {
-    return `${days}d ${hours}h ${minutes}m`
+    return `${days}d ${hours}h ${minutes}m`;
   }
 
-  return `${hours}h ${minutes}m`
+  return `${hours}h ${minutes}m`;
 }
