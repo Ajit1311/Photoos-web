@@ -25,22 +25,22 @@ export default function PlatformAdminGuard({ children }: Props) {
         if (!mounted) return;
 
         if (!session) {
-          router.replace("/ops-console");
+          router.replace("/ops-console/login");
           return;
         }
 
         if (
           session.must_change_password &&
-          pathname !== "/admin/change-password"
+          pathname !== "/ops-console/change-password"
         ) {
-          router.replace("/admin/change-password");
+          router.replace("/ops-console/change-password");
           return;
         }
 
         setAuthorized(true);
       } catch {
         if (mounted) {
-          router.replace("/ops-console");
+          router.replace("/ops-console/login");
         }
       } finally {
         if (mounted) {

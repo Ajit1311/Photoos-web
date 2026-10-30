@@ -95,7 +95,7 @@ const navSections: NavSection[] = [
     items: [
       {
         label: "Dashboard",
-        href: "/admin",
+        href: "/ops-console/dashboard",
         icon: LayoutDashboard,
       },
     ],
@@ -105,12 +105,12 @@ const navSections: NavSection[] = [
     items: [
       {
         label: "App Analytics",
-        href: "/admin/app-analytics",
+        href: "/ops-console/app-analytics",
         icon: Smartphone,
       },
       {
         label: "Bookings",
-        href: "/admin/app-analytics/bookings",
+        href: "/ops-console/app-analytics/bookings",
         icon: CalendarCheck2,
       },
     ],
@@ -120,37 +120,37 @@ const navSections: NavSection[] = [
     items: [
       {
         label: "All Users",
-        href: "/admin/users",
+        href: "/ops-console/users",
         icon: Users,
       },
       {
         label: "Studios",
-        href: "/admin/studios",
+        href: "/ops-console/studios",
         icon: Building2,
       },
       {
         label: "Active Subscriptions",
-        href: "/admin/subscriptions/active",
+        href: "/ops-console/subscriptions/active",
         icon: Zap,
       },
       {
         label: "Free Trials",
-        href: "/admin/subscriptions/trials",
+        href: "/ops-console/subscriptions/trials",
         icon: Activity,
       },
       {
         label: "Expired",
-        href: "/admin/subscriptions/expired",
+        href: "/ops-console/subscriptions/expired",
         icon: FileText,
       },
       {
         label: "Cancelled",
-        href: "/admin/subscriptions/cancelled",
+        href: "/ops-console/subscriptions/cancelled",
         icon: X,
       },
       {
         label: "User Activity",
-        href: "/admin/users/activity",
+        href: "/ops-console/users/activity",
         icon: Activity,
       },
     ],
@@ -160,57 +160,57 @@ const navSections: NavSection[] = [
     items: [
       {
         label: "Payments",
-        href: "/admin/payments",
+        href: "/ops-console/payments",
         icon: CreditCard,
       },
       {
         label: "Subscriptions",
-        href: "/admin/subscriptions",
+        href: "/ops-console/subscriptions",
         icon: CircleDollarSign,
       },
       {
         label: "Renewals",
-        href: "/admin/renewals",
+        href: "/ops-console/renewals",
         icon: ChevronRight,
       },
       {
         label: "Failed Payments",
-        href: "/admin/payments/failed",
+        href: "/ops-console/payments/failed",
         icon: MoreHorizontal,
       },
       {
         label: "Refunds",
-        href: "/admin/payments/refunds",
+        href: "/ops-console/payments/refunds",
         icon: CreditCard,
       },
       {
         label: "Accounting",
-        href: "/admin/accounting",
+        href: "/ops-console/accounting",
         icon: BarChart3,
         children: [
           {
             label: "Accounting Dashboard",
-            href: "/admin/accounting",
+            href: "/ops-console/accounting",
             icon: LayoutDashboard,
           },
           {
             label: "Sales / Revenue",
-            href: "/admin/accounting/sales",
+            href: "/ops-console/accounting/sales",
             icon: BarChart3,
           },
           {
             label: "Invoices",
-            href: "/admin/accounting/invoices",
+            href: "/ops-console/accounting/invoices",
             icon: FileText,
           },
           {
             label: "Tax / GST",
-            href: "/admin/accounting/tax-gst",
+            href: "/ops-console/accounting/tax-gst",
             icon: Globe2,
           },
           {
             label: "Financial Reports",
-            href: "/admin/accounting/reports",
+            href: "/ops-console/accounting/reports",
             icon: BarChart3,
           },
         ],
@@ -222,32 +222,32 @@ const navSections: NavSection[] = [
     items: [
       {
         label: "Software Overview",
-        href: "/admin/software",
+        href: "/ops-console/software",
         icon: Boxes,
       },
       {
         label: "Features",
-        href: "/admin/software/features",
+        href: "/ops-console/software/features",
         icon: Zap,
       },
       {
         label: "Plans",
-        href: "/admin/software/plans",
+        href: "/ops-console/software/plans",
         icon: FileText,
       },
       {
         label: "Plan Pricing",
-        href: "/admin/software/plan-pricing",
+        href: "/ops-console/software/plan-pricing",
         icon: BadgeIndianRupee,
       },
       {
         label: "Usage",
-        href: "/admin/software/usage",
+        href: "/ops-console/software/usage",
         icon: BarChart3,
       },
       {
         label: "System Health",
-        href: "/admin/software/system-health",
+        href: "/ops-console/software/system-health",
         icon: Activity,
       },
     ],
@@ -257,37 +257,37 @@ const navSections: NavSection[] = [
     items: [
       {
         label: "Marketplace Dashboard",
-        href: "/admin/marketplace",
+        href: "/ops-console/marketplace",
         icon: Store,
       },
       {
         label: "All Listings",
-        href: "/admin/marketplace/listings",
+        href: "/ops-console/marketplace/listings",
         icon: Building2,
       },
       {
         label: "Active Listings",
-        href: "/admin/marketplace/active",
+        href: "/ops-console/marketplace/active",
         icon: Eye,
       },
       {
         label: "Pending Approval",
-        href: "/admin/marketplace/pending",
+        href: "/ops-console/marketplace/pending",
         icon: Clock3,
       },
       {
         label: "Featured Listings",
-        href: "/admin/marketplace/featured",
+        href: "/ops-console/marketplace/featured",
         icon: Star,
       },
       {
         label: "Leads / Enquiries",
-        href: "/admin/marketplace/leads",
+        href: "/ops-console/marketplace/leads",
         icon: Users,
       },
       {
         label: "Marketplace Analytics",
-        href: "/admin/marketplace/analytics",
+        href: "/ops-console/marketplace/analytics",
         icon: BarChart3,
       },
     ],
@@ -297,32 +297,32 @@ const navSections: NavSection[] = [
     items: [
       {
         label: "Marketing Dashboard",
-        href: "/admin/marketing",
+        href: "/ops-console/marketing",
         icon: BarChart3,
       },
       {
         label: "Leads",
-        href: "/admin/marketing/leads",
+        href: "/ops-console/marketing/leads",
         icon: Users,
       },
       {
         label: "Signups",
-        href: "/admin/marketing/signups",
+        href: "/ops-console/marketing/signups",
         icon: UserCog,
       },
       {
         label: "Trial Conversion",
-        href: "/admin/marketing/trial-conversion",
+        href: "/ops-console/marketing/trial-conversion",
         icon: Zap,
       },
       {
         label: "Campaigns",
-        href: "/admin/marketing/campaigns",
+        href: "/ops-console/marketing/campaigns",
         icon: Mail,
       },
       {
         label: "Growth Analytics",
-        href: "/admin/marketing/growth",
+        href: "/ops-console/marketing/growth",
         icon: BarChart3,
       },
     ],
@@ -332,28 +332,28 @@ const navSections: NavSection[] = [
     items: [
       {
         label: "Support Dashboard",
-        href: "/admin/support",
+        href: "/ops-console/support",
         icon: Headphones,
       },
       {
         label: "Department Inbox",
-        href: "/admin/inbox",
+        href: "/ops-console/inbox",
         icon: Mail,
         badge: "Live",
       },
       {
         label: "Tickets",
-        href: "/admin/support-tickets",
+        href: "/ops-console/support-tickets",
         icon: FileText,
       },
       {
         label: "Subscription Cancellations",
-        href: "/admin/support/cancellations",
+        href: "/ops-console/support/cancellations",
         icon: X,
       },
       {
         label: "Customer Issues",
-        href: "/admin/support/issues",
+        href: "/ops-console/support/issues",
         icon: MessageSquare,
       },
     ],
@@ -363,17 +363,17 @@ const navSections: NavSection[] = [
     items: [
       {
         label: "Internal Chat",
-        href: "/admin/chat",
+        href: "/ops-console/chat",
         icon: MessageSquare,
       },
       {
         label: "Announcements",
-        href: "/admin/announcements",
+        href: "/ops-console/announcements",
         icon: Mail,
       },
       {
         label: "Notifications",
-        href: "/admin/notifications",
+        href: "/ops-console/notifications",
         icon: Bell,
       },
     ],
@@ -383,27 +383,27 @@ const navSections: NavSection[] = [
     items: [
       {
         label: "Admin Employees",
-        href: "/admin/employees",
+        href: "/ops-console/employees",
         icon: UserCog,
       },
       {
         label: "Roles & Permissions",
-        href: "/admin/roles",
+        href: "/ops-console/roles",
         icon: ShieldCheck,
       },
       {
         label: "Access Control",
-        href: "/admin/access-control",
+        href: "/ops-console/access-control",
         icon: ShieldCheck,
       },
       {
         label: "Audit Logs",
-        href: "/admin/audit-logs",
+        href: "/ops-console/audit-logs",
         icon: FileText,
       },
       {
         label: "Security Logs",
-        href: "/admin/security-logs",
+        href: "/ops-console/security-logs",
         icon: ShieldCheck,
       },
     ],
@@ -413,47 +413,47 @@ const navSections: NavSection[] = [
     items: [
       {
         label: "General",
-        href: "/admin/settings",
+        href: "/ops-console/settings",
         icon: Settings,
       },
       {
         label: "Company",
-        href: "/admin/settings/company",
+        href: "/ops-console/settings/company",
         icon: Building2,
       },
       {
         label: "Branding",
-        href: "/admin/settings/branding",
+        href: "/ops-console/settings/branding",
         icon: Globe2,
       },
       {
         label: "Email",
-        href: "/admin/settings/email",
+        href: "/ops-console/settings/email",
         icon: Mail,
       },
       {
         label: "Notifications",
-        href: "/admin/settings/notifications",
+        href: "/ops-console/settings/notifications",
         icon: Bell,
       },
       {
         label: "Payments",
-        href: "/admin/settings/payments",
+        href: "/ops-console/settings/payments",
         icon: CreditCard,
       },
       {
         label: "Security",
-        href: "/admin/settings/security",
+        href: "/ops-console/settings/security",
         icon: ShieldCheck,
       },
       {
         label: "Integrations",
-        href: "/admin/settings/integrations",
+        href: "/ops-console/settings/integrations",
         icon: Boxes,
       },
       {
         label: "System",
-        href: "/admin/settings/system",
+        href: "/ops-console/settings/system",
         icon: Settings,
       },
     ],
@@ -464,8 +464,12 @@ function isActivePath(
   pathname: string,
   href: string,
 ) {
-  if (href === "/admin") {
-    return pathname === "/admin";
+  if (href === "/ops-console/dashboard" || href === "/ops-console") {
+    return (
+      pathname === "/ops-console/dashboard" ||
+      pathname === "/ops-console" ||
+      pathname === "/admin"
+    );
   }
 
   return (
@@ -585,8 +589,8 @@ export default function AdminShell({
           if (session.user_id) {
             setAdminUserId(session.user_id);
           }
-          if (session.must_change_password && pathname !== "/admin/change-password") {
-            router.replace("/admin/change-password");
+          if (session.must_change_password && pathname !== "/ops-console/change-password") {
+            router.replace("/ops-console/change-password");
           }
         }
       } catch {
@@ -713,7 +717,7 @@ export default function AdminShell({
 
   async function handleLogout() {
     await logoutPlatformAdmin();
-    router.replace("/admin/login");
+    router.replace("/ops-console/login");
   }
 
   return (
@@ -739,7 +743,7 @@ export default function AdminShell({
       >
         <div className="flex h-[76px] shrink-0 items-center border-b border-white/10 px-4">
           <Link
-            href="/admin"
+            href="/ops-console/dashboard"
             className="flex min-w-0 flex-1 items-center gap-3"
             onClick={() =>
               setMobileOpen(false)
@@ -801,7 +805,7 @@ export default function AdminShell({
           {/* Dashboard */}
           <div className="mb-4">
             <Link
-              href="/admin"
+              href="/ops-console/dashboard"
               onClick={() =>
                 setMobileOpen(false)
               }
@@ -812,7 +816,7 @@ export default function AdminShell({
               }
               className={[
                 "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition",
-                pathname === "/admin"
+                (pathname === "/ops-console/dashboard" || pathname === "/ops-console")
                   ? "bg-white text-[#0A3F61] shadow-sm"
                   : "text-slate-300 hover:bg-white/10 hover:text-white",
                 collapsed
@@ -823,7 +827,7 @@ export default function AdminShell({
               <LayoutDashboard
                 className={[
                   "h-[17px] w-[17px] shrink-0",
-                  pathname === "/admin"
+                  (pathname === "/ops-console/dashboard" || pathname === "/ops-console")
                     ? "text-[#0A3F61]"
                     : "text-slate-400 group-hover:text-white",
                 ].join(" ")}
@@ -1304,7 +1308,7 @@ export default function AdminShell({
 
                     <div className="border-t border-slate-100 bg-slate-50 px-4 py-2.5 text-center">
                       <Link
-                        href="/admin/notifications"
+                        href="/ops-console/notifications"
                         onClick={() =>
                           setNotificationOpen(false)
                         }
@@ -1318,7 +1322,7 @@ export default function AdminShell({
               </div>
 
               <Link
-                href="/admin/chat"
+                href="/ops-console/chat"
                 className="rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition"
                 title="Internal chat"
               >
@@ -1341,7 +1345,7 @@ export default function AdminShell({
               </button>
 
               <Link
-                href="/admin/settings"
+                href="/ops-console/settings"
                 className="hidden rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition sm:block"
                 title="Settings"
               >
@@ -1386,7 +1390,7 @@ export default function AdminShell({
                     </div>
 
                     <Link
-                      href="/admin/profile"
+                      href="/ops-console/profile"
                       onClick={() =>
                         setProfileOpen(false)
                       }
@@ -1397,7 +1401,7 @@ export default function AdminShell({
                     </Link>
 
                     <Link
-                      href="/admin/security-logs"
+                      href="/ops-console/security-logs"
                       onClick={() =>
                         setProfileOpen(false)
                       }
@@ -1423,7 +1427,7 @@ export default function AdminShell({
             </div>
           </div>
 
-          {!pathname.startsWith("/admin/inbox") ? (
+          {!pathname.startsWith("/ops-console/inbox") ? (
             <div className="border-t border-slate-100 px-4 py-2.5 md:hidden">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -1443,7 +1447,7 @@ export default function AdminShell({
           ) : null}
         </header>
 
-        <main className={pathname.startsWith("/admin/inbox") ? "h-[calc(100vh-76px)] overflow-hidden" : "min-h-[calc(100vh-76px)]"}>
+        <main className={pathname.startsWith("/ops-console/inbox") ? "h-[calc(100vh-76px)] overflow-hidden" : "min-h-[calc(100vh-76px)]"}>
           {children}
         </main>
       </div>

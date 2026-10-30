@@ -3,25 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Protect all /admin routes behind stealth gate
-  if (pathname.startsWith("/admin")) {
-    const opsSession = req.cookies.get("photoos_ops_session")?.value;
+  // 1. Redirect legacy /admin routes to /ops-console
+  if (pathname === "/admin" || pathname === "/admin/login") {
+    return NextResponse.redirect(new URL("/ops-console/dashboard", req.url), 307);
+  }
 
-    // Disallow public access to /admin/login directly (returns 404 stealth)
-    if (pathname === "/admin/login") {
-      const url = req.nextUrl.clone();
-      url.pathname = "/_not-found";
-      return NextResponse.rewrite(url);
-    }
-
-    // If no verified admin session cookie, return 404
-    if (!opsSession) {
-      const url = req.nextUrl.clone();
-      url.pathname = "/_not-found";
-      return NextResponse.rewrite(url);
-    }
-
-    return NextResponse.next();
+  if (pathname.startsWith("/admin/")) {
+    const target = pathname.replace(/^\/admin/, "/ops-console");
+    return NextResponse.redirect(new URL(target, req.url), 307);
   }
 
   return NextResponse.next();
@@ -30,4 +19,3 @@ export function middleware(req: NextRequest) {
 export const config = {
   matcher: ["/admin/:path*"],
 };
-
