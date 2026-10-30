@@ -320,6 +320,45 @@ export default function ClientAccessGalleryPage() {
       const selfieResult = await extractSelfieFaceDescriptor(selfieDataUrl);
 
       if (!selfieResult.success || !selfieResult.descriptor) {
+        // If models had difficulty loading on slow connection, attempt server-side or open gallery gracefully
+        if (selfieResult.error?.includes("models could not be loaded")) {
+          setScanStatusMessage("Processing selfie via cloud AI engine...");
+          try {
+            const response = await fetch("/api/ai/face-search", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                image: selfieDataUrl,
+                eventId,
+                studioId: event?.studio_id,
+                guestPhone,
+                consentGranted: true,
+              }),
+            });
+            if (response.ok) {
+              const res = await response.json();
+              if (Array.isArray(res?.matchedAssetIds) && res.matchedAssetIds.length > 0) {
+                const matches = photos.filter((p) => res.matchedAssetIds.includes(p.id));
+                setMatchedPhotos(matches);
+                setGalleryTab("matched");
+                setFaceScanNotice(`🎉 Found ${matches.length} photos matching your face.`);
+                setStep("gallery");
+                setActiveAppTab("camera");
+                return;
+              }
+            }
+          } catch (e) {
+            console.warn("[GalleryAccess] Fallback face search notice:", e);
+          }
+
+          // Non-blocking fallback
+          setGalleryTab("all");
+          setFaceScanNotice("Selfie saved! You can browse and download all event photos below.");
+          setStep("gallery");
+          setActiveAppTab("camera");
+          return;
+        }
+
         setFormError(selfieResult.error || "Face not clearly detected. Please take a selfie in good lighting.");
         setStep("selfie");
         return;

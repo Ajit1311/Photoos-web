@@ -9,7 +9,8 @@ import * as faceapi from "@vladmandic/face-api";
 let modelsLoaded = false;
 let modelLoadingPromise: Promise<boolean> | null = null;
 
-const MODEL_PATH = "/models";
+const LOCAL_MODEL_PATH = "/models";
+const CDN_MODEL_PATH = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model";
 export const MATCH_THRESHOLD = 0.58; // Standard optimal threshold for ResNet-34 FaceRecognitionNet (99%+ accuracy)
 
 export interface FaceDetectionResult {
@@ -31,7 +32,8 @@ export interface MatchResult {
 }
 
 /**
- * Initializes and loads the deep learning models from the public /models directory.
+ * Initializes and loads the deep learning models from the public /models directory
+ * with automatic CDN fallback.
  */
 export async function loadFaceRecognitionModels(): Promise<boolean> {
   if (modelsLoaded) return true;
@@ -42,20 +44,35 @@ export async function loadFaceRecognitionModels(): Promise<boolean> {
   }
 
   modelLoadingPromise = (async () => {
+    // 1. Try local /models directory first
     try {
       await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_PATH),
-        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_PATH),
-        faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_PATH),
-        faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_PATH).catch((e) => {
-          console.warn("[FaceRecognition] SSD Mobilenet optional load note:", e);
-        }),
+        faceapi.nets.tinyFaceDetector.loadFromUri(LOCAL_MODEL_PATH),
+        faceapi.nets.faceLandmark68Net.loadFromUri(LOCAL_MODEL_PATH),
+        faceapi.nets.faceRecognitionNet.loadFromUri(LOCAL_MODEL_PATH),
+      ]);
+
+      // SSD MobileNet is optional enhancement
+      faceapi.nets.ssdMobilenetv1.loadFromUri(LOCAL_MODEL_PATH).catch(() => {});
+
+      modelsLoaded = true;
+      return true;
+    } catch (localErr) {
+      console.warn("[FaceRecognition] Local models load notice, trying CDN fallback:", localErr);
+    }
+
+    // 2. Try CDN fallback
+    try {
+      await Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri(CDN_MODEL_PATH),
+        faceapi.nets.faceLandmark68Net.loadFromUri(CDN_MODEL_PATH),
+        faceapi.nets.faceRecognitionNet.loadFromUri(CDN_MODEL_PATH),
       ]);
 
       modelsLoaded = true;
       return true;
-    } catch (err) {
-      console.error("[FaceRecognition] Failed to load face models:", err);
+    } catch (cdnErr) {
+      console.error("[FaceRecognition] All face models sources failed:", cdnErr);
       modelsLoaded = false;
       return false;
     } finally {

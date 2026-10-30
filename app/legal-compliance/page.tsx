@@ -384,7 +384,7 @@ export default function LegalCompliancePage() {
     accessMode,
     setAccessMode,
   ] =
-    useState<"studio" | "freelancer">(
+    useState<"studio" | "corporate" | "freelancer">(
       "studio",
     );
 
@@ -927,7 +927,7 @@ export default function LegalCompliancePage() {
         if (!cancelled) {
 
           setAccessMode(
-            "studio",
+            corporateMode ? "corporate" : "studio",
           );
 
           setNextPath(
@@ -935,7 +935,7 @@ export default function LegalCompliancePage() {
           );
 
           setStudioId(
-            resolvedStudioId,
+            corporateMode ? null : resolvedStudioId,
           );
 
           setLanguage(
@@ -1090,7 +1090,8 @@ export default function LegalCompliancePage() {
 
     if (
       accessMode === "studio" &&
-      !studioId
+      !studioId &&
+      !nextPath.includes("/onboarding/studio")
     ) {
 
       setError(

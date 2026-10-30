@@ -135,8 +135,15 @@ function LoadingContent() {
         }
 
         // -------------------------------------------------------------------
-        // STEP 3: CHECK STUDIO WORKSPACE MEMBERSHIP
+        // STEP 3: CORPORATE ROUTING OR STUDIO WORKSPACE MEMBERSHIP
         // -------------------------------------------------------------------
+        if (mode === "corporate") {
+          if (!cancelled) {
+            router.replace(nextParam ?? "/corporate/onboarding");
+          }
+          return;
+        }
+
         if (!activeMember?.studio_id) {
           if (!cancelled) {
             router.replace(`/onboarding/studio${planSuffix}`);

@@ -947,3 +947,4 @@ export default function CorporateEventDetailsPage() {
     </CorporateShell>
   );
 }
+
