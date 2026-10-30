@@ -28,13 +28,20 @@ export async function getCurrentSoftwareUpdate(): Promise<SoftwareUpdate | null>
     console.warn("[getCurrentSoftwareUpdate] Notice:", err);
   }
 
-  // Graceful default fallback
+  // Graceful default fallback matching SoftwareUpdate interface completely
+  const now = new Date().toISOString();
   return {
+    id: "update_stable_v1",
     version: "1.0.0",
-    release_date: new Date().toISOString(),
-    is_latest: true,
-    title: "PhotoOS v1.0.0",
-    description: "Stable Release",
-    changelog: ["Performance optimizations and studio workspace improvements."],
-  } as unknown as SoftwareUpdate;
+    release_name: "PhotoOS Cloud v1.0",
+    schema_version: 1,
+    released_at: now,
+    release_notes: "Performance optimizations, role-based access control, and studio workspace improvements.",
+    metadata: {
+      display_schema_version: "PhotoOS-01",
+      platform: "cloud",
+      is_stable: true,
+    },
+    created_at: now,
+  };
 }

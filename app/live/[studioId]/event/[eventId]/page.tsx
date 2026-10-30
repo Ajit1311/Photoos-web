@@ -892,6 +892,18 @@ export default function GuestLiveEventPage() {
                             loading="lazy"
                           />
 
+                          {/* Watermark overlay when QR download is disabled */}
+                          {!allowDownloads && (
+                            <div
+                              onClick={() => setPreviewPhoto(photo)}
+                              className="absolute inset-0 pointer-events-none flex items-center justify-center select-none overflow-hidden"
+                            >
+                              <div className="transform -rotate-25 rounded-lg border border-white/20 bg-black/35 px-2.5 py-1 text-center font-black tracking-widest text-[11px] sm:text-xs uppercase text-white/55 backdrop-blur-[1px] shadow-lg">
+                                © {studio?.brand_name || studio?.name || "PhotoOS Studio"}
+                              </div>
+                            </div>
+                          )}
+
                           <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2">
                             <button
                               type="button"
@@ -1080,13 +1092,23 @@ export default function GuestLiveEventPage() {
             <X className="h-6 w-6" />
           </button>
 
-          <div className="max-h-[85vh] max-w-full">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={previewPhoto.originalUrl || previewPhoto.thumbnailUrl}
-              alt="Preview"
-              className="max-h-[75vh] max-w-full rounded-2xl object-contain mx-auto"
-            />
+          <div className="relative max-h-[85vh] max-w-full">
+            <div className="relative inline-block w-full">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={previewPhoto.originalUrl || previewPhoto.thumbnailUrl}
+                alt="Preview"
+                className="max-h-[75vh] max-w-full rounded-2xl object-contain mx-auto"
+              />
+
+              {!allowDownloads && (
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center select-none">
+                  <div className="transform -rotate-20 rounded-2xl border-2 border-white/30 bg-black/40 px-5 py-2.5 sm:px-7 sm:py-3.5 text-center font-black tracking-widest text-sm sm:text-2xl uppercase text-white/55 backdrop-blur-sm shadow-2xl">
+                    © {studio?.brand_name || studio?.name || "PhotoOS Studio"}
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
               <button

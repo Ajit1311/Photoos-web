@@ -23,10 +23,25 @@ export interface MarketplaceStudio {
   rating: number;
   review_count: number;
   verified: boolean;
+  is_sponsored?: boolean;
   plan_tier: "pro" | "trial" | "enterprise";
   starting_price: number;
   services: string[];
   description: string;
+}
+
+function calculateProfileCompleteness(s: MarketplaceStudio): number {
+  let score = 0;
+  if (s.name && s.name.length > 2) score += 10;
+  if (s.brand_name) score += 10;
+  if (s.logo_url) score += 15;
+  if (s.phone) score += 10;
+  if (s.email) score += 10;
+  if (s.address) score += 10;
+  if (s.website) score += 10;
+  if (s.description && s.description.length > 20) score += 15;
+  if (s.services && s.services.length > 0) score += 10;
+  return score;
 }
 
 export async function GET(req: NextRequest) {
@@ -76,6 +91,7 @@ export async function GET(req: NextRequest) {
               rating: typeof meta?.rating === "number" ? meta.rating : 0,
               review_count: typeof meta?.review_count === "number" ? meta.review_count : 0,
               verified: Boolean(meta?.is_verified ?? false),
+              is_sponsored: Boolean(meta?.is_sponsored ?? meta?.sponsored_badge ?? meta?.sponsored ?? false),
               plan_tier: meta?.plan_tier === "enterprise" ? "enterprise" : meta?.plan_tier === "pro" ? "pro" : "trial",
               starting_price: typeof meta?.starting_price === "number" ? meta.starting_price : 0,
               services: Array.isArray(meta?.services) ? (meta.services as string[]) : [],
@@ -120,6 +136,20 @@ export async function GET(req: NextRequest) {
         s.services.some((srv) => srv.toLowerCase().includes(category)),
       );
     }
+
+    // Sort: Sponsored studios first, then top preference for studios with most updated profile
+    filtered.sort((a, b) => {
+      if (a.is_sponsored && !b.is_sponsored) return -1;
+      if (!a.is_sponsored && b.is_sponsored) return 1;
+
+      const scoreA = calculateProfileCompleteness(a);
+      const scoreB = calculateProfileCompleteness(b);
+      if (scoreA !== scoreB) {
+        return scoreB - scoreA;
+      }
+
+      return b.rating - a.rating;
+    });
 
     // Unique cities and areas from real database studios
     const availableCities = Array.from(new Set(dbStudios.map((s) => s.city).filter(Boolean)));

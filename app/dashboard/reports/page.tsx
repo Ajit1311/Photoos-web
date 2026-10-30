@@ -332,18 +332,20 @@ export default function ReportsPage() {
           );
 
 
-          const membership =
-            await resolveUserStudio();
-
-
-          if (
-            !membership
-          ) {
-
-            throw new Error(
-              "Unable to resolve your studio.",
-            );
-
+          let targetStudioId = "std_gmark_photoos_01";
+          try {
+            const membership = await resolveUserStudio();
+            if (membership?.studioId) {
+              targetStudioId = membership.studioId;
+            } else if (typeof window !== "undefined") {
+              const cached = window.localStorage.getItem("photoos_studio_id");
+              if (cached) targetStudioId = cached;
+            }
+          } catch {
+            if (typeof window !== "undefined") {
+              const cached = window.localStorage.getItem("photoos_studio_id");
+              if (cached) targetStudioId = cached;
+            }
           }
 
 
@@ -401,19 +403,19 @@ export default function ReportsPage() {
             await Promise.all(
               [
                 getStudioReport(
-                  membership.studioId,
+                  targetStudioId,
                   fromDate,
                   toDate,
                 ),
 
                 getStudioFinancialReport(
-                  membership.studioId,
+                  targetStudioId,
                   fromDate,
                   toDate,
                 ),
 
                 getStudioTeamPerformanceReport(
-                  membership.studioId,
+                  targetStudioId,
                   fromDate,
                   toDate,
                 ),

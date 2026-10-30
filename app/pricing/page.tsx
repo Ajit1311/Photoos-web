@@ -232,33 +232,33 @@ export default function PricingPage() {
 
         {/* Annual Shield Banner */}
         {activeTab === "yearly" && (
-          <div className="mt-10 rounded-3xl border border-white/10 bg-gradient-to-br from-[#073653] via-[#0A3F61] to-[#0B4D75] p-6 text-white shadow-xl shadow-[#0A3F61]/15 sm:p-8">
-            <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-slate-100 border border-white/20 backdrop-blur-md">
+          <div className="mt-10 rounded-3xl border border-white/10 dark:border-slate-300 bg-gradient-to-br from-[#073653] via-[#0A3F61] to-[#0B4D75] dark:from-white dark:via-slate-50 dark:to-slate-100 p-6 text-white dark:text-slate-900 shadow-xl shadow-[#0A3F61]/15 sm:p-8">
+            <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-white/15 dark:bg-black/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-slate-100 dark:text-slate-800 border border-white/20 dark:border-black/15 backdrop-blur-md">
               Option 2: Annual Shield
             </span>
-            <h2 className="mt-2 text-2xl font-extrabold tracking-tight sm:text-3xl">
+            <h2 className="mt-2 text-2xl font-extrabold tracking-tight sm:text-3xl text-white dark:text-black">
               13 Months Total: Complete Off-Season Monsoon Coverage
             </h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-200">
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-200 dark:text-slate-700">
               All yearly subscribers automatically bypass off-season churn with <strong>2 Months Free + 1 Extra Bonus Month (13 months total)</strong>. Full coverage across the entire monsoon with zero additional charges or gallery downtime.
             </p>
 
-            <div className="mt-6 grid gap-4 sm:grid-cols-3 border-t border-white/15 pt-6 text-xs">
-              <div className="rounded-2xl bg-white/10 p-4 border border-white/15 backdrop-blur-md">
-                <div className="font-bold text-white text-sm">🎁 13 Months for the Price of 10</div>
-                <p className="mt-1.5 text-slate-200 leading-relaxed">
+            <div className="mt-6 grid gap-4 sm:grid-cols-3 border-t border-white/15 dark:border-slate-200 pt-6 text-xs">
+              <div className="rounded-2xl bg-white/10 dark:bg-white p-4 border border-white/15 dark:border-slate-200 backdrop-blur-md shadow-sm">
+                <div className="font-bold text-white dark:text-black text-sm">🎁 13 Months for the Price of 10</div>
+                <p className="mt-1.5 text-slate-200 dark:text-slate-600 leading-relaxed">
                   Maximum savings on your studio budget with 3 full months included complimentary.
                 </p>
               </div>
-              <div className="rounded-2xl bg-white/10 p-4 border border-white/15 backdrop-blur-md">
-                <div className="font-bold text-white text-sm">🌧️ Zero Monsoon Interruption</div>
-                <p className="mt-1.5 text-slate-200 leading-relaxed">
+              <div className="rounded-2xl bg-white/10 dark:bg-white p-4 border border-white/15 dark:border-slate-200 backdrop-blur-md shadow-sm">
+                <div className="font-bold text-white dark:text-black text-sm">🌧️ Zero Monsoon Interruption</div>
+                <p className="mt-1.5 text-slate-200 dark:text-slate-600 leading-relaxed">
                   Keep all client galleries, AI face searches, and portfolio active all summer and monsoon.
                 </p>
               </div>
-              <div className="rounded-2xl bg-white/10 p-4 border border-white/15 backdrop-blur-md">
-                <div className="font-bold text-white text-sm">⚡ Peak Season Ready</div>
-                <p className="mt-1.5 text-slate-200 leading-relaxed">
+              <div className="rounded-2xl bg-white/10 dark:bg-white p-4 border border-white/15 dark:border-slate-200 backdrop-blur-md shadow-sm">
+                <div className="font-bold text-white dark:text-black text-sm">⚡ Peak Season Ready</div>
+                <p className="mt-1.5 text-slate-200 dark:text-slate-600 leading-relaxed">
                   Start the upcoming autumn wedding rush at full capacity with zero reactivations needed.
                 </p>
               </div>
@@ -272,11 +272,11 @@ export default function PricingPage() {
             <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-slate-100 border border-white/20 backdrop-blur-md">
               Peak Season Expansion
             </span>
-            <h2 className="mt-2 text-2xl font-extrabold tracking-tight sm:text-3xl">
+            <h2 className="mt-2 text-2xl font-extrabold tracking-tight sm:text-3xl text-white">
               Modular High-Margin Add-Ons
             </h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-200">
-              Studios can expand limits dynamically during peak wedding months without forcing an entire tier upgrade. Add extra event passes or boost Cloudflare R2 storage on demand.
+              Studios can expand limits dynamically during peak wedding months without forcing an entire tier upgrade. Add extra event passes or boost studio client reach with our verified marketplace badge.
             </p>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2 border-t border-white/15 pt-6 text-xs">
@@ -290,10 +290,10 @@ export default function PricingPage() {
               </div>
               <div className="rounded-2xl bg-white/10 p-4 border border-white/15 backdrop-blur-md">
                 <div className="font-bold text-white text-sm flex items-center gap-2">
-                  <span>💾</span> Cloudflare R2 Storage Boosters
+                  <span>⭐</span> Sponsored Marketplace Verified Badge (₹99 / month)
                 </div>
                 <p className="mt-1.5 text-slate-200 leading-relaxed">
-                  Instant allocation (+50 GB for ₹99/mo or +100 GB for ₹179/mo) with zero upload downtime.
+                  Listed as a Sponsored Verified Studio for 1 month with top placement preference for studios with fully updated profiles.
                 </p>
               </div>
             </div>

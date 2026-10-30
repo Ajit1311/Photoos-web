@@ -334,77 +334,58 @@ function InteractiveSettingRow(
 
 
 function formatDate(
-  value:
-    string,
+  value: string | undefined | null,
 ) {
-
+  if (!value) return "Latest";
   try {
-
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return "Latest";
     return new Intl.DateTimeFormat(
       "en-IN",
       {
-        day:
-          "numeric",
-
-        month:
-          "long",
-
-        year:
-          "numeric",
-
-        hour:
-          "numeric",
-
-        minute:
-          "2-digit",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
       },
-    ).format(
-      new Date(
-        value,
-      ),
-    );
-
+    ).format(d);
   } catch {
-
-    return value;
-
+    return String(value);
   }
-
 }
 
 
 function getDisplaySchemaVersion(
   softwareUpdate:
-    SoftwareUpdate,
+    SoftwareUpdate | null | undefined,
 ) {
+  if (!softwareUpdate) {
+    return "PhotoOS-01";
+  }
 
   const value =
-    softwareUpdate.metadata[
+    softwareUpdate.metadata?.[
       "display_schema_version"
     ];
-
 
   if (
     typeof value ===
     "string"
   ) {
-
     return value;
-
   }
-
 
   return (
     `PhotoOS-${
       String(
-        softwareUpdate.schema_version,
+        softwareUpdate.schema_version ?? 1,
       ).padStart(
         2,
         "0",
       )
     }`
   );
-
 }
 
 

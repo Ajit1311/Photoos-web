@@ -265,6 +265,12 @@ export default function JustdialMarketplace({
                         <h3 className="text-base font-bold text-white truncate">
                           {studio.brand_name || studio.name}
                         </h3>
+                        {studio.is_sponsored && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-500/30 to-amber-600/20 border border-amber-400/40 px-2.5 py-0.5 text-[10px] font-black text-amber-300 uppercase tracking-wider shadow-sm">
+                            <Sparkles className="h-3 w-3 text-amber-400" />
+                            Sponsored
+                          </span>
+                        )}
                         {studio.verified && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
                             <CheckCircle2 className="h-3 w-3" />

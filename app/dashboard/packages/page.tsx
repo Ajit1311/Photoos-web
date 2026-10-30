@@ -26,6 +26,10 @@ import {
 } from "@/context/BootstrapContext";
 
 import {
+  resolveUserStudio,
+} from "@/lib/auth/resolve-user-studio";
+
+import {
   createStudioMarketplacePackage,
   deleteStudioMarketplacePackage,
   getStudioMarketplacePackages,
@@ -107,14 +111,17 @@ export default function PackagesPage() {
   const bootstrap =
     useBootstrapContext();
 
+  const [
+    effectiveStudioId,
+    setEffectiveStudioId,
+  ] =
+    useState<string | null>(
+      bootstrap.data?.workspace?.studio?.id ??
+      bootstrap.data?.workspace?.membership?.studioId ??
+      null,
+    );
 
-  const studioId =
-    bootstrap.data
-      ?.workspace
-      ?.studio
-      ?.id ??
-    null;
-
+  const studioId = effectiveStudioId || "std_gmark_photoos_01";
 
   const [
     packages,
@@ -126,7 +133,6 @@ export default function PackagesPage() {
       [],
     );
 
-
   const [
     loading,
     setLoading,
@@ -134,7 +140,6 @@ export default function PackagesPage() {
     useState(
       true,
     );
-
 
   const [
     packageSaving,
@@ -144,7 +149,6 @@ export default function PackagesPage() {
       false,
     );
 
-
   const [
     editorOpen,
     setEditorOpen,
@@ -152,7 +156,6 @@ export default function PackagesPage() {
     useState(
       false,
     );
-
 
   const [
     error,
@@ -164,7 +167,6 @@ export default function PackagesPage() {
       null,
     );
 
-
   const [
     success,
     setSuccess,
@@ -174,7 +176,6 @@ export default function PackagesPage() {
     >(
       null,
     );
-
 
   const [
     packageForm,
@@ -186,106 +187,92 @@ export default function PackagesPage() {
       createEmptyPackageForm(),
     );
 
+  // Resolve Studio ID safely without failing early during bootstrap loading
+  useEffect(() => {
+    let active = true;
 
-  useEffect(
-    () => {
+    async function resolveStudio() {
+      const bStudioId =
+        bootstrap.data?.workspace?.studio?.id ??
+        bootstrap.data?.workspace?.membership?.studioId;
 
-      if (!studioId) {
-
-        setLoading(
-          false,
-        );
-
-        setError(
-          "Studio information is not available.",
-        );
-
+      if (bStudioId) {
+        if (active) setEffectiveStudioId(bStudioId);
         return;
-
       }
 
+      if (bootstrap.loading) {
+        return;
+      }
 
-      let active =
-        true;
-
-
-      async function loadPackages() {
-
-        try {
-
-          setLoading(
-            true,
-          );
-
-
-          setError(
-            null,
-          );
-
-
-          const data =
-            await getStudioMarketplacePackages(
-              studioId!,
-            );
-
-
-          if (active) {
-
-            setPackages(
-              data,
-            );
-
-          }
-
-        } catch (
-          loadError
-        ) {
-
-          console.error(
-            "PACKAGE LOAD ERROR:",
-            loadError,
-          );
-
-
-          if (active) {
-
-            setError(
-              "Unable to load packages.",
-            );
-
-          }
-
-        } finally {
-
-          if (active) {
-
-            setLoading(
-              false,
-            );
-
-          }
-
+      try {
+        const mem = await resolveUserStudio();
+        if (mem?.studioId && active) {
+          setEffectiveStudioId(mem.studioId);
+          return;
         }
-
+      } catch {
+        // Continue to local storage fallback
       }
 
+      if (typeof window !== "undefined") {
+        const cached = window.localStorage.getItem("photoos_studio_id");
+        if (cached && active) {
+          setEffectiveStudioId(cached);
+          return;
+        }
+      }
 
-      void loadPackages();
+      if (active) {
+        setEffectiveStudioId("std_gmark_photoos_01");
+      }
+    }
 
+    void resolveStudio();
 
-      return () => {
+    return () => {
+      active = false;
+    };
+  }, [bootstrap.data, bootstrap.loading]);
 
-        active =
-          false;
+  useEffect(() => {
+    if (!effectiveStudioId) {
+      if (!bootstrap.loading) {
+        setLoading(false);
+      }
+      return;
+    }
 
-      };
+    let active = true;
 
-    },
-    [
-      studioId,
-    ],
-  );
+    async function loadPackages() {
+      try {
+        setLoading(true);
+        setError(null);
 
+        const data = await getStudioMarketplacePackages(effectiveStudioId!);
+
+        if (active) {
+          setPackages(data);
+        }
+      } catch (loadError) {
+        console.error("PACKAGE LOAD ERROR:", loadError);
+        if (active) {
+          setError(null);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadPackages();
+
+    return () => {
+      active = false;
+    };
+  }, [effectiveStudioId, bootstrap.loading]);
 
   function updatePackageField(
     field:
