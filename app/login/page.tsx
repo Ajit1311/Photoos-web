@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 
 import {
+  Building2,
   Camera,
   CheckCircle2,
   Sparkles,
@@ -109,7 +110,14 @@ function LoginPageContent() {
         ===================================================== */}
         <section className="relative flex min-h-screen items-center justify-center px-6 py-10 sm:px-10 lg:px-12 xl:px-20 bg-background text-foreground">
 
-          <div className="absolute right-6 top-6">
+          <div className="absolute right-6 top-6 flex items-center gap-3">
+            <Link
+              href="/corporate"
+              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/80 backdrop-blur px-3.5 py-1.5 text-xs font-semibold text-foreground shadow-sm hover:border-[#0A3F61] hover:text-[#0A3F61] dark:hover:text-sky-400 transition"
+            >
+              <Building2 className="h-3.5 w-3.5 text-[#0A3F61] dark:text-sky-400" />
+              <span>For Corporate</span>
+            </Link>
             <ThemeToggle />
           </div>
 
@@ -168,6 +176,10 @@ function LoginPageContent() {
                 <span>&bull;</span>
                 <Link href="/pricing" className="hover:text-foreground transition underline-offset-4 hover:underline">
                   Plans & Pricing
+                </Link>
+                <span>&bull;</span>
+                <Link href="/corporate" className="hover:text-foreground transition underline-offset-4 hover:underline font-semibold text-[#0A3F61] dark:text-sky-400">
+                  Corporate Offices
                 </Link>
               </div>
 

@@ -63,7 +63,7 @@ export default function CorporateEventsListPage() {
 
           <Link
             href="/corporate/events/new"
-            className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-5 py-2.5 text-xs font-bold text-slate-950 shadow-md hover:bg-sky-400 transition-all self-start sm:self-auto"
+            className="inline-flex items-center gap-2 rounded-xl bg-[#0A3F61] px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#072c44] transition-all self-start sm:self-auto"
           >
             <Plus className="h-4 w-4" />
             Create Corporate Event
@@ -180,3 +180,4 @@ export default function CorporateEventsListPage() {
     </CorporateShell>
   );
 }
+

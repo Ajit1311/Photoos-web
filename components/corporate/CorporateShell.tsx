@@ -29,3 +29,4 @@ export function CorporateShell({ children }: CorporateShellProps) {
     </div>
   );
 }
+

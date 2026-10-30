@@ -201,14 +201,14 @@ export default function CorporateStandeeQRPage() {
           <div className="flex items-center gap-2.5">
             <button
               onClick={handleDownloadStandee}
-              className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-4 py-2.5 text-xs font-bold text-slate-950 shadow-md hover:bg-sky-400 transition-all"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#0A3F61] px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#072c44] transition-all"
             >
               <Download className="h-4 w-4" />
               Download Standee (PNG)
             </button>
             <button
               onClick={handlePrint}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 shadow-sm"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 shadow-sm"
             >
               <Printer className="h-4 w-4" />
               Print
@@ -398,3 +398,4 @@ export default function CorporateStandeeQRPage() {
     </CorporateShell>
   );
 }
+

@@ -57,19 +57,17 @@ export default function CorporateDashboardPage() {
   return (
     <CorporateShell>
       <div className="space-y-8">
-        {/* Executive Header Banner */}
-        <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 p-6 sm:p-8 text-white shadow-xl dark:border-slate-800">
-          <div className="absolute top-0 right-0 -mr-16 -mt-16 h-64 w-64 rounded-full bg-sky-500/10 blur-3xl pointer-events-none" />
-
-          <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+        {/* Executive Header Banner - Minimalist Clean Style */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 text-slate-900 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-white">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-sky-500/15 px-3 py-1 text-xs font-semibold text-sky-300">
-                  <Sparkles className="h-3 w-3 text-sky-400" />
-                  Enterprise Portal
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                  <Sparkles className="h-3 w-3 text-[#EF8619]" />
+                  Corporate Portal
                 </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-300">
-                  <Clock className="h-3 w-3 text-emerald-400" />
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300">
+                  <Clock className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
                   {company?.subscription?.days_remaining ?? 7} Days Free Trial Active
                 </span>
               </div>
@@ -77,7 +75,7 @@ export default function CorporateDashboardPage() {
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
                 {company?.name || "Corporate Office Dashboard"}
               </h1>
-              <p className="mt-1 text-xs sm:text-sm text-slate-300 max-w-xl">
+              <p className="mt-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-xl">
                 Manage your office events, generate reception Standee QRs, and let employees instantly discover their candid photos with AI selfie matching.
               </p>
             </div>
@@ -85,7 +83,7 @@ export default function CorporateDashboardPage() {
             <div className="flex flex-wrap items-center gap-3">
               <Link
                 href="/corporate/standee-qr"
-                className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-xs font-semibold text-white backdrop-blur hover:bg-white/20 transition-all"
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-all shadow-sm"
               >
                 <QrCode className="h-4 w-4" />
                 Standee QR Poster
@@ -93,7 +91,7 @@ export default function CorporateDashboardPage() {
 
               <Link
                 href="/corporate/events/new"
-                className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-5 py-2.5 text-xs font-bold text-slate-950 shadow-lg shadow-sky-500/25 hover:bg-sky-400 transition-all"
+                className="inline-flex items-center gap-2 rounded-xl bg-[#0A3F61] px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#072c44] transition-all"
               >
                 <Plus className="h-4 w-4" />
                 Create Corporate Event
@@ -241,27 +239,27 @@ export default function CorporateDashboardPage() {
         </div>
 
         {/* 3-Step Guide for Office Reception / HR */}
-        <div className="rounded-2xl border border-indigo-100 bg-gradient-to-r from-sky-50/50 via-indigo-50/30 to-purple-50/40 p-6 dark:border-indigo-900/40 dark:from-slate-900 dark:via-indigo-950/20 dark:to-slate-900">
-          <div className="flex items-center gap-2 text-indigo-900 dark:text-indigo-300 mb-3">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex items-center gap-2 text-[#0A3F61] dark:text-sky-400 mb-3">
             <Sparkles className="h-4 w-4" />
             <h3 className="text-sm font-bold uppercase tracking-wider">
               How PhotoOS Works For Your Office Events
             </h3>
           </div>
           <div className="grid sm:grid-cols-3 gap-4 text-xs text-slate-600 dark:text-slate-400">
-            <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3.5 dark:border-slate-800 dark:bg-slate-800/60">
-              <span className="font-bold text-sky-600 dark:text-sky-400">Step 1: Upload Photos</span>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+              <span className="font-bold text-[#0A3F61] dark:text-sky-400">Step 1: Upload Photos</span>
               <p className="mt-1">
                 Upload your photographer's DSLR captures or phone albums after the event. AI automatically indexes every face.
               </p>
             </div>
-            <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3.5 dark:border-slate-800 dark:bg-slate-800/60">
-              <span className="font-bold text-indigo-600 dark:text-indigo-400">Step 2: Print Standee QR</span>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+              <span className="font-bold text-[#0A3F61] dark:text-sky-400">Step 2: Print Standee QR</span>
               <p className="mt-1">
                 Download your high-res office standee poster with company branding and place it in the office cafeteria or reception.
               </p>
             </div>
-            <div className="rounded-xl border border-slate-200/80 bg-white/80 p-3.5 dark:border-slate-800 dark:bg-slate-800/60">
+            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-800/40">
               <span className="font-bold text-emerald-600 dark:text-emerald-400">Step 3: Instant Employee Delivery</span>
               <p className="mt-1">
                 Employees scan QR, take a selfie, and get all their event moments in 3 seconds directly on their smartphone.
@@ -273,3 +271,4 @@ export default function CorporateDashboardPage() {
     </CorporateShell>
   );
 }
+

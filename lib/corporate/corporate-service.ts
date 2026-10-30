@@ -268,3 +268,4 @@ export async function createCorporateEvent(
 
   return newEvent;
 }
+

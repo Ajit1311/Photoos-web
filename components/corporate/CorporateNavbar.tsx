@@ -41,7 +41,7 @@ export function CorporateNavbar() {
         {/* Brand / Logo */}
         <div className="flex items-center gap-6">
           <Link href="/corporate/dashboard" className="flex items-center gap-2.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-sky-600 via-indigo-600 to-blue-700 text-white shadow-md shadow-indigo-500/20">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0A3F61] text-white shadow-sm font-bold">
               <Building2 className="h-5 w-5" />
             </div>
             <div>
@@ -49,12 +49,12 @@ export function CorporateNavbar() {
                 <span className="text-base font-bold tracking-tight text-slate-900 dark:text-white">
                   PhotoOS
                 </span>
-                <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-sky-800 dark:bg-sky-950 dark:text-sky-300">
-                  Enterprise
+                <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#0A3F61] dark:bg-sky-950 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+                  Corporate
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Corporate Office Edition
+                Workplace Events Portal
               </p>
             </div>
           </Link>
@@ -115,3 +115,4 @@ export function CorporateNavbar() {
     </header>
   );
 }
+

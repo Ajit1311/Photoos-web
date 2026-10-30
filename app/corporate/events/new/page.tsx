@@ -215,7 +215,7 @@ export default function CreateCorporateEventPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-6 py-2.5 text-xs font-bold text-slate-950 shadow-md hover:bg-sky-400 transition-all disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-xl bg-[#0A3F61] px-6 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#072c44] transition-all disabled:opacity-50"
               >
                 {loading ? (
                   <>
@@ -236,3 +236,4 @@ export default function CreateCorporateEventPage() {
     </CorporateShell>
   );
 }
+

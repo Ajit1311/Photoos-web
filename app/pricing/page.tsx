@@ -97,6 +97,17 @@ export default function PricingPage() {
   return (
     <main className="min-h-screen bg-slate-50/60 px-4 py-16 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
+        {/* Corporate Office Link Banner */}
+        <div className="mb-6 flex justify-center">
+          <Link
+            href="/corporate"
+            className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-4 py-1.5 text-xs font-semibold text-[#0A3F61] hover:bg-sky-100 transition shadow-sm"
+          >
+            <span className="font-bold">🏢 Looking for Corporate Office Events?</span>
+            <span>Explore PhotoOS Enterprise &bull; 7-Day Free Trial &rarr;</span>
+          </Link>
+        </div>
+
         {/* Header */}
         <div className="mx-auto max-w-3xl text-center">
           <div className="inline-flex items-center gap-2 rounded-full bg-[#0A3F61]/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-[#0A3F61]">
