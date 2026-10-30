@@ -234,46 +234,60 @@ export default function CorporateEventDetailsPage() {
   const handleFilesSelected = async (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0 || !company || !event) return;
 
-    const files = Array.from(fileList).filter((f) => f.type.startsWith("image/"));
+    // Filter image files by mime-type or file extension (supports RAW/HEIC/camera uploads)
+    const files = Array.from(fileList).filter((f) => {
+      if (f.type && f.type.startsWith("image/")) return true;
+      const ext = f.name.split(".").pop()?.toLowerCase();
+      return ["jpg", "jpeg", "png", "webp", "heic", "heif", "avif", "gif", "tiff", "bmp", "dng", "cr2", "nef", "arw"].includes(ext || "");
+    });
+
     if (files.length === 0) return;
 
     setUploading(true);
-    setUploadProgress(10);
-    setUploadMessage(`Processing ${files.length} high-resolution photos...`);
+    setUploadProgress(0);
+    setUploadMessage(`Starting upload for ${files.length} photos...`);
 
-    const BATCH_SIZE = 5;
     let allPhotosList: CorporatePhoto[] = photos;
+    let successCount = 0;
 
     try {
-      for (let i = 0; i < files.length; i += BATCH_SIZE) {
-        const batch = files.slice(i, i + BATCH_SIZE);
+      // Upload one-by-one to stay well within Vercel's 4.5MB serverless body limit
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setUploadMessage(
+          `Uploading photo ${i + 1} of ${files.length}: ${file.name}...`
+        );
+
         const formData = new FormData();
         formData.set("eventId", eventId);
         formData.set("companyId", company.id);
-        batch.forEach((f) => formData.append("photos", f));
+        formData.append("photos", file);
 
-        setUploadMessage(
-          `Uploading & indexing photos (${i + 1} to ${Math.min(i + batch.length, files.length)} of ${files.length})...`
-        );
+        try {
+          const res = await fetch("/api/corporate/photos", {
+            method: "POST",
+            body: formData,
+          });
 
-        const res = await fetch("/api/corporate/photos", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          if (data?.success && Array.isArray(data?.photos)) {
-            allPhotosList = data.photos;
-            setPhotos(data.photos);
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.success && Array.isArray(data?.photos)) {
+              allPhotosList = data.photos;
+              setPhotos(data.photos);
+              successCount++;
+            }
+          } else {
+            console.warn(`[CorporateEvent] Upload HTTP ${res.status} for ${file.name}`);
           }
+        } catch (fileErr) {
+          console.warn(`[CorporateEvent] Upload error for ${file.name}:`, fileErr);
         }
 
-        const prog = Math.min(95, Math.round(((i + batch.length) / files.length) * 85) + 10);
+        const prog = Math.round(((i + 1) / files.length) * 100);
         setUploadProgress(prog);
       }
 
-      setUploadMessage("Indexing faces & updating live attendee gallery...");
+      setUploadMessage(`Uploaded ${successCount} of ${files.length} photos! Updating live gallery & QR...`);
 
       // Update event metadata
       const totalFaces = allPhotosList.reduce((acc, p) => acc + (p.ai_faces_detected || 1), 0);
@@ -289,12 +303,11 @@ export default function CorporateEventDetailsPage() {
     } catch (uploadErr) {
       console.error("[CorporateEvent] Upload error:", uploadErr);
     } finally {
-      setUploadProgress(100);
       setTimeout(() => {
         setUploading(false);
         setUploadProgress(0);
         setUploadMessage(null);
-      }, 600);
+      }, 1000);
     }
   };
 
@@ -441,10 +454,14 @@ export default function CorporateEventDetailsPage() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="inline-flex items-center gap-2 rounded-xl bg-[#0A3F61] px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#072c44] transition-all"
+                disabled={uploading}
+                className="inline-flex items-center gap-2 rounded-xl bg-[#0A3F61] px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#072c44] transition-all disabled:opacity-50"
               >
-                <Plus className="h-4 w-4" />
-                Upload Photos
+                <UploadCloud className="h-4 w-4" />
+                <span>Upload Photos</span>
+                <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold">
+                  Multiple
+                </span>
               </button>
             </div>
           </div>
@@ -522,14 +539,20 @@ export default function CorporateEventDetailsPage() {
           </button>
         </div>
 
-        {/* Hidden File Input */}
+        {/* Hidden File Input (Studio-compatible multi-file picker) */}
         <input
           type="file"
           ref={fileInputRef}
           multiple
-          accept="image/*"
+          accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif,image/gif,image/tiff"
           className="hidden"
-          onChange={(e) => void handleFilesSelected(e.target.files)}
+          onChange={(e) => {
+            const files = e.target.files;
+            e.target.value = "";
+            if (files && files.length > 0) {
+              void handleFilesSelected(files);
+            }
+          }}
         />
 
         {/* ================================================================= */}
@@ -557,9 +580,9 @@ export default function CorporateEventDetailsPage() {
                 Supports JPG, PNG, WEBP files. Photos are automatically indexed by the AI face engine.
               </p>
               <div className="mt-4">
-                <span className="inline-flex items-center gap-2 rounded-xl bg-[#0A3F61] px-4 py-2 text-xs font-bold text-white shadow-xs">
-                  <Plus className="h-3.5 w-3.5" />
-                  Select Files from Computer
+                <span className="inline-flex items-center gap-2 rounded-xl bg-[#0A3F61] px-5 py-2.5 text-xs font-bold text-white shadow-xs group-hover:bg-[#072c44] transition-colors">
+                  <UploadCloud className="h-4 w-4" />
+                  Select Multiple Photos from Computer
                 </span>
               </div>
             </div>

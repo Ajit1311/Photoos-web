@@ -72,29 +72,43 @@ export async function GET(
         const evName = corpEventData?.name || "Corporate Event";
         const compName = corpEventData?.company_name || "Corporate Office";
 
-        const formattedPhotos = corpPhotos.map((p, idx) => ({
-          id: p.id || `cp_${idx}`,
-          eventId: targetId,
-          fileName: p.name || `photo_${idx + 1}.jpg`,
-          thumbnailUrl: p.thumbnail_url || p.url,
-          originalUrl: p.url || p.thumbnail_url,
-          width: 1920,
-          height: 1080,
-          fileSize: p.size_bytes || 204800,
-          mimeType: "image/jpeg",
-          uploadedBy: compName,
-          uploadedAt: p.uploaded_at || new Date().toISOString(),
-          status: "ready",
-          visibility: "visible",
-          rating: 0,
-          likes: 0,
-          comments: 0,
-          isFavorite: false,
-          isSelected: false,
-          aiProcessed: true,
-          captureDate: corpEventData?.date,
-          location: corpEventData?.location,
-        }));
+        const formattedPhotos = await Promise.all(
+          corpPhotos.map(async (p, idx) => {
+            let photoUrl = p.url || p.thumbnail_url;
+            if (p.storage_path) {
+              try {
+                const { data: sData } = await supabaseAdmin.storage
+                  .from("assets")
+                  .createSignedUrl(p.storage_path, 86400);
+                if (sData?.signedUrl) photoUrl = sData.signedUrl;
+              } catch {}
+            }
+
+            return {
+              id: p.id || `cp_${idx}`,
+              eventId: targetId,
+              fileName: p.name || `photo_${idx + 1}.jpg`,
+              thumbnailUrl: photoUrl,
+              originalUrl: photoUrl,
+              width: 1920,
+              height: 1080,
+              fileSize: p.size_bytes || 204800,
+              mimeType: "image/jpeg",
+              uploadedBy: compName,
+              uploadedAt: p.uploaded_at || new Date().toISOString(),
+              status: "ready",
+              visibility: "visible",
+              rating: 0,
+              likes: 0,
+              comments: 0,
+              isFavorite: false,
+              isSelected: false,
+              aiProcessed: true,
+              captureDate: corpEventData?.date,
+              location: corpEventData?.location,
+            };
+          })
+        );
 
         return NextResponse.json(
           {

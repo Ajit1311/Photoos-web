@@ -136,15 +136,24 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      // Generate long-lived signed URL (1 year = 31,536,000s)
+      // Generate signed URL (7 days = 604800s, fallback 24h = 86400s)
       let photoUrl = "";
       try {
         const { data: signedData } = await supabase.storage
           .from("assets")
-          .createSignedUrl(storagePath, 31536000);
+          .createSignedUrl(storagePath, 604800);
         photoUrl = signedData?.signedUrl || "";
       } catch (signErr) {
-        console.warn("[CorporatePhotosRoute POST] Sign error:", signErr);
+        console.warn("[CorporatePhotosRoute POST] 7-day sign notice, trying 24h:", signErr);
+      }
+
+      if (!photoUrl) {
+        try {
+          const { data: signed24 } = await supabase.storage
+            .from("assets")
+            .createSignedUrl(storagePath, 86400);
+          photoUrl = signed24?.signedUrl || "";
+        } catch {}
       }
 
       if (!photoUrl) {
@@ -262,3 +271,4 @@ export async function DELETE(req: NextRequest) {
     );
   }
 }
+
