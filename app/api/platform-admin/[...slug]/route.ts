@@ -1122,8 +1122,13 @@ export async function GET(
   if (endpoint === "platform-admin-settings") {
     const section = searchParams.get("section");
 
+    const effectiveCompany = {
+      ...companySettingsState,
+      ...platformLiveStore.companySettings,
+    };
+
     if (section === "company") {
-      return NextResponse.json({ success: true, data: companySettingsState });
+      return NextResponse.json({ success: true, data: effectiveCompany });
     }
     if (section === "email") {
       return NextResponse.json({ success: true, data: emailSettingsState });
@@ -1142,7 +1147,7 @@ export async function GET(
           default_currency: "INR",
           maintenance_mode: false,
         },
-        company: companySettingsState,
+        company: effectiveCompany,
         email: emailSettingsState,
         branding: brandingSettingsState,
       },
@@ -1274,12 +1279,12 @@ export async function POST(
     const emp = platformLiveStore.employees.find((e) => e.platform_admin_id === adminId);
 
     if (emp) {
-      await platformLiveStore.createEmployee(emp.display_name, emp.email, emp.roles[0]?.code || "support");
+      await platformLiveStore.sendWelcomeCredentialsEmail(emp, tempPass);
     }
 
     return NextResponse.json({
       success: true,
-      message: "Credentials and welcome instructions sent via email.",
+      message: "Credentials and welcome instructions sent via team@photoos.in.",
     });
   }
 
@@ -1303,7 +1308,11 @@ export async function POST(
 
     if (section === "company" || !section) {
       companySettingsState = { ...companySettingsState, ...value };
-      return NextResponse.json({ success: true, data: companySettingsState });
+      platformLiveStore.updateCompanySettings(value);
+      return NextResponse.json({
+        success: true,
+        data: platformLiveStore.companySettings,
+      });
     }
     if (section === "email") {
       emailSettingsState = { ...emailSettingsState, ...value };

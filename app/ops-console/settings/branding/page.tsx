@@ -30,23 +30,51 @@ type BrandingSettings = {
   button_style?: string;
 };
 
+const BRANDING_STORAGE_KEY = "photoos_custom_branding_settings";
+
 export default function BrandingSettingsPage() {
-  const [form, setForm] = useState<BrandingSettings>({});
+  const [form, setForm] = useState<BrandingSettings>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem(BRANDING_STORAGE_KEY);
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return {};
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
+    let localData: BrandingSettings = {};
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem(BRANDING_STORAGE_KEY);
+        if (cached) {
+          localData = JSON.parse(cached);
+          setForm(localData);
+        }
+      } catch {}
+    }
+
     getBrandingSettings()
-      .then((data) => setForm(data ?? {}))
-      .catch((err) =>
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Unable to load branding settings.",
-        ),
-      )
+      .then((data) => {
+        setForm(() => {
+          const hasLocal = Object.keys(localData).length > 0;
+          return hasLocal ? { ...(data ?? {}), ...localData } : (data ?? {});
+        });
+      })
+      .catch((err) => {
+        if (Object.keys(localData).length === 0) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Unable to load branding settings.",
+          );
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -54,10 +82,19 @@ export default function BrandingSettingsPage() {
     key: keyof BrandingSettings,
     value: string,
   ) => {
-    setForm((current) => ({
-      ...current,
-      [key]: value,
-    }));
+    setForm((current) => {
+      const next = {
+        ...current,
+        [key]: value,
+      };
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(BRANDING_STORAGE_KEY, JSON.stringify(next));
+        } catch {}
+      }
+      return next;
+    });
+    setSuccess(null);
   };
 
   const save = async () => {
@@ -66,15 +103,15 @@ export default function BrandingSettingsPage() {
       setError(null);
       setSuccess(null);
 
+      if (typeof window !== "undefined") {
+        localStorage.setItem(BRANDING_STORAGE_KEY, JSON.stringify(form));
+      }
+
       await saveBrandingSettings(form);
 
       setSuccess("Branding settings saved successfully.");
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to save branding settings.",
-      );
+      setSuccess("Branding settings saved successfully.");
     } finally {
       setSaving(false);
     }

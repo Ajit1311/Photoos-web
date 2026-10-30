@@ -750,9 +750,7 @@ export default function AdminEmployeesPage() {
                   </div>
 
                   <p className="mt-1 text-sm text-emerald-700">
-                    These credentials are temporary.
-                    The employee must change the
-                    password after first login.
+                    Welcome email with login credentials and admin link has been dispatched automatically from <strong>team@photoos.in</strong>. The employee must change their temporary password upon first login.
                   </p>
                 </div>
 
@@ -793,19 +791,19 @@ export default function AdminEmployeesPage() {
                     {sendingInvite ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Sending Credentials...
+                        Sending Credentials via team@photoos.in...
                       </>
                     ) : (
                       <>
                         <Mail className="h-4 w-4" />
-                        Send Credentials by Email
+                        Resend Credentials via team@photoos.in
                       </>
                     )}
                   </button>
 
                   {inviteSent && (
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-center text-xs font-medium text-emerald-700">
-                      Credentials email sent successfully.
+                      Credentials email sent successfully via team@photoos.in.
                     </div>
                   )}
 

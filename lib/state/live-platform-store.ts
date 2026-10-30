@@ -47,6 +47,32 @@ export interface AdminEmployeeItem {
 
 // Global in-memory storage persisted during server runtime
 class PlatformLiveStore {
+  public companySettings = {
+    legal_name: "PhotoOS SaaS Technologies Private Limited",
+    display_name: "PhotoOS Platform",
+    brand_name: "PhotoOS Studio & Cloud",
+    email: "support@photoos.in",
+    phone: "+91 96896 89142",
+    website: "https://photoos.in",
+    logo_url: "/logo.png",
+    country: "India",
+    state: "Maharashtra",
+    city: "Pune",
+    address: "Senapati Bapat Marg, Pune, Maharashtra 411038, India",
+    postal_code: "411038",
+    tax_id: "27AABCP1234F1Z8",
+    timezone: "Asia/Kolkata",
+    currency: "INR",
+  };
+
+  public updateCompanySettings(updates: Partial<typeof this.companySettings>) {
+    this.companySettings = {
+      ...this.companySettings,
+      ...updates,
+    };
+    return this.companySettings;
+  }
+
   public singleStudio = {
     studio_id: "std_gmark_photoos_01",
     studio_code: "STD-GMARK-01",
@@ -357,7 +383,88 @@ class PlatformLiveStore {
   }
 
   /**
-   * Adds a new employee, creates credentials, dispatches an automated Resend welcome email.
+   * Dispatches an automated onboarding greeting email from team@photoos.in
+   * with the Ops Console admin link, User ID, and temporary password.
+   */
+  public async sendWelcomeCredentialsEmail(
+    emp: { display_name: string; email: string; roles?: Array<{ name: string }> },
+    tempPassword: string
+  ) {
+    const cleanEmail = emp.email.trim().toLowerCase();
+    const displayName = emp.display_name.trim();
+    const roleName = emp.roles?.[0]?.name || "Platform Staff";
+
+    try {
+      return await sendEmailWithResend({
+        department: "team",
+        to: cleanEmail,
+        subject: `Welcome to PhotoOS Team - Operations Console Credentials (${displayName})`,
+        html: `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff; color: #1e293b;">
+            <div style="text-align: center; margin-bottom: 28px;">
+              <div style="display: inline-block; background-color: #0A3F61; color: #ffffff; padding: 10px 22px; border-radius: 12px; font-weight: 700; font-size: 18px; letter-spacing: -0.5px;">
+                PhotoOS Admin Console
+              </div>
+              <h1 style="color: #0f172a; margin: 18px 0 6px 0; font-size: 22px; font-weight: 700;">Welcome to PhotoOS, ${displayName}! 👋</h1>
+              <p style="color: #64748b; font-size: 14px; margin: 0;">You have been invited as <strong>${roleName}</strong></p>
+            </div>
+
+            <p style="font-size: 14px; line-height: 1.6; color: #334155; margin-bottom: 20px;">
+              Hello <strong>${displayName}</strong>,<br /><br />
+              Welcome to the <strong>PhotoOS Platform Operations Team</strong>! Your employee admin credentials have been configured. You can now log in to the Operations Console to manage studios, customer support, marketing leads, and platform activities.
+            </p>
+
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 24px 0;">
+              <h3 style="margin: 0 0 14px 0; font-size: 14px; font-weight: 700; color: #0A3F61; text-transform: uppercase; letter-spacing: 0.5px;">Your Admin Access Details</h3>
+              
+              <div style="margin-bottom: 12px;">
+                <span style="font-size: 12px; color: #64748b; font-weight: 600; display: block; margin-bottom: 4px;">OPERATIONS CONSOLE URL</span>
+                <a href="https://app.photoos.in/ops-console/login" style="color: #0A3F61; font-weight: 600; font-size: 14px; text-decoration: none; word-break: break-all;">
+                  https://app.photoos.in/ops-console/login
+                </a>
+              </div>
+
+              <div style="margin-bottom: 12px;">
+                <span style="font-size: 12px; color: #64748b; font-weight: 600; display: block; margin-bottom: 4px;">USER ID / LOGIN EMAIL</span>
+                <span style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 15px; font-weight: 700; color: #0f172a;">${cleanEmail}</span>
+              </div>
+
+              <div>
+                <span style="font-size: 12px; color: #64748b; font-weight: 600; display: block; margin-bottom: 4px;">TEMPORARY PASSWORD</span>
+                <code style="background-color: #e2e8f0; padding: 6px 12px; border-radius: 8px; font-size: 16px; font-weight: 700; color: #0A3F61; display: inline-block;">${tempPassword}</code>
+              </div>
+            </div>
+
+            <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px 16px; border-radius: 8px; margin: 24px 0;">
+              <p style="margin: 0; font-size: 13px; color: #92400e; line-height: 1.5;">
+                🔒 <strong>First-Time Login Security Requirement:</strong><br />
+                Upon your first login with this temporary password, the system will automatically require you to <strong>Set a New Permanent Password</strong> before granting access to the Operations Console.
+              </p>
+            </div>
+
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="https://app.photoos.in/ops-console/login" style="background-color: #0A3F61; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 15px; display: inline-block; box-shadow: 0 4px 12px rgba(10, 63, 97, 0.25);">
+                Log In to Operations Console &rarr;
+              </a>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 28px 0;" />
+            
+            <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0; line-height: 1.5;">
+              This email was sent by <strong>PhotoOS Team</strong> (<a href="mailto:team@photoos.in" style="color: #64748b;">team@photoos.in</a>)<br />
+              PhotoOS SaaS Technologies Private Limited &bull; Senapati Bapat Marg, Pune 411038
+            </p>
+          </div>
+        `,
+      });
+    } catch (mailErr) {
+      console.warn("[PlatformLiveStore] Resend credentials mail notice:", mailErr);
+      return { success: false, error: String(mailErr) };
+    }
+  }
+
+  /**
+   * Adds a new employee, creates credentials, dispatches an automated Resend welcome email from team@photoos.in.
    */
   public async createEmployee(displayName: string, email: string, roleCode: string) {
     const cleanEmail = email.trim().toLowerCase();
@@ -398,66 +505,8 @@ class PlatformLiveStore {
 
     this.employees.push(newEmp);
 
-    // Automated Resend Invitation & Greeting Email
-    try {
-      await sendEmailWithResend({
-        department: "support",
-        to: cleanEmail,
-        subject: `Welcome to PhotoOS Admin Team - Your Login Credentials (${displayName})`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
-            <div style="text-align: center; margin-bottom: 24px;">
-              <div style="display: inline-block; background-color: #0A3F61; color: #ffffff; padding: 12px 24px; border-radius: 12px; font-weight: bold; font-size: 20px;">
-                PhotoOS Admin Console
-              </div>
-              <h2 style="color: #0F172A; margin: 16px 0 4px 0; font-size: 22px;">Welcome to the Team, ${displayName}!</h2>
-              <p style="color: #64748b; font-size: 14px; margin: 0;">You have been invited as <strong>${roleName}</strong></p>
-            </div>
-
-            <p style="font-size: 14px; color: #334155; line-height: 1.6;">
-              Your administrator account has been created on the PhotoOS Platform. Below are your temporary credentials to sign in to the Operations Console:
-            </p>
-
-            <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 20px; margin: 20px 0;">
-              <p style="margin: 0 0 10px 0; font-size: 14px; color: #334155;">
-                <strong>Admin Console URL:</strong><br />
-                <a href="https://photoos.in/ops-console/login" style="color: #0A3F61; font-weight: bold; text-decoration: none; word-break: break-all;">
-                  https://photoos.in/ops-console/login
-                </a>
-              </p>
-              <p style="margin: 0 0 10px 0; font-size: 14px; color: #334155;">
-                <strong>User ID / Login Email:</strong><br />
-                <span style="font-family: monospace; font-size: 15px; color: #0f172a; font-weight: bold;">${cleanEmail}</span>
-              </p>
-              <p style="margin: 0; font-size: 14px; color: #334155;">
-                <strong>System Generated Temporary Password:</strong><br />
-                <code style="background-color: #e2e8f0; padding: 4px 10px; border-radius: 6px; font-size: 16px; font-weight: bold; color: #0A3F61; display: inline-block; margin-top: 4px;">${tempPassword}</code>
-              </p>
-            </div>
-
-            <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px 16px; border-radius: 6px; margin: 20px 0;">
-              <p style="margin: 0; font-size: 13px; color: #92400e; line-height: 1.5;">
-                <strong>Important Security Requirement:</strong><br />
-                When you sign in with this temporary password, the system will immediately require you to <strong>Set a New Permanent Password</strong> before granting access to the dashboard.
-              </p>
-            </div>
-
-            <div style="text-align: center; margin: 28px 0 16px 0;">
-              <a href="https://photoos.in/ops-console/login" style="background-color: #0A3F61; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 10px; font-weight: bold; font-size: 15px; display: inline-block;">
-                Log In to Admin Console
-              </a>
-            </div>
-
-            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
-            <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0;">
-              PhotoOS Platform Operations &bull; G Mark Software Private Limited &bull; Pune, Maharashtra
-            </p>
-          </div>
-        `,
-      });
-    } catch (mailErr) {
-      console.warn("[PlatformLiveStore] Resend welcome mail notice:", mailErr);
-    }
+    // Automated Resend Invitation & Greeting Email from team@photoos.in
+    await this.sendWelcomeCredentialsEmail(newEmp, tempPassword);
 
     return {
       employee: newEmp,

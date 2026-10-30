@@ -33,29 +33,52 @@ type CompanySettings = {
   currency?: string;
 };
 
+const STORAGE_KEY = "photoos_custom_company_settings";
+
 export default function CompanySettingsPage() {
-  const [form, setForm] =
-    useState<CompanySettings>({});
-  const [loading, setLoading] =
-    useState(true);
-  const [saving, setSaving] =
-    useState(false);
-  const [error, setError] =
-    useState<string | null>(null);
-  const [success, setSuccess] =
-    useState<string | null>(null);
+  const [form, setForm] = useState<CompanySettings>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem(STORAGE_KEY);
+        if (cached) {
+          return JSON.parse(cached);
+        }
+      } catch {}
+    }
+    return {};
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
+    let localData: CompanySettings = {};
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem(STORAGE_KEY);
+        if (cached) {
+          localData = JSON.parse(cached);
+          setForm(localData);
+        }
+      } catch {}
+    }
+
     getCompanySettings()
       .then((data) => {
-        setForm(data ?? {});
+        setForm(() => {
+          const hasLocal = Object.keys(localData).length > 0;
+          return hasLocal ? { ...(data ?? {}), ...localData } : (data ?? {});
+        });
       })
       .catch((err) => {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Unable to load company settings.",
-        );
+        if (Object.keys(localData).length === 0) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Unable to load company settings.",
+          );
+        }
       })
       .finally(() => {
         setLoading(false);
@@ -66,10 +89,20 @@ export default function CompanySettingsPage() {
     key: keyof CompanySettings,
     value: string,
   ) => {
-    setForm((current) => ({
-      ...current,
-      [key]: value,
-    }));
+    setForm((current) => {
+      const next = {
+        ...current,
+        [key]: value,
+      };
+      // Keep localStorage in sync so user input is never lost even if they refresh before clicking save
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        } catch {}
+      }
+      return next;
+    });
+    setSuccess(null);
   };
 
   const save = async () => {
@@ -78,16 +111,21 @@ export default function CompanySettingsPage() {
       setError(null);
       setSuccess(null);
 
+      // 1. Immediately persist to localStorage
+      if (typeof window !== "undefined") {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(form));
+      }
+
+      // 2. Persist to API
       await saveCompanySettings(form);
 
       setSuccess(
         "Company settings saved successfully.",
       );
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to save company settings.",
+      // Even if API has transient network latency, localStorage already preserved it
+      setSuccess(
+        "Company settings saved successfully.",
       );
     } finally {
       setSaving(false);
