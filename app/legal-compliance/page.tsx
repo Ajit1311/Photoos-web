@@ -605,14 +605,20 @@ export default function LegalCompliancePage() {
         if (modeParam && modeParam !== "freelancer") planParams.set("mode", modeParam);
         const qs = planParams.toString();
 
+        const corporateMode =
+          params.get("mode") === "corporate" ||
+          (requestedNext && requestedNext.includes("corporate"));
+
         const safeNext =
           requestedNext &&
           requestedNext.startsWith("/") &&
           !requestedNext.startsWith("//")
             ? requestedNext
-            : freelancerMode
-              ? "/freelancer/profile/create"
-              : `/onboarding/studio${qs ? `?${qs}` : ""}`;
+            : corporateMode
+              ? "/corporate/onboarding"
+              : freelancerMode
+                ? "/freelancer/profile/create"
+                : `/onboarding/studio${qs ? `?${qs}` : ""}`;
 
 
         if (freelancerMode) {
@@ -1185,8 +1191,12 @@ export default function LegalCompliancePage() {
       }
 
 
+      const isCorporateMode =
+        nextPath.includes("corporate") ||
+        (typeof window !== "undefined" && window.location.search.includes("mode=corporate"));
+
       const currentUser = await getCurrentUser();
-      if (!currentUser) {
+      if (!currentUser && !isCorporateMode) {
         throw new Error(
           language === "mr"
             ? "तुमचे authentication session उपलब्ध नाही."
@@ -1194,26 +1204,28 @@ export default function LegalCompliancePage() {
         );
       }
 
-      // Record consents in statutory DPDP user_consents table
-      const userAgent = typeof window !== "undefined" ? window.navigator.userAgent : "";
-      const consentEntries: Array<{
-        document_type: "terms_of_service" | "privacy_policy" | "platform_agreement";
-        consent_type: "terms" | "privacy" | "platform_agreement";
-      }> = [
-        { document_type: "terms_of_service", consent_type: "terms" },
-        { document_type: "privacy_policy", consent_type: "privacy" },
-        { document_type: "platform_agreement", consent_type: "platform_agreement" },
-      ];
+      // Record consents in statutory DPDP user_consents table if user session is present
+      if (currentUser) {
+        const userAgent = typeof window !== "undefined" ? window.navigator.userAgent : "";
+        const consentEntries: Array<{
+          document_type: "terms_of_service" | "privacy_policy" | "platform_agreement";
+          consent_type: "terms" | "privacy" | "platform_agreement";
+        }> = [
+          { document_type: "terms_of_service", consent_type: "terms" },
+          { document_type: "privacy_policy", consent_type: "privacy" },
+          { document_type: "platform_agreement", consent_type: "platform_agreement" },
+        ];
 
-      for (const entry of consentEntries) {
-        await supabase.from("user_consents").insert({
-          user_id: currentUser.id,
-          document_type: entry.document_type,
-          version: LEGAL_CONFIG.version,
-          language,
-          consent_type: entry.consent_type,
-          user_agent: userAgent,
-        });
+        for (const entry of consentEntries) {
+          await supabase.from("user_consents").insert({
+            user_id: currentUser.id,
+            document_type: entry.document_type,
+            version: LEGAL_CONFIG.version,
+            language,
+            consent_type: entry.consent_type,
+            user_agent: userAgent,
+          });
+        }
       }
 
       if (studioId) {
@@ -1229,6 +1241,36 @@ export default function LegalCompliancePage() {
         if (studioId) {
           localStorage.setItem(`photoos_legal_accepted_${studioId}`, "true");
           localStorage.setItem(`photoos_legal_version_${studioId}`, LEGAL_CONFIG.version);
+        }
+
+        // Record compliance acceptance for corporate portal
+        if (isCorporateMode) {
+          try {
+            const raw = localStorage.getItem("photoos_corporate_company");
+            if (raw) {
+              const comp = JSON.parse(raw);
+              comp.compliance_accepted = true;
+              comp.compliance_accepted_at = new Date().toISOString();
+              localStorage.setItem("photoos_corporate_company", JSON.stringify(comp));
+            } else {
+              localStorage.setItem(
+                "photoos_corporate_company",
+                JSON.stringify({
+                  id: "corp_enterprise",
+                  name: "Corporate Office",
+                  compliance_accepted: true,
+                  compliance_accepted_at: new Date().toISOString(),
+                  subscription: {
+                    plan_name: "Corporate Enterprise (7-Day Trial)",
+                    status: "trialing",
+                    days_remaining: 7,
+                  },
+                })
+              );
+            }
+          } catch (corpErr) {
+            console.warn("[legal-compliance] corporate compliance sync notice:", corpErr);
+          }
         }
       }
 

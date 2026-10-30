@@ -147,10 +147,10 @@ export default function CorporateDashboardPage() {
               <TrendingUp className="h-5 w-5 text-amber-600 dark:text-amber-400" />
             </div>
             <p className="mt-3 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-              98.4%
+              {totalPhotos > 0 ? "100%" : "Ready"}
             </p>
             <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-              Selfie search satisfaction
+              {totalPhotos > 0 ? "Live face matching active" : "Awaiting event upload"}
             </p>
           </div>
         </div>
@@ -163,7 +163,7 @@ export default function CorporateDashboardPage() {
                 Company Events & Live Galleries
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Click any event to manage uploaded photos, view AI face indexing, or download standee posters.
+                Click any event to upload photos, manage media, view AI face indexing, or download standee posters.
               </p>
             </div>
             <Link
@@ -203,14 +203,17 @@ export default function CorporateDashboardPage() {
                   key={ev.id}
                   className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors"
                 >
-                  <div className="flex items-start sm:items-center gap-4">
+                  <Link
+                    href={`/corporate/events/${ev.id}`}
+                    className="flex items-start sm:items-center gap-4 group flex-1"
+                  >
                     <div className="h-16 w-20 rounded-xl bg-slate-100 dark:bg-slate-800 overflow-hidden shrink-0 relative border border-slate-200 dark:border-slate-700">
                       {ev.cover_image_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={ev.cover_image_url}
                           alt={ev.name}
-                          className="h-full w-full object-cover"
+                          className="h-full w-full object-cover group-hover:scale-105 transition-transform"
                         />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center text-slate-400">
@@ -228,18 +231,26 @@ export default function CorporateDashboardPage() {
                           {ev.date}
                         </span>
                       </div>
-                      <h3 className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
+                      <h3 className="mt-1 text-sm font-bold text-slate-900 dark:text-white group-hover:text-[#0A3F61] dark:group-hover:text-sky-400 transition-colors">
                         {ev.name}
                       </h3>
                       <p className="text-xs text-slate-500 dark:text-slate-400">
                         📍 {ev.location} · {ev.photos_count} photos · {ev.ai_faces_indexed} AI faces
                       </p>
                     </div>
-                  </div>
+                  </Link>
 
                   <div className="flex items-center gap-2 self-end sm:self-center">
                     <Link
-                      href={`/corporate/standee-qr?eventId=${ev.id}`}
+                      href={`/corporate/events/${ev.id}`}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-[#0A3F61] px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-[#072c44] transition-all"
+                    >
+                      <Upload className="h-3.5 w-3.5" />
+                      Manage & Upload
+                    </Link>
+
+                    <Link
+                      href={`/corporate/events/${ev.id}?tab=qrcode`}
                       className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 shadow-sm"
                     >
                       <QrCode className="h-3.5 w-3.5 text-indigo-500" />
@@ -252,7 +263,7 @@ export default function CorporateDashboardPage() {
                       className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 shadow-sm"
                     >
                       <ExternalLink className="h-3.5 w-3.5 text-emerald-500" />
-                      Employee View
+                      Live View
                     </Link>
                   </div>
                 </div>

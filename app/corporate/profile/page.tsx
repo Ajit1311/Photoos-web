@@ -49,8 +49,8 @@ export default function CorporateProfilePage() {
       setContactPerson(comp.contact_person || "");
       setWorkEmail(comp.work_email || "");
       setPhone(comp.phone || "");
-      setIndustry(comp.industry || "IT & Software Services");
-      setCompanySize(comp.company_size || "50-200 Employees");
+      setIndustry(comp.industry || "");
+      setCompanySize(comp.company_size || "");
       setLocation(comp.location || "");
       setWebsite(comp.website || "");
       setLogoUrl(comp.logo_url || "");

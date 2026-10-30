@@ -55,34 +55,28 @@ function EmailOtpContent() {
 
   const callOtp = useCallback(
     async (action: "send" | "verify", code?: string) => {
-      if (!SUPABASE_URL) {
-        throw new Error("Supabase URL is not configured.");
-      }
-
       const user = await getCurrentUser();
       if (!user) {
         throw new Error("Your session has expired. Please sign in again.");
       }
 
       const accessToken = await getAccessToken();
-      if (!accessToken) {
-        throw new Error("Unable to establish authentication session.");
-      }
 
       const userEmail = user.email || email.trim();
       if (!userEmail) {
         throw new Error("A valid email address is required.");
       }
 
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/email-otp`, {
+      const response = await fetch("/api/auth/otp", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         },
         body: JSON.stringify({
           action,
           email: userEmail,
+          purpose: "Studio Workspace Authentication",
           ...(action === "verify" ? { otp: code } : {}),
         }),
       });

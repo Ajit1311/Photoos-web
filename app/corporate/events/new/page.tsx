@@ -66,8 +66,8 @@ export default function CreateCorporateEventPage() {
           "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80",
       });
 
-      // Redirect directly to Standee QR for this new event
-      router.push(`/corporate/standee-qr?eventId=${created.id}`);
+      // Redirect directly to the event workspace for uploading photos & generating Standee QR
+      router.push(`/corporate/events/${created.id}`);
     } catch {
       setError("Failed to create corporate event. Please retry.");
     } finally {

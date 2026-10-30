@@ -105,7 +105,7 @@ export default function CorporateEventsListPage() {
               key={ev.id}
               className="group rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm hover:shadow-md dark:border-slate-800 dark:bg-slate-900 transition-all flex flex-col justify-between"
             >
-              <div>
+              <Link href={`/corporate/events/${ev.id}`} className="block">
                 {/* Event Image */}
                 <div className="relative h-44 w-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
                   {ev.cover_image_url ? (
@@ -139,7 +139,7 @@ export default function CorporateEventsListPage() {
                   <span className="text-[11px] font-semibold text-slate-400">
                     {ev.date}
                   </span>
-                  <h3 className="mt-1 text-base font-bold text-slate-900 dark:text-white line-clamp-1">
+                  <h3 className="mt-1 text-base font-bold text-slate-900 dark:text-white group-hover:text-[#0A3F61] dark:group-hover:text-sky-400 transition-colors line-clamp-1">
                     {ev.name}
                   </h3>
                   <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
@@ -152,16 +152,25 @@ export default function CorporateEventsListPage() {
                     </p>
                   )}
                 </div>
-              </div>
+              </Link>
 
               {/* Event Actions Footer */}
               <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
                 <Link
-                  href={`/corporate/standee-qr?eventId=${ev.id}`}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 shadow-sm"
+                  href={`/corporate/events/${ev.id}`}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#0A3F61] py-2 text-xs font-bold text-white hover:bg-[#072c44] shadow-xs transition-all"
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  Manage & Upload
+                </Link>
+
+                <Link
+                  href={`/corporate/events/${ev.id}?tab=qrcode`}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 shadow-sm"
+                  title="View Standee QR"
                 >
                   <QrCode className="h-3.5 w-3.5 text-indigo-500" />
-                  Standee QR
+                  QR
                 </Link>
 
                 <Link
@@ -170,7 +179,7 @@ export default function CorporateEventsListPage() {
                   className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 shadow-sm"
                   title="Open Mobile Employee View"
                 >
-                  <ExternalLink className="h-4 w-4" />
+                  <ExternalLink className="h-4 w-4 text-emerald-500" />
                 </Link>
               </div>
             </div>

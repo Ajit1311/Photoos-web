@@ -202,6 +202,54 @@ export default function ClientAccessGalleryPage() {
           setStudio(studioData as StudioData);
         }
       }
+
+      // Check corporate storage fallback for corporate events
+      if (typeof window !== "undefined") {
+        try {
+          const rawCorp = window.localStorage.getItem(`photoos_corporate_photos_${eventId}`);
+          if (rawCorp) {
+            const corpPhotos = JSON.parse(rawCorp);
+            if (Array.isArray(corpPhotos) && corpPhotos.length > 0) {
+              const mapped: GalleryPhoto[] = corpPhotos.map((cp: any) => ({
+                id: cp.id,
+                eventId,
+                fileName: cp.name,
+                thumbnailUrl: cp.thumbnail_url || cp.url,
+                originalUrl: cp.url,
+                width: cp.width || 1200,
+                height: cp.height || 800,
+                fileSize: cp.size_bytes || 500000,
+                mimeType: "image/jpeg",
+                uploadedBy: "Corporate Office",
+                uploadedAt: cp.uploaded_at,
+                status: "ready",
+                visibility: "visible",
+                rating: 0,
+                likes: 0,
+                comments: 0,
+                isFavorite: false,
+                isSelected: false,
+                aiProcessed: true,
+              }));
+              setPhotos(mapped);
+              setAllowDownloads(true);
+
+              const rawComp = window.localStorage.getItem("photoos_corporate_company");
+              if (rawComp) {
+                const comp = JSON.parse(rawComp);
+                setStudio({
+                  id: comp.id || "corp_office",
+                  name: comp.name || "Corporate Office",
+                  brand_name: comp.name || "Corporate Office",
+                });
+              }
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn("[ClientAccessGallery] corp photos fallback error:", e);
+        }
+      }
     } catch (err) {
       console.error("[ClientAccessGallery] Failed to load gallery data:", err);
     } finally {

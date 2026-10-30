@@ -223,3 +223,133 @@ export async function createCorporateEvent(
   return newEvent;
 }
 
+// Get single corporate event
+export async function getCorporateEvent(companyId: string, eventId: string): Promise<CorporateEvent | null> {
+  const events = await getCorporateEvents(companyId);
+  return events.find((e) => e.id === eventId) || null;
+}
+
+// Update corporate event
+export async function updateCorporateEvent(
+  companyId: string,
+  eventId: string,
+  updates: Partial<CorporateEvent>
+): Promise<CorporateEvent | null> {
+  const events = await getCorporateEvents(companyId);
+  const index = events.findIndex((e) => e.id === eventId);
+  if (index === -1) return null;
+
+  events[index] = { ...events[index], ...updates };
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.setItem(`${STORAGE_KEY_EVENTS}_${companyId}`, JSON.stringify(events));
+    } catch {
+      // ignore
+    }
+  }
+
+  return events[index];
+}
+
+// Delete corporate event
+export async function deleteCorporateEvent(companyId: string, eventId: string): Promise<boolean> {
+  const events = await getCorporateEvents(companyId);
+  const filtered = events.filter((e) => e.id !== eventId);
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.setItem(`${STORAGE_KEY_EVENTS}_${companyId}`, JSON.stringify(filtered));
+      window.localStorage.removeItem(`photoos_corporate_photos_${eventId}`);
+    } catch {
+      // ignore
+    }
+  }
+  return true;
+}
+
+export type CorporatePhoto = {
+  id: string;
+  event_id: string;
+  name: string;
+  url: string;
+  thumbnail_url: string;
+  size_bytes: number;
+  width?: number;
+  height?: number;
+  ai_faces_detected?: number;
+  uploaded_at: string;
+};
+
+const STORAGE_KEY_PHOTOS_PREFIX = "photoos_corporate_photos_";
+
+// Get corporate photos for an event
+export async function getCorporatePhotos(eventId: string): Promise<CorporatePhoto[]> {
+  if (typeof window !== "undefined") {
+    try {
+      const stored = window.localStorage.getItem(`${STORAGE_KEY_PHOTOS_PREFIX}${eventId}`);
+      if (stored) {
+        return JSON.parse(stored) as CorporatePhoto[];
+      }
+    } catch {
+      // fallback
+    }
+  }
+  return [];
+}
+
+// Save corporate photos for an event
+export async function saveCorporatePhotos(
+  companyId: string,
+  eventId: string,
+  newPhotos: CorporatePhoto[]
+): Promise<CorporatePhoto[]> {
+  const existing = await getCorporatePhotos(eventId);
+  const combined = [...newPhotos, ...existing];
+
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.setItem(`${STORAGE_KEY_PHOTOS_PREFIX}${eventId}`, JSON.stringify(combined));
+    } catch (e) {
+      console.warn("[corporate-service] localStorage save notice:", e);
+    }
+  }
+
+  // Update photos count on the event
+  const totalFaces = combined.reduce((acc, p) => acc + (p.ai_faces_detected || 1), 0);
+  await updateCorporateEvent(companyId, eventId, {
+    photos_count: combined.length,
+    ai_faces_indexed: totalFaces,
+    cover_image_url: combined[0]?.url,
+  });
+
+  return combined;
+}
+
+// Delete corporate photo
+export async function deleteCorporatePhoto(
+  companyId: string,
+  eventId: string,
+  photoId: string
+): Promise<boolean> {
+  const existing = await getCorporatePhotos(eventId);
+  const remaining = existing.filter((p) => p.id !== photoId);
+
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.setItem(`${STORAGE_KEY_PHOTOS_PREFIX}${eventId}`, JSON.stringify(remaining));
+    } catch {
+      // ignore
+    }
+  }
+
+  // Update photos count on the event
+  const totalFaces = remaining.reduce((acc, p) => acc + (p.ai_faces_detected || 1), 0);
+  await updateCorporateEvent(companyId, eventId, {
+    photos_count: remaining.length,
+    ai_faces_indexed: totalFaces,
+    cover_image_url: remaining[0]?.url,
+  });
+
+  return true;
+}
+
+
