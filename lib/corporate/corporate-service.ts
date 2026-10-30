@@ -64,18 +64,18 @@ export function getDefaultCorporateCompany(): CorporateCompany {
   
   return {
     id: DEFAULT_COMPANY_ID,
-    name: "Enterprise Tech Solutions",
-    work_email: "team@company.com",
-    contact_person: "HR & People Team",
-    phone: "+91 98765 43210",
-    industry: "IT & Software Services",
-    company_size: "100-500 Employees",
-    location: "Corporate Tower, Tech Park, Mumbai",
-    website: "https://photoos.in",
+    name: "",
+    work_email: "",
+    contact_person: "",
+    phone: "",
+    industry: "",
+    company_size: "",
+    location: "",
+    website: "",
     logo_url: "",
     theme_color: "#0A3F61",
-    compliance_accepted: true,
-    compliance_accepted_at: now.toISOString(),
+    compliance_accepted: false,
+    compliance_accepted_at: undefined,
     subscription: {
       plan_name: "Corporate Enterprise (7-Day Free Trial)",
       plan_code: "corp_enterprise_7d_trial",
@@ -90,54 +90,7 @@ export function getDefaultCorporateCompany(): CorporateCompany {
 }
 
 export function getDefaultCorporateEvents(companyId: string): CorporateEvent[] {
-  const now = new Date();
-  return [
-    {
-      id: "ev_corp_annual_day_2026",
-      company_id: companyId,
-      name: "Annual Corporate Day & Excellence Awards 2026",
-      event_type: "Annual Day",
-      date: new Date(now.getTime() - 2 * 86400000).toISOString().slice(0, 10),
-      location: "Grand Ballroom, The St. Regis, Mumbai",
-      description: "Celebrating company achievements, team awards, and cultural night performances.",
-      cover_image_url: "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80",
-      photos_count: 642,
-      ai_faces_indexed: 598,
-      allow_downloads: true,
-      status: "active",
-      created_at: new Date(now.getTime() - 3 * 86400000).toISOString(),
-    },
-    {
-      id: "ev_corp_townhall_q3",
-      company_id: companyId,
-      name: "Q3 All-Hands Executive Townhall",
-      event_type: "Townhall",
-      date: new Date(now.getTime() - 10 * 86400000).toISOString().slice(0, 10),
-      location: "Main Auditorium, Level 4 Office",
-      description: "Quarterly business review, executive Q&A, and new product roadmap reveal.",
-      cover_image_url: "https://images.unsplash.com/photo-1475721027785-f74eccf877e2?auto=format&fit=crop&w=1200&q=80",
-      photos_count: 184,
-      ai_faces_indexed: 180,
-      allow_downloads: true,
-      status: "active",
-      created_at: new Date(now.getTime() - 12 * 86400000).toISOString(),
-    },
-    {
-      id: "ev_corp_diwali_party",
-      company_id: companyId,
-      name: "Diwali Corporate Gala & Ethnic Celebration",
-      event_type: "Festive Celebration",
-      date: new Date(now.getTime() - 25 * 86400000).toISOString().slice(0, 10),
-      location: "Office Rooftop Lounge",
-      description: "Traditional attire day, team potluck, rangoli competition, and festive photo booths.",
-      cover_image_url: "https://images.unsplash.com/photo-1543269865-cbf427effbad?auto=format&fit=crop&w=1200&q=80",
-      photos_count: 420,
-      ai_faces_indexed: 412,
-      allow_downloads: true,
-      status: "completed",
-      created_at: new Date(now.getTime() - 26 * 86400000).toISOString(),
-    },
-  ];
+  return [];
 }
 
 // Get corporate company data
@@ -147,6 +100,12 @@ export async function getCorporateCompany(): Promise<CorporateCompany> {
       const stored = window.localStorage.getItem(STORAGE_KEY_COMPANY);
       if (stored) {
         const company = JSON.parse(stored) as CorporateCompany;
+        // Purge old demo data if found
+        if (company.name === "Enterprise Tech Solutions" || company.contact_person === "HR & People Team") {
+          const fresh = getDefaultCorporateCompany();
+          window.localStorage.setItem(STORAGE_KEY_COMPANY, JSON.stringify(fresh));
+          return fresh;
+        }
         company.subscription.days_remaining = calculateTrialDays(company.subscription.trial_start);
         return company;
       }
@@ -210,22 +169,17 @@ export async function getCorporateEvents(companyId: string): Promise<CorporateEv
     try {
       const stored = window.localStorage.getItem(`${STORAGE_KEY_EVENTS}_${companyId}`);
       if (stored) {
-        return JSON.parse(stored) as CorporateEvent[];
+        const evs = JSON.parse(stored) as CorporateEvent[];
+        // Filter out any legacy hardcoded demo events
+        const realEvents = evs.filter((e) => !e.id.startsWith("ev_corp_annual_day") && !e.id.startsWith("ev_corp_townhall") && !e.id.startsWith("ev_corp_diwali"));
+        return realEvents;
       }
     } catch {
       // fallback
     }
   }
 
-  const defaultEvents = getDefaultCorporateEvents(companyId);
-  if (typeof window !== "undefined") {
-    try {
-      window.localStorage.setItem(`${STORAGE_KEY_EVENTS}_${companyId}`, JSON.stringify(defaultEvents));
-    } catch {
-      // ignore
-    }
-  }
-  return defaultEvents;
+  return [];
 }
 
 // Create new corporate event

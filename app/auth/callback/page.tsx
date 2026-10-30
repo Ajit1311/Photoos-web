@@ -8,6 +8,7 @@ import {
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
+import { getSafeRedirectUrl } from "@/lib/security/safe-redirect";
 import type { Session } from "@supabase/supabase-js";
 
 function AuthCallbackContent() {
@@ -120,16 +121,10 @@ function AuthCallbackContent() {
         }
 
         if (mounted) {
-          const loadingUrl = new URL(
-            "/auth/loading",
-            window.location.origin,
-          );
-
-          if (next) {
-            loadingUrl.searchParams.set("next", next);
-          }
-
-          router.replace(loadingUrl.toString());
+          const destination = next
+            ? getSafeRedirectUrl(next, "/auth/loading")
+            : "/auth/loading";
+          router.replace(destination);
         }
       } catch (error) {
         console.error(

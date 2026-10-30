@@ -109,8 +109,8 @@ export default function DashboardComplianceGuard({
               !cancelled
             ) {
 
-              setAccessGranted(
-                true,
+              router.replace(
+                "/onboarding/studio",
               );
 
             }

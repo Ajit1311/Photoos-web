@@ -69,10 +69,22 @@ export function LoginForm() {
         );
       }
 
-      const next =
-        searchParams.get("next");
+      const params = new URLSearchParams();
+      const planId = searchParams.get("planId");
+      const planCode = searchParams.get("planCode");
+      const billingCycle = searchParams.get("billingCycle");
+      const mode = searchParams.get("mode");
+      const next = searchParams.get("next");
 
-      window.location.href = getSafeRedirectUrl(next, "/dashboard");
+      if (planId) params.set("planId", planId);
+      if (planCode) params.set("planCode", planCode);
+      if (billingCycle) params.set("billingCycle", billingCycle);
+      if (mode) params.set("mode", mode);
+
+      const qs = params.toString();
+      const fallbackTarget = qs ? `/auth/loading?${qs}` : "/auth/loading";
+
+      window.location.href = getSafeRedirectUrl(next, fallbackTarget);
     } catch (err) {
       console.error(
         "[SupabaseLogin]",

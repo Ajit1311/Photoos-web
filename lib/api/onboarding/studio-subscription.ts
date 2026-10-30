@@ -142,20 +142,40 @@ export async function createOnboardingSubscription(
 
   // 2. Direct database query fallback
   try {
+    // Check if an active or trial subscription already exists for this studio
+    const { data: existingSub } = await supabase
+      .from("subscriptions")
+      .select("id, studio_id, plan_id, status, trial_start_at, trial_end_at, subscription_start_at, subscription_end_at")
+      .eq("studio_id", studioId)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingSub && (existingSub.status === "trial" || existingSub.status === "active")) {
+      return existingSub as SubscriptionResult;
+    }
+
     // Find plan in DB by id or plan_code
     const { data: planRow } = await supabase
       .from("subscription_plans")
-      .select("id, plan_code, billing_cycle")
+      .select("id, plan_code, billing_cycle, price, trial_days")
       .or(`id.eq.${planId},plan_code.eq.${planId}`)
       .limit(1)
       .maybeSingle();
 
     const actualPlanId = planRow?.id ?? planId;
-    const isYearly = planRow?.billing_cycle === "yearly" || planId.includes("yearly");
-    const durationDays = isYearly ? 365 : 30;
+    const isTrial =
+      planRow?.plan_code === "photoos_free_trial_7_day" ||
+      planId === "photoos_free_trial_7_day" ||
+      planId.toLowerCase().includes("trial") ||
+      (planRow && planRow.price === 0 && (planRow.trial_days ?? 0) > 0);
 
     const now = new Date();
+    const trialDurationDays = 7;
+    const isYearly = planRow?.billing_cycle === "yearly" || planId.includes("yearly");
+    const durationDays = isTrial ? trialDurationDays : isYearly ? 365 : 30;
     const endAt = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+
+    const subStatus = isTrial ? "trial" : "past_due";
 
     const { data: sub, error: subErr } = await supabase
       .from("subscriptions")
@@ -163,11 +183,11 @@ export async function createOnboardingSubscription(
         {
           studio_id: studioId,
           plan_id: actualPlanId,
-          status: "active",
+          status: subStatus,
           subscription_start_at: now.toISOString(),
           subscription_end_at: endAt.toISOString(),
-          trial_start_at: now.toISOString(),
-          trial_end_at: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          trial_start_at: isTrial ? now.toISOString() : null,
+          trial_end_at: isTrial ? endAt.toISOString() : null,
           created_by: userId,
         },
         { onConflict: "studio_id" },

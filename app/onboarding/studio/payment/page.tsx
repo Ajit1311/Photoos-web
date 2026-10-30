@@ -273,7 +273,7 @@ function StudioOnboardingPaymentContent() {
       (planCode && planCode.toLowerCase().includes("trial"));
 
     if (isTrial) {
-      router.replace("/legal-compliance");
+      router.replace("/dashboard");
     }
   }, [loadingPlan, mode, selectedPlan, planId, planCode, router]);
 
@@ -469,7 +469,7 @@ function StudioOnboardingPaymentContent() {
   function handleContinueAfterPayment() {
 
     router.replace(
-      "/legal-compliance",
+      "/dashboard",
     );
 
   }

@@ -41,6 +41,7 @@ import {
   LEGAL_LANGUAGE_OPTIONS,
 } from "@/lib/api/legal-compliance";
 
+import { supabase } from "@/lib/supabase/client";
 import { LEGAL_CONFIG } from "@/config/legal";
 
 import type {
@@ -593,6 +594,17 @@ export default function LegalCompliancePage() {
         const requestedNext =
           params.get("next");
 
+        const planParams = new URLSearchParams();
+        const planId = params.get("planId");
+        const planCode = params.get("planCode");
+        const billingCycle = params.get("billingCycle");
+        const modeParam = params.get("mode");
+        if (planId) planParams.set("planId", planId);
+        if (planCode) planParams.set("planCode", planCode);
+        if (billingCycle) planParams.set("billingCycle", billingCycle);
+        if (modeParam && modeParam !== "freelancer") planParams.set("mode", modeParam);
+        const qs = planParams.toString();
+
         const safeNext =
           requestedNext &&
           requestedNext.startsWith("/") &&
@@ -600,7 +612,7 @@ export default function LegalCompliancePage() {
             ? requestedNext
             : freelancerMode
               ? "/freelancer/profile/create"
-              : "/dashboard";
+              : `/onboarding/studio${qs ? `?${qs}` : ""}`;
 
 
         if (freelancerMode) {
@@ -754,43 +766,73 @@ export default function LegalCompliancePage() {
         }
 
 
-        const membership =
-          await resolveUserStudio();
-
-
-        if (!membership) {
-
-          throw new Error(
-            "Unable to resolve your active studio membership.",
-          );
-
+        let membership = null;
+        try {
+          membership = await resolveUserStudio();
+        } catch {
+          // Expected for new onboarding user
         }
 
+        const resolvedStudioId = membership?.studioId ?? null;
 
-        let compliance;
+        let compliance = {
+          is_compliant: false,
+          compliance_required: true,
+          is_photoos_admin: false,
+        };
 
-        try {
-          console.log(
-            "LEGAL STEP 1: getCurrentMemberComplianceStatus",
-            membership.studioId,
-          );
-
-          compliance =
-            await getCurrentMemberComplianceStatus(
-              membership.studioId,
+        if (resolvedStudioId) {
+          try {
+            console.log(
+              "LEGAL STEP 1: getCurrentMemberComplianceStatus",
+              resolvedStudioId,
             );
 
-          console.log(
-            "LEGAL STEP 1 SUCCESS:",
-            compliance,
-          );
-        } catch (error) {
-          console.error(
-            "LEGAL STEP 1 FAILED:",
-            error,
-          );
+            const memberCompliance =
+              await getCurrentMemberComplianceStatus(
+                resolvedStudioId,
+              );
 
-          throw error;
+            compliance = {
+              is_compliant: memberCompliance.is_compliant,
+              compliance_required: memberCompliance.compliance_required,
+              is_photoos_admin: memberCompliance.is_photoos_admin,
+            };
+
+            console.log(
+              "LEGAL STEP 1 SUCCESS:",
+              compliance,
+            );
+          } catch (error) {
+            console.warn(
+              "LEGAL STEP 1 NOTICE:",
+              error,
+            );
+          }
+        } else {
+          // Check statutory DPDP user_consents table directly for current user
+          try {
+            const { data: consents } = await supabase
+              .from("user_consents")
+              .select("document_type")
+              .eq("user_id", sessionUser.id)
+              .eq("version", LEGAL_CONFIG.version)
+              .is("withdrawn_at", null);
+
+            const hasTerms = consents?.some((c) => c.document_type === "terms_of_service");
+            const hasPrivacy = consents?.some((c) => c.document_type === "privacy_policy");
+            const hasPlatform = consents?.some((c) => c.document_type === "platform_agreement");
+
+            if (hasTerms && hasPrivacy && hasPlatform) {
+              compliance = {
+                is_compliant: true,
+                compliance_required: false,
+                is_photoos_admin: false,
+              };
+            }
+          } catch (dbErr) {
+            console.warn("[legal-compliance] Direct consent check notice:", dbErr);
+          }
         }
 
         let currentAgreements;
@@ -841,7 +883,7 @@ export default function LegalCompliancePage() {
         const searchParams = new URLSearchParams(window.location.search);
         const autoRedirect = searchParams.get("auto_redirect") === "true";
         if (autoRedirect && compliance.compliance_required === false) {
-          router.replace("/dashboard");
+          router.replace(safeNext);
           return;
         }
 
@@ -883,11 +925,11 @@ export default function LegalCompliancePage() {
           );
 
           setNextPath(
-            "/dashboard",
+            safeNext,
           );
 
           setStudioId(
-            membership.studioId,
+            resolvedStudioId,
           );
 
           setLanguage(
@@ -1143,30 +1185,52 @@ export default function LegalCompliancePage() {
       }
 
 
-      await acceptCurrentMemberLegalCompliance(
-        studioId!,
-      );
-
-
-      const compliance =
-        await getCurrentMemberComplianceStatus(
-          studioId!,
-        );
-
-
-      if (
-        compliance.is_compliant !==
-        true
-      ) {
-
+      const currentUser = await getCurrentUser();
+      if (!currentUser) {
         throw new Error(
           language === "mr"
-            ? "तुमची कायदेशीर स्वीकृती पडताळता आली नाही. कृपया पुन्हा प्रयत्न करा."
-            : "Your legal acceptance could not be verified. Please try again.",
+            ? "तुमचे authentication session उपलब्ध नाही."
+            : "Your authentication session is no longer available.",
         );
-
       }
 
+      // Record consents in statutory DPDP user_consents table
+      const userAgent = typeof window !== "undefined" ? window.navigator.userAgent : "";
+      const consentEntries: Array<{
+        document_type: "terms_of_service" | "privacy_policy" | "platform_agreement";
+        consent_type: "terms" | "privacy" | "platform_agreement";
+      }> = [
+        { document_type: "terms_of_service", consent_type: "terms" },
+        { document_type: "privacy_policy", consent_type: "privacy" },
+        { document_type: "platform_agreement", consent_type: "platform_agreement" },
+      ];
+
+      for (const entry of consentEntries) {
+        await supabase.from("user_consents").insert({
+          user_id: currentUser.id,
+          document_type: entry.document_type,
+          version: LEGAL_CONFIG.version,
+          language,
+          consent_type: entry.consent_type,
+          user_agent: userAgent,
+        });
+      }
+
+      if (studioId) {
+        try {
+          await acceptCurrentMemberLegalCompliance(studioId);
+        } catch (studioErr) {
+          console.warn("[legal-compliance] studio compliance recording notice:", studioErr);
+        }
+      }
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem("photoos_legal_last_accepted_version", LEGAL_CONFIG.version);
+        if (studioId) {
+          localStorage.setItem(`photoos_legal_accepted_${studioId}`, "true");
+          localStorage.setItem(`photoos_legal_version_${studioId}`, LEGAL_CONFIG.version);
+        }
+      }
 
       router.replace(
         nextPath,

@@ -112,25 +112,24 @@ function OnboardingStudioPage() {
     }));
   }
 
-  async function startTrial() {
+  async function completeStudioAndRoute(skipped = false) {
     setSubmitting(true);
     setError(null);
 
     try {
       const session = await getSession();
-
       if (!session?.user) {
         router.replace("/login");
         return;
       }
 
-      // 1. Try to resolve or bootstrap studio
+      // 1. Resolve or bootstrap studio workspace
       let studioId: string | null = null;
       try {
         const bootstrap = await getBootstrap();
         studioId = bootstrap?.workspace?.studio?.id ?? null;
       } catch (bootErr) {
-        console.warn("[Onboarding] Bootstrap notice:", bootErr);
+        console.warn("[Onboarding] Bootstrap check notice:", bootErr);
       }
 
       if (!studioId) {
@@ -142,98 +141,87 @@ function OnboardingStudioPage() {
         }
       }
 
-      // 2. If details are provided, update studio profile
-      const hasStudioDetails =
+      if (!studioId) {
+        throw new Error("Unable to establish your studio workspace. Please retry.");
+      }
+
+      // 2. If details were entered and not skipped, update studio profile
+      const hasDetails =
         form.fullName.trim() ||
         form.phone.trim() ||
         form.email.trim() ||
         form.studioName.trim() ||
         form.location.trim();
 
-      if (studioId && hasStudioDetails) {
+      if (!skipped && hasDetails) {
         try {
-          await updateStudioProfile(
-            studioId,
-            {
-              name: form.studioName || "My Studio",
-              owner_name: form.fullName || "Studio Owner",
-              contact_email: form.email || session.user.email,
-              contact_phone: form.phone,
-              city: form.location,
-            },
-          );
+          await updateStudioProfile(studioId, {
+            name: form.studioName.trim() || "My Studio",
+            owner_name: form.fullName.trim() || "Studio Owner",
+            contact_email: form.email.trim() || session.user.email,
+            contact_phone: form.phone.trim(),
+            city: form.location.trim(),
+          });
         } catch (profileErr) {
           console.warn("[Onboarding] Profile update notice:", profileErr);
         }
       }
 
-      // 3. Activate 7-day trial subscription in database
-      if (studioId) {
+      // 3. Subscription Routing
+      if (isTrial) {
+        // Free Trial: Create/activate exactly 7-day trial in database, redirect to /dashboard
         try {
-          await createOnboardingSubscription(studioId, planId || "photoos_free_trial_7_day");
-        } catch (trialErr) {
-          console.warn("[Onboarding] Trial subscription setup notice:", trialErr);
+          await createOnboardingSubscription(studioId, "photoos_free_trial_7_day");
+        } catch (subErr) {
+          console.warn("[Onboarding] Trial subscription setup notice:", subErr);
         }
+        router.replace("/dashboard");
+        return;
       }
 
-      // 4. Smoothly navigate to legal compliance
-      router.replace("/legal-compliance");
+      // Paid Plan: Create subscription, redirect to Payment page
+      if (planId) {
+        try {
+          await createOnboardingSubscription(studioId, planId);
+        } catch (subErr) {
+          console.warn("[Onboarding] Paid subscription init notice:", subErr);
+        }
+
+        const params = new URLSearchParams({
+          planId,
+          planCode: planCode ?? "",
+          billingCycle: billingCycle ?? "monthly",
+          fullName: form.fullName,
+          phone: form.phone,
+          email: form.email,
+          studioName: form.studioName,
+          location: form.location,
+        });
+
+        router.push(`/onboarding/studio/payment?${params.toString()}`);
+        return;
+      }
+
+      // Default fallback if no plan specified: Free trial directly to dashboard
+      try {
+        await createOnboardingSubscription(studioId, "photoos_free_trial_7_day");
+      } catch {
+        // ignored
+      }
+      router.replace("/dashboard");
     } catch (err) {
-      console.warn("[Onboarding] Navigation fallback:", err);
-      router.replace("/legal-compliance");
+      console.error("[Onboarding] Error during studio setup:", err);
+      setError(err instanceof Error ? err.message : "Unable to save studio details.");
+      setSubmitting(false);
     }
   }
 
   function continueToPayment() {
-    if (isTrial) {
-      void startTrial();
-      return;
-    }
-
-    if (planId) {
-      setSubmitting(true);
-      setError(null);
-
-      const params = new URLSearchParams({
-        planId,
-        planCode: planCode ?? "",
-        billingCycle: billingCycle ?? "monthly",
-        fullName: form.fullName,
-        phone: form.phone,
-        email: form.email,
-        studioName: form.studioName,
-        location: form.location,
-      });
-
-      router.push(
-        `/onboarding/studio/payment?${params.toString()}`,
-      );
-      return;
-    }
-
-    void startTrial();
+    void completeStudioAndRoute(false);
   }
 
   function skipInformation() {
-    if (isTrial) {
-      void startTrial();
-      return;
-    }
-
-    const params = new URLSearchParams({
-      ...(planId ? { planId } : {}),
-      ...(planCode ? { planCode } : {}),
-      billingCycle: billingCycle ?? "monthly",
-      fullName: form.fullName,
-      phone: form.phone,
-      email: form.email,
-      studioName: form.studioName,
-      location: form.location,
-    });
-
-    router.push(
-      `/onboarding/studio/payment?${params.toString()}`,
-    );
+    void completeStudioAndRoute(true);
   }
 
 
