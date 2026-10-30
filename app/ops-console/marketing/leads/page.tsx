@@ -538,7 +538,7 @@ export default function MarketingLeadsPage() {
                     >
                       <td className="px-5 py-4 text-sm font-medium">
                         <Link
-                          href={`/admin/marketing/leads/${lead.id}`}
+                          href={`/ops-console/marketing/leads/${lead.id}`}
                           className="inline-flex rounded-md px-1 py-0.5 text-slate-900 hover:bg-slate-100 hover:text-blue-700"
                         >
                           #{lead.lead_number}
@@ -547,7 +547,7 @@ export default function MarketingLeadsPage() {
 
                       <td className="max-w-[300px] px-5 py-4">
                         <Link
-                          href={`/admin/marketing/leads/${lead.id}`}
+                          href={`/ops-console/marketing/leads/${lead.id}`}
                           className="block rounded-md px-1 py-0.5 hover:bg-slate-50"
                         >
                           <div className="truncate text-sm font-medium text-slate-900 hover:text-blue-700">

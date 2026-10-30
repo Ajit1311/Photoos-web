@@ -895,7 +895,7 @@ export default function AdminDashboardPage() {
             </div>
 
             <Link
-              href="/ops-console/software/health"
+              href="/ops-console/software/system-health"
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#0A3F61]"
             >
               System health
