@@ -44,8 +44,7 @@ export default function MarketplaceLeads() {
 
 
   const marketplaceLeads =
-    dashboard.data?.metrics
-      .marketplaceLeads ??
+    dashboard.data?.metrics?.marketplaceLeads ??
     {
       items: [],
       total: 0,

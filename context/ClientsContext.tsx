@@ -111,21 +111,16 @@ export function ClientsProvider({
 
 }
 
+const DEFAULT_CLIENTS_VALUE: ClientsContextValue = {
+  data: null,
+  clients: [],
+  pagination: null,
+  loading: false,
+  error: null,
+  reload: async () => {},
+};
+
 export function useClientsContext() {
-
-  const context =
-    useContext(
-      ClientsContext,
-    );
-
-  if (!context) {
-
-    throw new Error(
-      "useClientsContext must be used inside ClientsProvider.",
-    );
-
-  }
-
-  return context;
-
+  const context = useContext(ClientsContext);
+  return context ?? DEFAULT_CLIENTS_VALUE;
 }

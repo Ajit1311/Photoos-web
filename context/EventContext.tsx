@@ -41,15 +41,12 @@ export function EventProvider({
   );
 }
 
+const DEFAULT_EVENT_VALUE: EventContextValue = {
+  event: null,
+  loading: false,
+};
+
 export function useCurrentEvent() {
-  const context =
-    useContext(EventContext);
-
-  if (!context) {
-    throw new Error(
-      "useCurrentEvent must be used inside EventProvider."
-    );
-  }
-
-  return context;
+  const context = useContext(EventContext);
+  return context ?? DEFAULT_EVENT_VALUE;
 }

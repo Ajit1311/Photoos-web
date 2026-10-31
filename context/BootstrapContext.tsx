@@ -68,15 +68,15 @@ export function BootstrapProvider({
   );
 }
 
+const DEFAULT_BOOTSTRAP_VALUE: BootstrapContextValue = {
+  data: null,
+  loading: false,
+  refreshing: false,
+  error: null,
+  reload: async () => {},
+};
+
 export function useBootstrapContext() {
-  const context =
-    useContext(BootstrapContext);
-
-  if (!context) {
-    throw new Error(
-      "useBootstrapContext must be used inside BootstrapProvider.",
-    );
-  }
-
-  return context;
+  const context = useContext(BootstrapContext);
+  return context ?? DEFAULT_BOOTSTRAP_VALUE;
 }

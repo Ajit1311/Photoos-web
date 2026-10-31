@@ -624,7 +624,7 @@ export default function LegalCompliancePage() {
               ? "/corporate/onboarding"
               : freelancerMode
                 ? "/freelancer/profile/create"
-                : `/onboarding/studio${qs ? `?${qs}` : ""}`;
+                : "/dashboard";
 
 
         if (freelancerMode) {

@@ -617,39 +617,40 @@ export default function DashboardPage() {
               {
                 label: "Team members",
                 used:
-                  subscriptionUsage.data.users.used,
+                  subscriptionUsage.data?.users?.used ?? 0,
                 limit:
-                  subscriptionUsage.data.users.limit,
+                  subscriptionUsage.data?.users?.limit ?? null,
                 remaining:
-                  subscriptionUsage.data.users.remaining,
+                  subscriptionUsage.data?.users?.remaining ?? null,
                 percentage:
-                  subscriptionUsage.data.users.percentage,
+                  subscriptionUsage.data?.users?.percentage ?? null,
               },
               {
                 label: "Events / month",
                 used:
-                  subscriptionUsage.data.events.used_this_month,
+                  subscriptionUsage.data?.events?.used_this_month ?? 0,
                 limit:
-                  subscriptionUsage.data.events.limit,
+                  subscriptionUsage.data?.events?.limit ?? null,
                 remaining:
-                  subscriptionUsage.data.events.remaining,
+                  subscriptionUsage.data?.events?.remaining ?? null,
                 percentage:
-                  subscriptionUsage.data.events.percentage,
+                  subscriptionUsage.data?.events?.percentage ?? null,
               },
               {
                 label: "Storage",
                 used:
-                  subscriptionUsage.data.storage.used_bytes /
+                  (subscriptionUsage.data?.storage?.used_bytes ?? 0) /
                   (1024 * 1024 * 1024),
                 limit:
-                  subscriptionUsage.data.storage.limit_gb,
+                  subscriptionUsage.data?.storage?.limit_gb ?? null,
                 remaining:
-                  subscriptionUsage.data.storage.remaining_bytes === null
+                  subscriptionUsage.data?.storage?.remaining_bytes === null ||
+                  subscriptionUsage.data?.storage?.remaining_bytes === undefined
                     ? null
-                    : subscriptionUsage.data.storage.remaining_bytes /
+                    : (subscriptionUsage.data?.storage?.remaining_bytes ?? 0) /
                       (1024 * 1024 * 1024),
                 percentage:
-                  subscriptionUsage.data.storage.percentage,
+                  subscriptionUsage.data?.storage?.percentage ?? null,
               },
             ].map(
               (item) => {

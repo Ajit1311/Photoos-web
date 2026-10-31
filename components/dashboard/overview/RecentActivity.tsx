@@ -197,7 +197,7 @@ export default function RecentActivity() {
 
 
   const activities =
-    center.items.slice(
+    center?.items?.slice(
       0,
       5,
     );

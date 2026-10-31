@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { AlertTriangle, RefreshCw, Home } from "lucide-react";
+import { AlertTriangle, RefreshCw, Home, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function GlobalError({
@@ -13,9 +13,20 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log error to console without exposing secrets
-    console.error("[AppError] Unhandled route error:", error.message);
+    console.error("[AppError] Unhandled route error:", error);
   }, [error]);
+
+  function handleClearCacheAndReload() {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem("photoos_active_studio_id");
+        localStorage.removeItem("photoos_studio_id");
+      } catch {
+        // ignore
+      }
+      window.location.href = "/dashboard";
+    }
+  }
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 py-16 text-center">
@@ -39,8 +50,14 @@ export default function GlobalError({
         has received notice of this event.
       </p>
 
+      {error?.message && (
+        <div className="mt-4 max-w-lg rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-2.5 text-xs text-destructive font-mono break-words">
+          {error.message}
+        </div>
+      )}
+
       {error.digest && (
-        <p className="mt-3 font-mono text-[11px] text-muted-foreground/60">
+        <p className="mt-2 font-mono text-[11px] text-muted-foreground/60">
           Incident ID: {error.digest}
         </p>
       )}
@@ -66,8 +83,15 @@ export default function GlobalError({
             Return to Dashboard
           </Button>
         </Link>
+        <Button
+          variant="ghost"
+          onClick={handleClearCacheAndReload}
+          className="gap-2 text-xs text-muted-foreground"
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+          Reset Workspace Cache
+        </Button>
       </div>
     </div>
   );
 }
-

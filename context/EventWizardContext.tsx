@@ -257,14 +257,21 @@ export function EventWizardProvider({ children, initialProjectId }: Props) {
   );
 }
 
+const DEFAULT_EVENT_WIZARD_VALUE: EventWizardContextValue = {
+  currentStep: 1,
+  data: defaultEventWizardData,
+  submitting: false,
+  error: null,
+  setStep: () => {},
+  nextStep: () => {},
+  previousStep: () => {},
+  setField: () => {},
+  clearError: () => {},
+  reset: () => {},
+  submit: async () => {},
+};
+
 export function useEventWizard() {
   const context = useContext(EventWizardContext);
-
-  if (!context) {
-    throw new Error(
-      "useEventWizard must be used inside EventWizardProvider."
-    );
-  }
-
-  return context;
+  return context ?? DEFAULT_EVENT_WIZARD_VALUE;
 }

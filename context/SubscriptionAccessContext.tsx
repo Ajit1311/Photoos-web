@@ -266,23 +266,14 @@ export function SubscriptionAccessProvider({
 }
 
 
+const DEFAULT_SUBSCRIPTION_ACCESS_VALUE: SubscriptionAccessContextValue = {
+  data: null,
+  loading: false,
+  error: null,
+  reload: async () => {},
+};
+
 export function useSubscriptionAccess() {
-
-  const context =
-    useContext(
-      SubscriptionAccessContext,
-    );
-
-
-  if (!context) {
-
-    throw new Error(
-      "useSubscriptionAccess must be used inside SubscriptionAccessProvider.",
-    );
-
-  }
-
-
-  return context;
-
+  const context = useContext(SubscriptionAccessContext);
+  return context ?? DEFAULT_SUBSCRIPTION_ACCESS_VALUE;
 }

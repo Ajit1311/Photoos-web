@@ -59,8 +59,7 @@ export default function PendingPayments() {
 
 
   const pendingPayments =
-    dashboard.data?.metrics
-      .pendingPaymentsData ??
+    dashboard.data?.metrics?.pendingPaymentsData ??
     {
       items: [],
       total_due: 0,

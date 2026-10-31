@@ -795,23 +795,19 @@ export function NotificationProvider({
 }
 
 
+const DEFAULT_NOTIFICATION_VALUE: NotificationContextValue = {
+  center: EMPTY_CENTER,
+  badge: EMPTY_BADGE,
+  chatUnread: 0,
+  loading: false,
+  refreshing: false,
+  error: null,
+  reload: async () => {},
+  markAsRead: async () => {},
+  markAllAsRead: async () => {},
+};
+
 export function useNotificationContext() {
-
-  const context =
-    useContext(
-      NotificationContext,
-    );
-
-
-  if (!context) {
-
-    throw new Error(
-      "useNotificationContext must be used inside NotificationProvider.",
-    );
-
-  }
-
-
-  return context;
-
+  const context = useContext(NotificationContext);
+  return context ?? DEFAULT_NOTIFICATION_VALUE;
 }

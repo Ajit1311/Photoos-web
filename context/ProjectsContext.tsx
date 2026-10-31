@@ -85,21 +85,14 @@ export function ProjectsProvider({
 
 }
 
+const DEFAULT_PROJECTS_VALUE: ProjectsContextValue = {
+  data: null,
+  loading: false,
+  error: null,
+  reload: async () => {},
+};
+
 export function useProjectsContext() {
-
-  const context =
-    useContext(
-      ProjectsContext,
-    );
-
-  if (!context) {
-
-    throw new Error(
-      "useProjectsContext must be used inside ProjectsProvider.",
-    );
-
-  }
-
-  return context;
-
+  const context = useContext(ProjectsContext);
+  return context ?? DEFAULT_PROJECTS_VALUE;
 }

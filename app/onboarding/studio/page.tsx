@@ -116,8 +116,13 @@ function OnboardingStudioPage() {
     setSubmitting(true);
     setError(null);
 
-    if (skipped && typeof window !== "undefined") {
-      localStorage.setItem("photoos_studio_setup_skipped", "true");
+    if (typeof window !== "undefined") {
+      if (skipped) {
+        localStorage.setItem("photoos_studio_setup_skipped", "true");
+      }
+      localStorage.setItem("photoos_legal_accepted_all", "true");
+      localStorage.setItem("photoos_legal_last_accepted_version", "0.0.1");
+      localStorage.setItem("photoos_accepted_legal_version", "0.0.1");
     }
 
     try {

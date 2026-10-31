@@ -80,21 +80,15 @@ export function DashboardProvider({
 
 }
 
+const DEFAULT_DASHBOARD_VALUE: DashboardContextValue = {
+  data: null,
+  loading: false,
+  refreshing: false,
+  error: null,
+  reload: async () => {},
+};
+
 export function useDashboardContext() {
-
-  const context =
-    useContext(
-      DashboardContext,
-    );
-
-  if (!context) {
-
-    throw new Error(
-      "useDashboardContext must be used inside DashboardProvider.",
-    );
-
-  }
-
-  return context;
-
+  const context = useContext(DashboardContext);
+  return context ?? DEFAULT_DASHBOARD_VALUE;
 }

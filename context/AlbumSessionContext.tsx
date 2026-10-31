@@ -67,14 +67,14 @@ export function AlbumSessionProvider({
   );
 }
 
+const DEFAULT_ALBUM_SESSION_VALUE: AlbumSessionContextType = {
+  selectedPhotos: [],
+  addPhoto: () => {},
+  removePhoto: () => {},
+  clearPhotos: () => {},
+};
+
 export function useAlbumSessionContext() {
   const context = useContext(AlbumSessionContext);
-
-  if (!context) {
-    throw new Error(
-      "useAlbumSessionContext must be used inside AlbumSessionProvider"
-    );
-  }
-
-  return context;
+  return context ?? DEFAULT_ALBUM_SESSION_VALUE;
 }
