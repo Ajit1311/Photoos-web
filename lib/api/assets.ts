@@ -214,7 +214,60 @@ export async function prepareAsset(
     ? (payload.assetType || "").toLowerCase()
     : "photo";
 
-  // 1. Try Edge function first
+  // 1. Primary: Server-side API route /api/assets/prepare
+  try {
+    const accessToken = await getAccessToken();
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (accessToken) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+
+    const res = await fetch("/api/assets/prepare", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        studio_id: studioId,
+        album_id: payload.albumId,
+        asset_type: normalizedAssetType,
+        original_filename: payload.originalFilename,
+        mime_type: payload.mimeType,
+        file_size: payload.fileSize,
+        width,
+        height,
+        checksum: payload.checksum ?? null,
+        metadata: payload.metadata ?? {},
+      }),
+    });
+
+    if (res.ok) {
+      const json = await res.json().catch(() => null);
+      if (json?.success && json?.data?.asset_id && json?.data?.storage_path) {
+        const d = json.data;
+        return {
+          id: d.asset_id,
+          studio_id: d.studio_id || studioId,
+          album_id: d.album_id || payload.albumId,
+          asset_type: normalizedAssetType,
+          original_filename: payload.originalFilename,
+          storage_filename: d.storage_filename ?? `${Date.now()}-${payload.originalFilename}`,
+          storage_bucket: d.storage_bucket ?? "assets",
+          storage_path: d.storage_path,
+          mime_type: payload.mimeType,
+          file_size: payload.fileSize,
+          width,
+          height,
+          checksum: payload.checksum ?? null,
+          status: "uploading",
+        };
+      }
+    }
+  } catch (apiErr) {
+    console.warn("[prepareAsset] API route notice, falling back:", apiErr);
+  }
+
+  // 2. Try Edge function fallback
   try {
     const headers = await getHeaders(studioId);
     const { data, error } = await supabase.functions.invoke(
@@ -428,7 +481,56 @@ export async function completeAsset(
     duration_seconds: payload.durationSeconds ?? null,
   };
 
-  // 1. Try Edge function first
+  // 1. Primary: Server-side API route /api/assets/complete
+  try {
+    const accessToken = await getAccessToken();
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (accessToken) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+
+    const res = await fetch("/api/assets/complete", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        asset_id: payload.assetId,
+        storage_path: payload.storagePath,
+        storage_filename: payload.storageFilename,
+        mime_type: payload.mimeType,
+        file_size: payload.fileSize,
+        checksum: payload.checksum ?? null,
+        width,
+        height,
+        duration_seconds: payload.durationSeconds ?? null,
+      }),
+    });
+
+    if (res.ok) {
+      const json = await res.json().catch(() => null);
+      if (json?.success && json?.data) {
+        const d = json.data;
+        return {
+          id: d.id || payload.assetId,
+          studio_id: d.studio_id || studioId,
+          album_id: d.album_id || "",
+          storage_bucket: d.storage_bucket || "assets",
+          storage_path: d.storage_path || payload.storagePath,
+          storage_filename: d.storage_filename || payload.storageFilename,
+          mime_type: d.mime_type || payload.mimeType,
+          file_size: d.file_size || payload.fileSize,
+          width: d.width || width,
+          height: d.height || height,
+          processing_status: d.processing_status || "completed",
+        };
+      }
+    }
+  } catch (apiErr) {
+    console.warn("[completeAsset] API route notice, falling back:", apiErr);
+  }
+
+  // 2. Try Edge function fallback
   try {
     const headers = await getHeaders(studioId);
     const { data, error } = await supabase.functions.invoke(

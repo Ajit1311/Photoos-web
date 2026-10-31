@@ -86,8 +86,9 @@ export default function GalleryWorkspace() {
   } = useWorkspace(eventId);
 
   const projectId =
-    workspace?.event?.projectId ??
-    eventId;
+    workspace?.event?.projectId ||
+    (workspace?.project as any)?.id ||
+    "";
 
 
   // ==========================================================================
@@ -248,8 +249,8 @@ useEffect(() => {
     return;
   }
 
-  const effectiveStudioId = studioId || "studio_default";
-  const effectiveProjectId = projectId || eventId;
+  const effectiveStudioId = studioId || workspace?.event?.studioId || "";
+  const effectiveProjectId = projectId;
 
   void upload(
     effectiveStudioId,

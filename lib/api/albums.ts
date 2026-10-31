@@ -269,14 +269,22 @@ export async function createAlbum(
   }
 
   // Direct DB insert fallback
+  const randomSuffix = Date.now().toString(36);
+  const safeSlug = `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${randomSuffix}`;
+  const safeCode = `ALB_${randomSuffix.toUpperCase()}`;
+
   const { data: inserted, error: insertError } = await supabase
     .from("albums")
     .insert({
       studio_id: studioId,
       project_id: projectId,
       title: title,
+      slug: safeSlug,
+      code: safeCode,
+      sequence: 1,
       album_type: "standard",
       visibility: "private",
+      status: "active",
     })
     .select("*")
     .single();
