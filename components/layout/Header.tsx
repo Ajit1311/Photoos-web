@@ -73,7 +73,7 @@ export default function Header({
 
 
   const studio =
-    bootstrap.data?.workspace.studio ??
+    bootstrap.data?.workspace?.studio ??
     null;
 
 
@@ -237,7 +237,7 @@ export default function Header({
 
 
   const organization =
-    bootstrap.data?.workspace.organization ??
+    bootstrap.data?.workspace?.organization ??
     null;
 
 

@@ -180,7 +180,12 @@ export function EventWizardProvider({ children, initialProjectId }: Props) {
       throw new Error("Bootstrap data not loaded.");
     }
 
-    const studioId = bootstrap.workspace.membership.studioId;
+    const studioId =
+      bootstrap.workspace?.membership?.studioId ??
+      (typeof window !== "undefined"
+        ? localStorage.getItem("photoos_active_studio_id") ||
+          localStorage.getItem("photoos_studio_id")
+        : null);
 
     if (!studioId) {
       throw new Error("Studio not found.");

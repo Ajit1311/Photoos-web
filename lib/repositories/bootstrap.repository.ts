@@ -79,6 +79,21 @@ class BootstrapRepository {
       }
     }
 
+    if (!memberData && typeof window !== "undefined") {
+      const cachedStudioId =
+        localStorage.getItem("photoos_active_studio_id") ||
+        localStorage.getItem("photoos_studio_id");
+
+      if (cachedStudioId) {
+        memberData = {
+          id: "member_" + cachedStudioId,
+          studio_id: cachedStudioId,
+          role_id: "studio_owner",
+          status: "active",
+        };
+      }
+    }
+
     if (!memberData) {
       return {
         success: true,

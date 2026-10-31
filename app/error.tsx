@@ -48,7 +48,13 @@ export default function GlobalError({
       <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
         <Button
           variant="default"
-          onClick={() => reset()}
+          onClick={() => {
+            if (typeof window !== "undefined") {
+              window.location.reload();
+            } else {
+              reset();
+            }
+          }}
           className="gap-2 shadow-xs"
         >
           <RefreshCw className="h-4 w-4" />

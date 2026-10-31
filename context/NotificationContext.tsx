@@ -129,13 +129,17 @@ export function NotificationProvider({
 
 
   const studioId =
-    bootstrap.data?.workspace.studio?.id ??
+    bootstrap.data?.workspace?.studio?.id ??
+    (typeof window !== "undefined"
+      ? localStorage.getItem("photoos_active_studio_id") ||
+        localStorage.getItem("photoos_studio_id")
+      : null) ??
     null;
 
 
   const profileId =
     bootstrap.data?.profile?.id ??
-    bootstrap.data?.workspace.membership.profileId ??
+    bootstrap.data?.workspace?.membership?.profileId ??
     null;
 
 

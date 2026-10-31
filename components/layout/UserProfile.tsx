@@ -134,7 +134,7 @@ export default function UserProfile() {
 
 
   const role =
-    bootstrap.data?.workspace.role ??
+    bootstrap.data?.workspace?.role ??
     null;
 
 
