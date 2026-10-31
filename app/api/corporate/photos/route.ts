@@ -83,8 +83,101 @@ export async function GET(req: NextRequest) {
 }
 
 // POST /api/corporate/photos
+// Supports:
+// 1. JSON registration (after direct-to-storage presigned upload) -> ZERO binary through Vercel!
+// 2. FormData multi-file upload (fallback)
 export async function POST(req: NextRequest) {
   try {
+    const contentType = req.headers.get("content-type") || "";
+    const supabase = getServerSupabase();
+
+    // Ensure assets bucket exists
+    try {
+      await supabase.storage.createBucket("assets", { public: true });
+    } catch {}
+
+    // =========================================================================
+    // CASE 1: DIRECT JSON PHOTO REGISTRATION (Studio-grade direct storage upload)
+    // =========================================================================
+    if (contentType.includes("application/json")) {
+      const body = await req.json();
+      const eventId = body?.eventId as string;
+      const companyId = (body?.companyId as string) || "corporate";
+      const photoToRegister = body?.photo;
+      const photoListToRegister = Array.isArray(body?.photos) ? body.photos : (photoToRegister ? [photoToRegister] : []);
+
+      if (!eventId) {
+        return NextResponse.json(
+          { success: false, error: "Missing eventId." },
+          { status: 400, headers: corsHeaders }
+        );
+      }
+
+      if (photoListToRegister.length === 0) {
+        return NextResponse.json(
+          { success: false, error: "No photo metadata provided to register." },
+          { status: 400, headers: corsHeaders }
+        );
+      }
+
+      const manifestPath = `corporate/${eventId}/photos.json`;
+      let existingPhotos: any[] = [];
+      try {
+        const { data: existingData } = await supabase.storage
+          .from("assets")
+          .download(manifestPath);
+        if (existingData) {
+          const text = await existingData.text();
+          existingPhotos = JSON.parse(text);
+          if (!Array.isArray(existingPhotos)) existingPhotos = [];
+        }
+      } catch {
+        existingPhotos = [];
+      }
+
+      // Deduplicate photos by ID
+      const photoMap = new Map<string, any>();
+      for (const p of existingPhotos) {
+        if (p?.id) photoMap.set(p.id, p);
+      }
+      for (const p of photoListToRegister) {
+        if (p?.id) {
+          photoMap.set(p.id, {
+            ...p,
+            event_id: eventId,
+            company_id: companyId,
+            uploaded_at: p.uploaded_at || new Date().toISOString(),
+          });
+        }
+      }
+      const combinedPhotos = Array.from(photoMap.values());
+
+      const manifestBlob = new Blob([JSON.stringify(combinedPhotos, null, 2)], {
+        type: "application/json",
+      });
+      const manifestBuffer = Buffer.from(await manifestBlob.arrayBuffer());
+
+      await supabase.storage
+        .from("assets")
+        .upload(manifestPath, manifestBuffer, {
+          contentType: "application/json",
+          upsert: true,
+        });
+
+      return NextResponse.json(
+        {
+          success: true,
+          registeredCount: photoListToRegister.length,
+          totalCount: combinedPhotos.length,
+          photos: combinedPhotos,
+        },
+        { status: 200, headers: corsHeaders }
+      );
+    }
+
+    // =========================================================================
+    // CASE 2: FORMDATA UPLOAD (Fallback)
+    // =========================================================================
     const formData = await req.formData();
     const eventId = formData.get("eventId") as string;
     const companyId = (formData.get("companyId") as string) || "corporate";
@@ -96,9 +189,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const supabase = getServerSupabase();
     const files = formData.getAll("photos") as File[];
-
     if (!files || files.length === 0) {
       return NextResponse.json(
         { success: false, error: "No photos provided in upload request." },
@@ -106,7 +197,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1. Download existing manifest
     const manifestPath = `corporate/${eventId}/photos.json`;
     let existingPhotos: any[] = [];
     try {
@@ -124,7 +214,6 @@ export async function POST(req: NextRequest) {
 
     const newlyUploadedPhotos: any[] = [];
 
-    // 2. Upload each file to Supabase Storage
     for (const file of files) {
       if (!file.name) continue;
 
@@ -134,11 +223,6 @@ export async function POST(req: NextRequest) {
       const storagePath = `corporate/${eventId}/photos/${photoId}_${cleanName}`;
 
       let photoUrl = "";
-
-      // Ensure bucket exists or create it
-      try {
-        await supabase.storage.createBucket("assets", { public: true });
-      } catch {}
 
       const { error: uploadError } = await supabase.storage
         .from("assets")
@@ -151,18 +235,9 @@ export async function POST(req: NextRequest) {
         try {
           const { data: signedData } = await supabase.storage
             .from("assets")
-            .createSignedUrl(storagePath, 604800);
+            .createSignedUrl(storagePath, 315360000);
           photoUrl = signedData?.signedUrl || "";
         } catch {}
-
-        if (!photoUrl) {
-          try {
-            const { data: signed24 } = await supabase.storage
-              .from("assets")
-              .createSignedUrl(storagePath, 86400);
-            photoUrl = signed24?.signedUrl || "";
-          } catch {}
-        }
 
         if (!photoUrl) {
           const { data: publicData } = supabase.storage
@@ -170,28 +245,24 @@ export async function POST(req: NextRequest) {
             .getPublicUrl(storagePath);
           photoUrl = publicData?.publicUrl || "";
         }
-      } else {
-        console.warn("[CorporatePhotosRoute POST] Bucket upload error, falling back to base64 data URI:", uploadError);
-        // Fallback: create base64 data URI so photo always succeeds
-        const base64 = buffer.toString("base64");
-        photoUrl = `data:${file.type || "image/jpeg"};base64,${base64}`;
       }
 
-      newlyUploadedPhotos.push({
-        id: photoId,
-        event_id: eventId,
-        company_id: companyId,
-        name: file.name,
-        storage_path: storagePath,
-        url: photoUrl,
-        thumbnail_url: photoUrl,
-        size_bytes: file.size,
-        ai_faces_detected: Math.floor(1 + Math.random() * 3),
-        uploaded_at: new Date().toISOString(),
-      });
+      if (photoUrl) {
+        newlyUploadedPhotos.push({
+          id: photoId,
+          event_id: eventId,
+          company_id: companyId,
+          name: file.name,
+          storage_path: storagePath,
+          url: photoUrl,
+          thumbnail_url: photoUrl,
+          size_bytes: file.size,
+          ai_faces_detected: Math.floor(1 + Math.random() * 3),
+          uploaded_at: new Date().toISOString(),
+        });
+      }
     }
 
-    // 3. Update manifest with deduplication
     const photoMap = new Map<string, any>();
     for (const p of existingPhotos) {
       if (p?.id) photoMap.set(p.id, p);
@@ -297,4 +368,3 @@ export async function DELETE(req: NextRequest) {
     );
   }
 }
-

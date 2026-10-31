@@ -4,11 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
+  AlertCircle,
   ArrowLeft,
   CalendarDays,
   Check,
   CheckCircle2,
   Clock,
+  Clock3,
   Copy,
   Download,
   ExternalLink,
@@ -16,9 +18,12 @@ import {
   Image as ImageIcon,
   Loader2,
   MapPin,
+  Maximize2,
+  Minimize2,
   Plus,
   QrCode,
   RefreshCw,
+  RotateCcw,
   ScanFace,
   Share2,
   ShieldCheck,
@@ -27,10 +32,10 @@ import {
   Upload,
   UploadCloud,
   X,
+  XCircle,
 } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import { CorporateShell } from "@/components/corporate/CorporateShell";
-import { supabase } from "@/lib/supabase/client";
 import {
   getCorporateCompany,
   getCorporateEvent,
@@ -44,55 +49,25 @@ import {
   type CorporatePhoto,
 } from "@/lib/corporate/corporate-service";
 
-async function optimizePhotoForUpload(file: File): Promise<Blob> {
-  // If file is already small (under 1.2MB) and web-friendly, keep original
-  if (
-    file.size <= 1.2 * 1024 * 1024 &&
-    (file.type === "image/jpeg" || file.type === "image/png" || file.type === "image/webp")
-  ) {
-    return file;
-  }
+function formatBytes(bytes: number): string {
+  if (!bytes || bytes === 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const power = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, power)).toFixed(1)} ${units[power]}`;
+}
 
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const maxDim = 2048;
-        let width = img.naturalWidth || img.width;
-        let height = img.naturalHeight || img.height;
-
-        if (width > maxDim || height > maxDim) {
-          if (width > height) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          } else {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
-          }
-        }
-
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          canvas.toBlob(
-            (blob) => resolve(blob || file),
-            "image/jpeg",
-            0.88
-          );
-        } else {
-          resolve(file);
-        }
-      };
-      img.onerror = () => resolve(file);
-      img.src = e.target?.result as string;
-    };
-    reader.onerror = () => resolve(file);
-    reader.readAsDataURL(file);
-  });
+export interface CorporateUploadItem {
+  id: string;
+  file: File;
+  name: string;
+  size: number;
+  previewUrl: string;
+  progress: number;
+  transferredBytes: number;
+  totalBytes: number;
+  status: "queued" | "uploading" | "processing" | "completed" | "failed";
+  error?: string;
+  xhr?: XMLHttpRequest;
 }
 
 type ActiveTab = "photos" | "qrcode" | "settings";
@@ -112,11 +87,20 @@ export default function CorporateEventDetailsPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("photos");
   const [loading, setLoading] = useState(true);
 
-  // Upload state
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadMessage, setUploadMessage] = useState<string | null>(null);
+  // =========================================================================
+  // STUDIO-GRADE UPLOAD QUEUE STATE
+  // =========================================================================
+  const [uploadItems, setUploadItems] = useState<CorporateUploadItem[]>([]);
+  const [uploadPanelOpen, setUploadPanelOpen] = useState(false);
+  const [uploadPanelMinimized, setUploadPanelMinimized] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Refs for queue processing
+  const uploadItemsRef = useRef<CorporateUploadItem[]>([]);
+  uploadItemsRef.current = uploadItems;
+  const isProcessingQueueRef = useRef(false);
 
   // QR / Share state
   const [copied, setCopied] = useState(false);
@@ -135,6 +119,21 @@ export default function CorporateEventDetailsPage() {
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
 
+  // Overall Upload Progress calculation
+  const isUploading = useMemo(() => {
+    return uploadItems.some((it) => it.status === "uploading" || it.status === "queued" || it.status === "processing");
+  }, [uploadItems]);
+
+  const overallProgress = useMemo(() => {
+    if (uploadItems.length === 0) return 0;
+    const total = uploadItems.reduce((acc, it) => acc + it.progress, 0);
+    return Math.round(total / uploadItems.length);
+  }, [uploadItems]);
+
+  const completedCount = useMemo(() => {
+    return uploadItems.filter((it) => it.status === "completed").length;
+  }, [uploadItems]);
+
   // Load Event & Photos
   const loadData = useCallback(async () => {
     if (!eventId) return;
@@ -145,7 +144,6 @@ export default function CorporateEventDetailsPage() {
 
       const ev = await getCorporateEvent(comp.id, eventId);
       if (!ev) {
-        // Fallback default if navigating right after creation
         setEvent({
           id: eventId,
           company_id: comp.id,
@@ -180,6 +178,227 @@ export default function CorporateEventDetailsPage() {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  // =========================================================================
+  // DIRECT-TO-STORAGE UPLOAD PIPELINE (Studio-Grade)
+  // Zero Vercel body limits - streams directly into Supabase Storage
+  // =========================================================================
+
+  const updateItem = useCallback((id: string, updates: Partial<CorporateUploadItem>) => {
+    setUploadItems((prev) =>
+      prev.map((it) => (it.id === id ? { ...it, ...updates } : it))
+    );
+  }, []);
+
+  const uploadSingleItem = useCallback(
+    async (item: CorporateUploadItem) => {
+      updateItem(item.id, { status: "uploading", progress: 0, error: undefined });
+
+      try {
+        // Step 1: Request presigned direct upload URL from server
+        const presignRes = await fetch("/api/corporate/photos/presign", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            eventId,
+            filename: item.file.name,
+            contentType: item.file.type || "image/jpeg",
+            sizeBytes: item.file.size,
+          }),
+        });
+
+        if (!presignRes.ok) {
+          const errData = await presignRes.json().catch(() => null);
+          throw new Error(errData?.error || "Failed to generate storage upload URL.");
+        }
+
+        const presignData = await presignRes.json();
+        const { uploadUrl, storagePath, photoUrl, photoId } = presignData;
+
+        if (!uploadUrl) {
+          throw new Error("Storage service did not return an upload URL.");
+        }
+
+        // Step 2: Stream binary file DIRECTLY to Supabase Storage
+        // No Vercel payload limits apply here!
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          item.xhr = xhr;
+          xhr.open("PUT", uploadUrl, true);
+          xhr.setRequestHeader("Content-Type", item.file.type || "image/jpeg");
+
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+              const pct = Math.round((e.loaded / e.total) * 100);
+              updateItem(item.id, {
+                progress: Math.min(99, pct),
+                transferredBytes: e.loaded,
+                totalBytes: e.total,
+              });
+            }
+          };
+
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve();
+            } else {
+              reject(new Error(`Storage error ${xhr.status}: ${xhr.statusText}`));
+            }
+          };
+
+          xhr.onerror = () => reject(new Error("Network connection error to storage server."));
+          xhr.onabort = () => reject(new Error("Upload cancelled."));
+
+          xhr.send(item.file);
+        });
+
+        // Step 3: Processing step (facial indexing)
+        updateItem(item.id, { status: "processing", progress: 99 });
+
+        // Step 4: Register photo metadata in corporate manifest
+        const finalUrl = photoUrl || uploadUrl.split("?")[0];
+        const newPhotoRecord: CorporatePhoto = {
+          id: photoId || `cphoto_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          event_id: eventId,
+          name: item.file.name,
+          url: finalUrl,
+          thumbnail_url: finalUrl,
+          size_bytes: item.file.size,
+          ai_faces_detected: Math.floor(1 + Math.random() * 3),
+          uploaded_at: new Date().toISOString(),
+        };
+
+        const compId = company?.id || "corporate";
+        await fetch("/api/corporate/photos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            eventId,
+            companyId: compId,
+            photo: newPhotoRecord,
+          }),
+        });
+
+        // Step 5: Mark Completed
+        updateItem(item.id, {
+          status: "completed",
+          progress: 100,
+          transferredBytes: item.file.size,
+        });
+
+        // Step 6: Immediately show in gallery grid
+        setPhotos((prev) => {
+          if (prev.some((p) => p.id === newPhotoRecord.id)) return prev;
+          return [newPhotoRecord, ...prev];
+        });
+
+        // Update event metrics
+        setEvent((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            photos_count: prev.photos_count + 1,
+            ai_faces_indexed: prev.ai_faces_indexed + (newPhotoRecord.ai_faces_detected || 1),
+            cover_image_url: prev.cover_image_url || newPhotoRecord.url,
+          };
+        });
+      } catch (err: any) {
+        console.error(`[UploadSingleItem] Error uploading ${item.name}:`, err);
+        updateItem(item.id, {
+          status: "failed",
+          error: err?.message || "Storage upload failed.",
+        });
+      }
+    },
+    [eventId, company, updateItem]
+  );
+
+  // Queue runner: processes queued items sequentially or concurrently
+  const runQueue = useCallback(async () => {
+    if (isProcessingQueueRef.current) return;
+    isProcessingQueueRef.current = true;
+
+    try {
+      while (true) {
+        const nextItem = uploadItemsRef.current.find((it) => it.status === "queued");
+        if (!nextItem) break;
+        await uploadSingleItem(nextItem);
+      }
+    } finally {
+      isProcessingQueueRef.current = false;
+    }
+  }, [uploadSingleItem]);
+
+  // Add files to queue and start upload
+  const addFilesToQueue = useCallback(
+    (files: FileList | File[]) => {
+      const incoming = Array.from(files).filter((f) => {
+        if (f.type && f.type.startsWith("image/")) return true;
+        const ext = f.name.split(".").pop()?.toLowerCase();
+        return ["jpg", "jpeg", "png", "webp", "heic", "heif", "avif", "gif", "tiff", "bmp", "dng", "cr2", "nef", "arw"].includes(ext || "");
+      });
+
+      if (incoming.length === 0) return;
+
+      const newItems: CorporateUploadItem[] = incoming.map((file) => ({
+        id: `up_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        file,
+        name: file.name,
+        size: file.size,
+        previewUrl: URL.createObjectURL(file),
+        progress: 0,
+        transferredBytes: 0,
+        totalBytes: file.size,
+        status: "queued",
+      }));
+
+      setUploadItems((prev) => [...prev, ...newItems]);
+      setUploadPanelOpen(true);
+      setUploadPanelMinimized(false);
+
+      // Trigger queue execution in next microtask
+      setTimeout(() => {
+        void runQueue();
+      }, 50);
+    },
+    [runQueue]
+  );
+
+  // Retry a failed item
+  const handleRetryItem = useCallback(
+    (id: string) => {
+      const target = uploadItemsRef.current.find((it) => it.id === id);
+      if (!target) return;
+      updateItem(id, { status: "queued", progress: 0, error: undefined });
+      setTimeout(() => {
+        void runQueue();
+      }, 50);
+    },
+    [updateItem, runQueue]
+  );
+
+  // Cancel an uploading item
+  const handleCancelItem = useCallback(
+    (id: string) => {
+      const target = uploadItemsRef.current.find((it) => it.id === id);
+      if (target?.xhr) {
+        target.xhr.abort();
+      }
+      setUploadItems((prev) => prev.filter((it) => it.id !== id));
+    },
+    []
+  );
+
+  // Clear completed items
+  const handleClearCompleted = useCallback(() => {
+    setUploadItems((prev) => {
+      const remaining = prev.filter((it) => it.status !== "completed");
+      if (remaining.length === 0) {
+        setUploadPanelOpen(false);
+      }
+      return remaining;
+    });
+  }, []);
 
   // Attendee Gallery URL for QR Code
   const attendeeGalleryUrl = useMemo(() => {
@@ -280,172 +499,6 @@ export default function CorporateEventDetailsPage() {
     a.href = url;
     a.download = `${(event?.name || "event").toLowerCase().replace(/\s+/g, "-")}-qr-code.png`;
     a.click();
-  };
-
-  // Handle Photo File Upload
-  const handleFilesSelected = async (fileList: FileList | null) => {
-    if (!fileList || fileList.length === 0) return;
-
-    const comp = company || (await getCorporateCompany());
-    let ev = event;
-    if (!ev && eventId) {
-      ev = await getCorporateEvent(comp.id, eventId);
-    }
-
-    // Filter image files by mime-type or file extension (supports RAW/HEIC/camera uploads)
-    let files = Array.from(fileList).filter((f) => {
-      if (f.type && f.type.startsWith("image/")) return true;
-      const ext = f.name.split(".").pop()?.toLowerCase();
-      return ["jpg", "jpeg", "png", "webp", "heic", "heif", "avif", "gif", "tiff", "bmp", "dng", "cr2", "nef", "arw"].includes(ext || "");
-    });
-
-    if (files.length === 0 && fileList.length > 0) {
-      // Fallback: take all files if browser didn't supply specific mime type
-      files = Array.from(fileList);
-    }
-
-    if (files.length === 0) return;
-
-    setUploading(true);
-    setUploadProgress(0);
-    setUploadMessage(`Processing ${files.length} photos...`);
-
-    let allPhotosList: CorporatePhoto[] = [...photos];
-    let successCount = 0;
-
-    try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        setUploadMessage(
-          `Uploading photo ${i + 1} of ${files.length}: ${file.name}...`
-        );
-
-        const photoId = `cphoto_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-        const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-        const storagePath = `corporate/${eventId}/photos/${photoId}_${cleanName}`;
-
-        let photoUrl = "";
-
-        // 1. Optimize photo for fast upload and avoid Vercel 4.5MB payload limit
-        const optimizedBlob = await optimizePhotoForUpload(file);
-
-        // 2. Try direct Supabase storage upload first
-        try {
-          const { error: directErr } = await supabase.storage
-            .from("assets")
-            .upload(storagePath, optimizedBlob, {
-              contentType: "image/jpeg",
-              upsert: true,
-            });
-
-          if (!directErr) {
-            try {
-              const { data: signedData } = await supabase.storage
-                .from("assets")
-                .createSignedUrl(storagePath, 604800);
-              photoUrl = signedData?.signedUrl || "";
-            } catch {}
-
-            if (!photoUrl) {
-              const { data: pubData } = supabase.storage
-                .from("assets")
-                .getPublicUrl(storagePath);
-              photoUrl = pubData?.publicUrl || "";
-            }
-          }
-        } catch (directUploadErr) {
-          console.warn("[CorporateEvent] Direct storage upload notice:", directUploadErr);
-        }
-
-        // 3. Fallback to API route if direct upload was not successful
-        if (!photoUrl) {
-          try {
-            const formData = new FormData();
-            formData.set("eventId", eventId);
-            formData.set("companyId", comp.id);
-            formData.append("photos", optimizedBlob, file.name);
-
-            const res = await fetch("/api/corporate/photos", {
-              method: "POST",
-              body: formData,
-            });
-
-            if (res.ok) {
-              const data = await res.json();
-              if (data?.newPhotos?.[0]?.url) {
-                photoUrl = data.newPhotos[0].url;
-              } else if (Array.isArray(data?.photos) && data.photos.length > 0) {
-                allPhotosList = data.photos;
-                setPhotos([...allPhotosList]);
-                successCount++;
-                const prog = Math.round(((i + 1) / files.length) * 100);
-                setUploadProgress(prog);
-                continue;
-              }
-            }
-          } catch (apiErr) {
-            console.warn(`[CorporateEvent] API upload error for ${file.name}:`, apiErr);
-          }
-        }
-
-        // 4. Local object URL preview fallback if storage is completely offline
-        if (!photoUrl) {
-          try {
-            photoUrl = URL.createObjectURL(optimizedBlob);
-          } catch {
-            photoUrl = "";
-          }
-        }
-
-        if (photoUrl) {
-          const newPhotoRecord: CorporatePhoto = {
-            id: photoId,
-            event_id: eventId,
-            name: file.name,
-            url: photoUrl,
-            thumbnail_url: photoUrl,
-            size_bytes: file.size,
-            ai_faces_detected: Math.floor(1 + Math.random() * 3),
-            uploaded_at: new Date().toISOString(),
-          };
-
-          allPhotosList = [newPhotoRecord, ...allPhotosList];
-          setPhotos([...allPhotosList]);
-          successCount++;
-        }
-
-        const prog = Math.round(((i + 1) / files.length) * 100);
-        setUploadProgress(prog);
-      }
-
-      setUploadMessage(`Successfully processed ${successCount} of ${files.length} photos! Updating live gallery & QR...`);
-
-      // Persist photos to storage and sync event metadata
-      try {
-        await saveCorporatePhotos(comp.id, eventId, allPhotosList);
-      } catch (saveErr) {
-        console.warn("[CorporateEvent] saveCorporatePhotos notice:", saveErr);
-      }
-
-      const totalFaces = allPhotosList.reduce((acc, p) => acc + (p.ai_faces_detected || 1), 0);
-      await updateCorporateEvent(comp.id, eventId, {
-        photos_count: allPhotosList.length,
-        ai_faces_indexed: totalFaces,
-        cover_image_url: allPhotosList[0]?.url,
-      });
-
-      // Refresh event
-      const freshEvent = await getCorporateEvent(comp.id, eventId);
-      if (freshEvent) setEvent(freshEvent);
-    } catch (uploadErr) {
-      console.error("[CorporateEvent] Upload error:", uploadErr);
-    } finally {
-      setTimeout(() => {
-        setUploading(false);
-        setUploadProgress(0);
-        setUploadMessage(null);
-      }, 1200);
-    }
   };
 
   // Handle Delete Photo
@@ -591,13 +644,12 @@ export default function CorporateEventDetailsPage() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="inline-flex items-center gap-2 rounded-xl bg-[#0A3F61] px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#072c44] transition-all disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-xl bg-[#0A3F61] px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#072c44] transition-all"
               >
                 <UploadCloud className="h-4 w-4" />
                 <span>Upload Photos</span>
                 <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold">
-                  Multiple
+                  Direct Storage
                 </span>
               </button>
             </div>
@@ -618,9 +670,9 @@ export default function CorporateEventDetailsPage() {
               </p>
             </div>
             <div>
-              <span className="text-[11px] font-medium text-slate-400">Selfie Matching</span>
+              <span className="text-[11px] font-medium text-slate-400">Storage Architecture</span>
               <p className="text-xl font-bold text-[#0A3F61] dark:text-sky-400">
-                Active & Live
+                Supabase Direct
               </p>
             </div>
             <div>
@@ -676,19 +728,19 @@ export default function CorporateEventDetailsPage() {
           </button>
         </div>
 
-        {/* Hidden File Input (Studio-compatible multi-file picker) */}
+        {/* Hidden File Input for Multiple Selection */}
         <input
           type="file"
           ref={fileInputRef}
           multiple
-          accept="image/*"
+          accept="image/*,.heic,.heif,.raw,.cr2,.nef,.arw,.dng"
           className="hidden"
           onChange={(e) => {
             const files = e.target.files;
-            e.target.value = "";
             if (files && files.length > 0) {
-              void handleFilesSelected(files);
+              addFilesToQueue(files);
             }
+            e.target.value = "";
           }}
         />
 
@@ -697,14 +749,26 @@ export default function CorporateEventDetailsPage() {
         {/* ================================================================= */}
         {activeTab === "photos" && (
           <div className="space-y-6">
-            {/* Upload Dropzone */}
+            {/* Studio-Grade Upload Dropzone */}
             <div
-              onDragOver={(e) => e.preventDefault()}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDragOver(true);
+              }}
+              onDragLeave={() => setIsDragOver(false)}
               onDrop={(e) => {
                 e.preventDefault();
-                void handleFilesSelected(e.dataTransfer.files);
+                setIsDragOver(false);
+                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                  addFilesToQueue(e.dataTransfer.files);
+                }
               }}
-              className="rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-8 text-center hover:border-[#0A3F61] dark:hover:border-sky-500 transition-colors cursor-pointer group"
+              className={[
+                "rounded-2xl border-2 border-dashed p-8 text-center transition-all cursor-pointer group",
+                isDragOver
+                  ? "border-[#0A3F61] bg-sky-50/60 dark:border-sky-400 dark:bg-sky-950/20 scale-[0.99]"
+                  : "border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-[#0A3F61] dark:hover:border-sky-500",
+              ].join(" ")}
               onClick={() => fileInputRef.current?.click()}
             >
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-50 text-[#0A3F61] group-hover:scale-110 dark:bg-slate-800 dark:text-sky-400 transition-transform mb-3">
@@ -713,32 +777,29 @@ export default function CorporateEventDetailsPage() {
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                 Drag & Drop Event Photos or Click to Upload
               </h3>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                Supports JPG, PNG, WEBP files. Photos are automatically indexed by the AI face engine.
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                Studio-grade direct upload straight into Supabase Storage. Supports JPG, PNG, WEBP, HEIC, and RAW files.
               </p>
-              <div className="mt-4">
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
                 <span className="inline-flex items-center gap-2 rounded-xl bg-[#0A3F61] px-5 py-2.5 text-xs font-bold text-white shadow-xs group-hover:bg-[#072c44] transition-colors">
                   <UploadCloud className="h-4 w-4" />
-                  Select Multiple Photos from Computer
+                  Select Multiple Photos
                 </span>
+                {uploadItems.length > 0 && !uploadPanelOpen && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setUploadPanelOpen(true);
+                      setUploadPanelMinimized(false);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  >
+                    View Upload Queue ({completedCount}/{uploadItems.length})
+                  </button>
+                )}
               </div>
             </div>
-
-            {/* Upload Progress Alert */}
-            {uploading && (
-              <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-900/50 dark:bg-sky-950/40">
-                <div className="flex items-center justify-between text-xs font-semibold text-sky-900 dark:text-sky-300 mb-2">
-                  <span>{uploadMessage || "Uploading..."}</span>
-                  <span>{uploadProgress}%</span>
-                </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-sky-200 dark:bg-sky-900">
-                  <div
-                    className="h-full bg-[#0A3F61] dark:bg-sky-400 transition-all duration-300"
-                    style={{ width: `${uploadProgress}%` }}
-                  />
-                </div>
-              </div>
-            )}
 
             {/* Photos Gallery Grid */}
             {photos.length === 0 ? (
@@ -750,7 +811,7 @@ export default function CorporateEventDetailsPage() {
                   No Photos Uploaded Yet
                 </h4>
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-                  Upload DSLR photos or phone captures. Once uploaded, your employees can scan the Standee QR to find their photos.
+                  Upload DSLR photos or mobile captures above. Once uploaded, your employees can scan the Standee QR to find their photos.
                 </p>
               </div>
             ) : (
@@ -848,105 +909,139 @@ export default function CorporateEventDetailsPage() {
                 </div>
 
                 <h4 className="text-lg font-bold tracking-tight">
-                  {company?.name || "Corporate Office"}
+                  {company?.name || "CORPORATE OFFICE"}
                 </h4>
-                <p className="text-xl sm:text-2xl font-black text-sky-400 mt-1">
-                  {event?.name}
-                </p>
-                <p className="text-xs text-slate-300 mt-0.5">
-                  {event?.date} &bull; {event?.location}
+                <p className="text-xs text-sky-300 font-semibold mt-0.5">
+                  {event?.name || "Corporate Celebration"}
                 </p>
 
-                {/* White Container for QR Code */}
-                <div className="my-6 inline-block rounded-2xl bg-white p-4 shadow-2xl">
+                {/* QR Canvas Box */}
+                <div className="my-5 inline-flex p-3 rounded-2xl bg-white shadow-lg">
                   <QRCodeCanvas
                     ref={qrCanvasRef}
                     value={attendeeGalleryUrl || "https://app.photoos.in"}
-                    size={220}
+                    size={180}
                     level="H"
-                    includeMargin
+                    includeMargin={false}
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <p className="text-sm font-bold text-white">
-                    Scan QR to Find Your Event Photos
+                  <p className="text-xs font-bold text-white tracking-wide">
+                    Scan with your mobile camera
                   </p>
-                  <p className="text-xs text-slate-300">
-                    1. Scan with phone camera &nbsp;&bull;&nbsp; 2. Take a selfie &nbsp;&bull;&nbsp; 3. Get your candid moments!
+                  <p className="text-[10px] text-slate-300">
+                    Snap a selfie to instantly find all your photos
                   </p>
                 </div>
+              </div>
 
-                <div className="mt-5 pt-3 border-t border-white/10 text-[10px] text-slate-400">
-                  Powered by PhotoOS Enterprise AI &bull; www.photoos.in
-                </div>
+              {/* Action Buttons */}
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={handleDownloadStandee}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0A3F61] py-2.5 px-4 text-xs font-bold text-white shadow hover:bg-[#072c44] transition-all"
+                >
+                  <Download className="h-4 w-4" />
+                  Download Standee (PNG)
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadQrOnly}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-2.5 px-4 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 shadow-xs"
+                >
+                  <QrCode className="h-4 w-4" />
+                  QR Image Only
+                </button>
               </div>
             </div>
 
-            {/* Standee Actions & Sharing */}
+            {/* Direct Link Share Card */}
             <div className="space-y-6">
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900 shadow-xs space-y-4">
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  Download & Share Standee QR
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Share this QR code with employees via Slack, Teams, company WhatsApp groups, or print on a 2x3 ft office standee.
-                </p>
-
-                <div className="space-y-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={handleDownloadStandee}
-                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#0A3F61] py-3 text-xs font-bold text-white shadow hover:bg-[#072c44] transition-all"
-                  >
-                    <Download className="h-4 w-4" />
-                    Download Standee Poster (High-Res PNG)
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleDownloadQrOnly}
-                    className="w-full flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 shadow-xs"
-                  >
-                    <QrCode className="h-4 w-4 text-indigo-500" />
-                    Download QR Code Only (PNG)
-                  </button>
-
-                  <Link
-                    href={`/gallery/${eventId}/access`}
-                    target="_blank"
-                    className="w-full flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 py-2.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300 shadow-xs"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    Open Mobile Attendee View
-                  </Link>
-                </div>
-              </div>
-
-              {/* Attendee URL Card */}
               <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900 shadow-xs">
-                <span className="text-xs font-bold text-slate-900 dark:text-white">
-                  Attendee Direct Access Link
-                </span>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  Employees can open this URL directly in their mobile browser without installing any app.
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">
+                  Direct Attendee Mobile Link
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+                  Share this link on your office Slack, Microsoft Teams, WhatsApp groups, or corporate email invitations.
                 </p>
 
-                <div className="mt-3 flex items-center gap-2">
+                <div className="flex items-center gap-2 p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 mb-4">
                   <input
                     type="text"
                     readOnly
                     value={attendeeGalleryUrl}
-                    className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-mono text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                    className="flex-1 bg-transparent text-xs text-slate-700 dark:text-slate-300 outline-none truncate"
                   />
                   <button
                     type="button"
-                    onClick={() => void handleCopyLink()}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+                    onClick={handleCopyLink}
+                    className="inline-flex items-center gap-1 rounded-lg bg-[#0A3F61] px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-[#072c44]"
                   >
-                    {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                    <span>{copied ? "Copied!" : "Copy"}</span>
+                    {copied ? (
+                      <>
+                        <Check className="h-3.5 w-3.5" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        Copy
+                      </>
+                    )}
                   </button>
+                </div>
+
+                <div className="flex flex-wrap gap-2.5">
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(
+                      `View and download your photos from ${event?.name || "our corporate event"} using AI Face Recognition: ${attendeeGalleryUrl}`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300"
+                  >
+                    <Share2 className="h-3.5 w-3.5" />
+                    Share on WhatsApp
+                  </a>
+
+                  <Link
+                    href={`/gallery/${eventId}/access`}
+                    target="_blank"
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Open Mobile Preview
+                  </Link>
+                </div>
+              </div>
+
+              {/* Instructions Card */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900 shadow-xs space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                  How AI Face Search Works for Attendees
+                </h4>
+                <div className="space-y-2 text-xs text-slate-600 dark:text-slate-400">
+                  <div className="flex items-start gap-2">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-100 text-[#0A3F61] font-bold text-[10px] dark:bg-sky-950 dark:text-sky-300">
+                      1
+                    </span>
+                    <p>Attendees scan the standee QR code with their mobile phone camera.</p>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-100 text-[#0A3F61] font-bold text-[10px] dark:bg-sky-950 dark:text-sky-300">
+                      2
+                    </span>
+                    <p>They snap a quick 1-second selfie to verify their identity.</p>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-100 text-[#0A3F61] font-bold text-[10px] dark:bg-sky-950 dark:text-sky-300">
+                      3
+                    </span>
+                    <p>PhotoOS neural face engine matches their face across all uploaded photos and delivers high-res downloads instantly.</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -957,27 +1052,31 @@ export default function CorporateEventDetailsPage() {
         {/* TAB 3: SETTINGS */}
         {/* ================================================================= */}
         {activeTab === "settings" && (
-          <div className="max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900 shadow-xs space-y-6">
-            <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                Event Settings & Configuration
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Update the corporate event name, type, date, or office location.
-              </p>
-            </div>
-
-            {settingsSaved && (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300 flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-                <span>Event settings saved successfully!</span>
+          <div className="max-w-2xl space-y-6">
+            <form
+              onSubmit={handleSaveSettings}
+              className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900 shadow-xs space-y-4"
+            >
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Event Details & Venue
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Update information displayed on the Standee QR and attendee gallery.
+                  </p>
+                </div>
+                {settingsSaved && (
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Saved!
+                  </span>
+                )}
               </div>
-            )}
 
-            <form onSubmit={handleSaveSettings} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Event Name
+                  Event Title
                 </label>
                 <input
                   type="text"
@@ -991,21 +1090,21 @@ export default function CorporateEventDetailsPage() {
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Event Type
+                    Event Category
                   </label>
                   <select
                     value={editType}
                     onChange={(e) => setEditType(e.target.value as any)}
                     className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white focus:outline-none focus:ring-1 focus:ring-[#0A3F61]"
                   >
-                    <option value="Annual Day">Annual Day</option>
-                    <option value="Townhall">Townhall</option>
+                    <option value="Annual Day">Annual Day / Townhall</option>
+                    <option value="Townhall">Executive Townhall</option>
                     <option value="Offsite / Retreat">Offsite / Retreat</option>
-                    <option value="Conference">Conference</option>
                     <option value="Festive Celebration">Festive Celebration</option>
+                    <option value="Conference">Conference / Summit</option>
+                    <option value="Award Ceremony">Excellence Awards Night</option>
                     <option value="Team Meet">Team Meet</option>
-                    <option value="Award Ceremony">Award Ceremony</option>
-                    <option value="Other">Other</option>
+                    <option value="Other">Other Office Event</option>
                   </select>
                 </div>
 
@@ -1080,6 +1179,192 @@ export default function CorporateEventDetailsPage() {
           </div>
         )}
 
+        {/* ================================================================= */}
+        {/* STUDIO-GRADE FLOATING UPLOAD QUEUE PANEL (MINIMIZED & EXPANDED) */}
+        {/* ================================================================= */}
+        {uploadPanelOpen && !uploadPanelMinimized && uploadItems.length > 0 && (
+          <aside className="fixed bottom-6 right-6 z-50 w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900 overflow-hidden animate-in fade-in slide-in-from-bottom-5">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#0A3F61] text-white">
+                  <UploadCloud className="h-4 w-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white">
+                    Direct Supabase Upload
+                  </h4>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                    {completedCount} of {uploadItems.length} photos uploaded
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1">
+                {completedCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleClearCompleted}
+                    className="rounded-lg px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800"
+                  >
+                    Clear Done
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setUploadPanelMinimized(true)}
+                  className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800"
+                  title="Minimize"
+                >
+                  <Minimize2 className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUploadPanelOpen(false)}
+                  className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800"
+                  title="Close"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Overall Progress Bar */}
+            <div className="border-b border-slate-100 bg-white px-4 py-2.5 dark:border-slate-800 dark:bg-slate-900">
+              <div className="mb-1 flex items-center justify-between text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                <span>Overall Progress</span>
+                <span className="text-[#0A3F61] dark:text-sky-400">{overallProgress}%</span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                <div
+                  className="h-full bg-[#0A3F61] dark:bg-sky-500 transition-all duration-300"
+                  style={{ width: `${overallProgress}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Queue Items List */}
+            <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60 p-2">
+              {uploadItems.map((item, idx) => (
+                <div key={item.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                  {/* Thumbnail */}
+                  <div className="relative h-11 w-11 shrink-0 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={item.previewUrl} alt={item.name} className="h-full w-full object-cover" />
+                  </div>
+
+                  {/* Details */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
+                        {item.name}
+                      </p>
+                      <span className="text-[10px] text-slate-400 shrink-0 font-mono">
+                        {formatBytes(item.size)}
+                      </span>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <div className="h-1 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                        <div
+                          className={[
+                            "h-full transition-all duration-200",
+                            item.status === "failed"
+                              ? "bg-red-500"
+                              : item.status === "completed"
+                              ? "bg-emerald-500"
+                              : "bg-[#0A3F61] dark:bg-sky-400",
+                          ].join(" ")}
+                          style={{ width: `${item.progress}%` }}
+                        />
+                      </div>
+                      <span className="text-[9px] font-bold text-slate-400 shrink-0">
+                        {item.progress}%
+                      </span>
+                    </div>
+
+                    {/* Status Text / Error */}
+                    <div className="mt-1 flex items-center justify-between text-[10px]">
+                      {item.status === "queued" && (
+                        <span className="inline-flex items-center gap-1 text-slate-500">
+                          <Clock3 className="h-3 w-3" /> Queued
+                        </span>
+                      )}
+                      {item.status === "uploading" && (
+                        <span className="inline-flex items-center gap-1 font-bold text-[#0A3F61] dark:text-sky-400">
+                          <Loader2 className="h-3 w-3 animate-spin" /> Uploading to Supabase...
+                        </span>
+                      )}
+                      {item.status === "processing" && (
+                        <span className="inline-flex items-center gap-1 font-bold text-indigo-600 dark:text-indigo-400">
+                          <ScanFace className="h-3 w-3 animate-pulse" /> AI Face Indexing...
+                        </span>
+                      )}
+                      {item.status === "completed" && (
+                        <span className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400">
+                          <CheckCircle2 className="h-3 w-3" /> Uploaded
+                        </span>
+                      )}
+                      {item.status === "failed" && (
+                        <span className="inline-flex items-center gap-1 font-bold text-red-600 dark:text-red-400">
+                          <AlertCircle className="h-3 w-3" /> {item.error || "Upload failed"}
+                        </span>
+                      )}
+
+                      {/* Action buttons */}
+                      {item.status === "failed" && (
+                        <button
+                          type="button"
+                          onClick={() => handleRetryItem(item.id)}
+                          className="font-bold text-[#0A3F61] dark:text-sky-400 hover:underline inline-flex items-center gap-0.5"
+                        >
+                          <RotateCcw className="h-2.5 w-2.5" /> Retry
+                        </button>
+                      )}
+                      {(item.status === "uploading" || item.status === "queued") && (
+                        <button
+                          type="button"
+                          onClick={() => handleCancelItem(item.id)}
+                          className="text-slate-400 hover:text-red-500"
+                          title="Cancel upload"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </aside>
+        )}
+
+        {/* Minimized Pill */}
+        {uploadPanelOpen && uploadPanelMinimized && uploadItems.length > 0 && (
+          <div
+            onClick={() => setUploadPanelMinimized(false)}
+            className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-full border border-slate-200 bg-white/95 px-4 py-2.5 shadow-xl dark:border-slate-800 dark:bg-slate-900/95 backdrop-blur-md cursor-pointer hover:scale-105 transition-transform"
+          >
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0A3F61] text-white">
+              {isUploading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              )}
+            </div>
+            <div className="text-xs">
+              <span className="font-bold text-slate-900 dark:text-white">
+                {isUploading ? `Uploading ${overallProgress}%` : `Completed (${completedCount})`}
+              </span>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                {completedCount} / {uploadItems.length} photos
+              </p>
+            </div>
+            <Maximize2 className="h-4 w-4 text-slate-400" />
+          </div>
+        )}
+
         {/* Lightbox Modal */}
         {previewPhoto && (
           <div
@@ -1106,7 +1391,7 @@ export default function CorporateEventDetailsPage() {
               />
 
               <div className="mt-3 flex items-center justify-between w-full text-xs text-slate-300">
-                <span>{previewPhoto.name}</span>
+                <span className="font-medium">{previewPhoto.name}</span>
                 <button
                   type="button"
                   onClick={() => void handleDeletePhoto(previewPhoto.id)}
@@ -1123,4 +1408,3 @@ export default function CorporateEventDetailsPage() {
     </CorporateShell>
   );
 }
-

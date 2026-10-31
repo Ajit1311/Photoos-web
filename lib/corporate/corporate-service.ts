@@ -366,6 +366,21 @@ export async function saveCorporatePhotos(
     }
   }
 
+  // Sync to Supabase storage manifest in background
+  try {
+    fetch("/api/corporate/photos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        eventId,
+        companyId,
+        photos: newPhotos,
+      }),
+    }).catch((e) => console.warn("[corporate-service] Cloud photos sync notice:", e));
+  } catch (err) {
+    // Non-blocking
+  }
+
   // Update photos count on the event
   const totalFaces = combined.reduce((acc, p) => acc + (p.ai_faces_detected || 1), 0);
   await updateCorporateEvent(companyId, eventId, {

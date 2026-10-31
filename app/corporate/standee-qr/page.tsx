@@ -60,15 +60,13 @@ export default function CorporateStandeeQRPage() {
 
   // Construct target live URL for scanning
   const qrTargetUrl = useMemo(() => {
-    if (typeof window === "undefined") {
-      return `https://app.photoos.in/gallery/${selectedEventId || "corp-event"}/access`;
-    }
-    const origin = window.location.origin;
-    if (selectedEventId) {
-      return `${origin}/gallery/${selectedEventId}/access`;
-    }
-    return `${origin}/gallery/corp-demo/access`;
-  }, [selectedEventId]);
+    const clientAppUrl =
+      process.env.NEXT_PUBLIC_CLIENT_APP_URL ||
+      "https://ajit1311.github.io/photoos-app";
+    const evId = selectedEventId || activeEvent?.id || "corp-event";
+    const evName = activeEvent?.name || "Corporate Event";
+    return `${clientAppUrl}/?event=${encodeURIComponent(evId)}&name=${encodeURIComponent(evName)}`;
+  }, [selectedEventId, activeEvent]);
 
   const handleCopyLink = async () => {
     try {

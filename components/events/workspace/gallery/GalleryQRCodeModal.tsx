@@ -56,15 +56,21 @@ export default function GalleryQRCodeModal({
     });
   }, [expiresAt]);
 
+  const clientAppUrl =
+    process.env.NEXT_PUBLIC_CLIENT_APP_URL ||
+    "https://ajit1311.github.io/photoos-app";
+
   const galleryUrl = useMemo(() => {
-    if (typeof window === "undefined" || !eventId) {
+    if (!eventId) {
       return "";
     }
 
-    return `${window.location.origin}/gallery/${encodeURIComponent(
+    return `${clientAppUrl}/?event=${encodeURIComponent(
       eventId,
-    )}/access?exp=${expiresAt}`;
-  }, [eventId, expiresAt]);
+    )}&name=${encodeURIComponent(eventName)}&studio=${encodeURIComponent(
+      studioName,
+    )}&exp=${expiresAt}`;
+  }, [eventId, eventName, studioName, expiresAt, clientAppUrl]);
 
   const handleCopy = async () => {
     if (!galleryUrl) return;

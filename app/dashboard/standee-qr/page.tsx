@@ -53,11 +53,12 @@ export default function StandeeQRPage() {
 
   const standeeUrl = useMemo(() => {
     if (!studioId) return "";
-    if (typeof window !== "undefined") {
-      return `${window.location.origin}/live/${studioId}`;
-    }
-    return `https://app.photoos.in/live/${studioId}`;
-  }, [studioId]);
+    const clientAppUrl =
+      process.env.NEXT_PUBLIC_CLIENT_APP_URL ||
+      "https://ajit1311.github.io/photoos-app";
+    const eventParam = selectedEventId ? `&event=${encodeURIComponent(selectedEventId)}` : "";
+    return `${clientAppUrl}/?studio=${encodeURIComponent(studioId)}${eventParam}&studioName=${encodeURIComponent(studioName)}`;
+  }, [studioId, selectedEventId, studioName]);
 
   const loadData = useCallback(async () => {
     if (!studioId) return;
