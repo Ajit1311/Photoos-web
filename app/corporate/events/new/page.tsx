@@ -61,9 +61,7 @@ export default function CreateCorporateEventPage() {
         date,
         location: location.trim(),
         description: description.trim(),
-        cover_image_url:
-          coverImageUrl.trim() ||
-          "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80",
+        cover_image_url: coverImageUrl.trim() || undefined,
       });
 
       // Redirect directly to the event workspace for uploading photos & generating Standee QR
@@ -199,7 +197,7 @@ export default function CreateCorporateEventPage() {
                   type="url"
                   value={coverImageUrl}
                   onChange={(e) => setCoverImageUrl(e.target.value)}
-                  placeholder="https://images.unsplash.com/..."
+                  placeholder="https://..."
                   className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                 />
               </div>

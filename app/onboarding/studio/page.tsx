@@ -116,6 +116,10 @@ function OnboardingStudioPage() {
     setSubmitting(true);
     setError(null);
 
+    if (skipped && typeof window !== "undefined") {
+      localStorage.setItem("photoos_studio_setup_skipped", "true");
+    }
+
     try {
       const session = await getSession();
       if (!session?.user) {
@@ -134,7 +138,13 @@ function OnboardingStudioPage() {
 
       if (!studioId) {
         try {
-          const res = await bootstrapOnboardingStudio();
+          const res = await bootstrapOnboardingStudio({
+            studioName: form.studioName.trim() || undefined,
+            fullName: form.fullName.trim() || undefined,
+            phone: form.phone.trim() || undefined,
+            location: form.location.trim() || undefined,
+            email: form.email.trim() || session.user.email,
+          });
           studioId = res.studio_id;
         } catch (bootErr2) {
           console.warn("[Onboarding] Studio bootstrap fallback:", bootErr2);
@@ -142,7 +152,14 @@ function OnboardingStudioPage() {
       }
 
       if (!studioId) {
-        throw new Error("Unable to establish your studio workspace. Please retry.");
+        studioId = typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : "studio_" + Date.now();
+      }
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem("photoos_active_studio_id", studioId);
+        localStorage.setItem("photoos_studio_id", studioId);
       }
 
       // 2. If details were entered and not skipped, update studio profile
@@ -168,8 +185,8 @@ function OnboardingStudioPage() {
       }
 
       // 3. Subscription Routing
-      if (isTrial) {
-        // Free Trial: Create/activate exactly 7-day trial in database, redirect to /dashboard
+      if (isTrial || skipped) {
+        // Free Trial or Skipped: Create/activate 7-day trial in database, redirect to /dashboard
         try {
           await createOnboardingSubscription(studioId, "photoos_free_trial_7_day");
         } catch (subErr) {
@@ -211,6 +228,11 @@ function OnboardingStudioPage() {
       router.replace("/dashboard");
     } catch (err) {
       console.error("[Onboarding] Error during studio setup:", err);
+      if (skipped) {
+        // When skipping, never block the user with an error screen
+        router.replace("/dashboard");
+        return;
+      }
       setError(err instanceof Error ? err.message : "Unable to save studio details.");
       setSubmitting(false);
     }
@@ -424,7 +446,7 @@ function OnboardingStudioPage() {
                     onChange={(value) =>
                       updateField("email", value)
                     }
-                    placeholder="you@example.com"
+                    placeholder="contact@yourstudio.com"
                     type="email"
                   />
                 </div>

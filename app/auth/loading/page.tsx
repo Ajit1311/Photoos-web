@@ -92,23 +92,28 @@ function LoadingContent() {
         // Check if user is an existing studio owner who already completed onboarding
         const { data: activeMember } = await supabase
           .from("studio_members")
-          .select("id, studio_id, role_code")
+          .select("id, studio_id")
           .eq("profile_id", user.id)
           .eq("status", "active")
           .limit(1)
           .maybeSingle();
 
-        const { data: activeSub } = activeMember?.studio_id
+        let currentStudioId = activeMember?.studio_id ?? null;
+        if (!currentStudioId && typeof window !== "undefined") {
+          currentStudioId = localStorage.getItem("photoos_active_studio_id") || localStorage.getItem("photoos_studio_id");
+        }
+
+        const { data: activeSub } = currentStudioId
           ? await supabase
               .from("subscriptions")
               .select("id, plan_id, status, trial_end_at, subscription_end_at")
-              .eq("studio_id", activeMember.studio_id)
+              .eq("studio_id", currentStudioId)
               .limit(1)
               .maybeSingle()
           : { data: null };
 
         const isAlreadyOnboardedStudio =
-          Boolean(activeMember?.studio_id) &&
+          Boolean(currentStudioId) &&
           Boolean(activeSub) &&
           (activeSub?.status === "active" ||
             (activeSub?.status === "trial" &&
@@ -153,14 +158,14 @@ function LoadingContent() {
           return;
         }
 
-        if (!activeMember?.studio_id) {
+        if (!currentStudioId) {
           if (!cancelled) {
             router.replace(`/onboarding/studio${planSuffix}`);
           }
           return;
         }
 
-        const studioId = activeMember.studio_id;
+        const studioId = currentStudioId;
 
         // -------------------------------------------------------------------
         // STEP 4: SUBSCRIPTION & PAYMENT ROUTING

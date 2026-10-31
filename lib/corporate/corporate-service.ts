@@ -203,7 +203,7 @@ export async function createCorporateEvent(
     date: input.date || new Date().toISOString().slice(0, 10),
     location: input.location.trim(),
     description: input.description?.trim() || "",
-    cover_image_url: input.cover_image_url || "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80",
+    cover_image_url: input.cover_image_url || undefined,
     photos_count: 0,
     ai_faces_indexed: 0,
     allow_downloads: true,

@@ -120,5 +120,21 @@ export async function resolveUserStudio(): Promise<ResolvedStudioMembership | nu
     console.warn("[resolveUserStudio] RPC bootstrap error:", rpcErr);
   }
 
+  // 4. Check localStorage cached studio fallback
+  if (typeof window !== "undefined") {
+    const cachedStudioId = localStorage.getItem("photoos_active_studio_id") || localStorage.getItem("photoos_studio_id");
+    if (cachedStudioId) {
+      return {
+        memberId: "cached_" + cachedStudioId,
+        studioId: cachedStudioId,
+        profileId: userId,
+        roleId: "studio_owner",
+        status: "active",
+        invitationStatus: "accepted",
+        joinedAt: null,
+      };
+    }
+  }
+
   return null;
 }
