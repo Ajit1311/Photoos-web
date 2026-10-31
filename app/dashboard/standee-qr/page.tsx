@@ -57,7 +57,7 @@ export default function StandeeQRPage() {
       process.env.NEXT_PUBLIC_CLIENT_APP_URL ||
       "https://ajit1311.github.io/photoos-app";
     const eventParam = selectedEventId ? `&event=${encodeURIComponent(selectedEventId)}` : "";
-    return `${clientAppUrl}/?studio=${encodeURIComponent(studioId)}${eventParam}&studioName=${encodeURIComponent(studioName)}`;
+    return `${clientAppUrl}/?studio=${encodeURIComponent(studioId)}${eventParam}&studioName=${encodeURIComponent(studioName)}&type=studio`;
   }, [studioId, selectedEventId, studioName]);
 
   const loadData = useCallback(async () => {

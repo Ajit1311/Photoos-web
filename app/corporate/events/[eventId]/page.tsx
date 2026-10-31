@@ -400,11 +400,16 @@ export default function CorporateEventDetailsPage() {
     });
   }, []);
 
-  // Attendee Gallery URL for QR Code
+  // Attendee Gallery URL for QR Code pointing to photoos-app
   const attendeeGalleryUrl = useMemo(() => {
     if (typeof window === "undefined" || !eventId) return "";
-    return `${window.location.origin}/gallery/${encodeURIComponent(eventId)}/access`;
-  }, [eventId]);
+    const clientAppUrl =
+      process.env.NEXT_PUBLIC_CLIENT_APP_URL ||
+      "https://ajit1311.github.io/photoos-app";
+    const evName = event?.name || "Corporate Event";
+    const compName = company?.name || "Corporate Office";
+    return `${clientAppUrl}/?event=${encodeURIComponent(eventId)}&name=${encodeURIComponent(evName)}&studio=${encodeURIComponent(compName)}&type=corporate`;
+  }, [eventId, event?.name, company?.name]);
 
   // Copy share URL
   const handleCopyLink = async () => {

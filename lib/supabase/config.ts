@@ -85,6 +85,18 @@ export function isAllowedOrigin(origin: string | null | undefined): boolean {
     // Allow configured app origin
     if (originUrl.origin === configuredAppUrl.origin) return true;
 
+    // Allow client app on GitHub Pages and PhotoOS domains
+    if (
+      originUrl.hostname === "ajit1311.github.io" ||
+      originUrl.hostname.endsWith(".github.io") ||
+      originUrl.hostname === "photoos.in" ||
+      originUrl.hostname.endsWith(".photoos.in") ||
+      originUrl.hostname === "photoos.app" ||
+      originUrl.hostname.endsWith(".photoos.app")
+    ) {
+      return true;
+    }
+
     // Allow local development origin only in development
     if (process.env.NODE_ENV === "development") {
       if (originUrl.hostname === "localhost" || originUrl.hostname === "127.0.0.1") {

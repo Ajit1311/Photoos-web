@@ -65,8 +65,9 @@ export default function CorporateStandeeQRPage() {
       "https://ajit1311.github.io/photoos-app";
     const evId = selectedEventId || activeEvent?.id || "corp-event";
     const evName = activeEvent?.name || "Corporate Event";
-    return `${clientAppUrl}/?event=${encodeURIComponent(evId)}&name=${encodeURIComponent(evName)}`;
-  }, [selectedEventId, activeEvent]);
+    const compName = companyName || "Corporate Office";
+    return `${clientAppUrl}/?event=${encodeURIComponent(evId)}&name=${encodeURIComponent(evName)}&studio=${encodeURIComponent(compName)}&type=corporate`;
+  }, [selectedEventId, activeEvent, companyName]);
 
   const handleCopyLink = async () => {
     try {
