@@ -8,7 +8,6 @@ import QueryProvider from "@/providers/QueryProvider";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import { BootstrapProvider } from "@/context/BootstrapContext";
 import { CookieConsentBanner } from "@/components/legal/CookieConsentBanner";
-import { ReconsentModal } from "@/components/legal/ReconsentModal";
 
 type Props = {
   children: React.ReactNode;
@@ -64,7 +63,6 @@ export default function RootLayout({
               />
 
               <CookieConsentBanner />
-              <ReconsentModal />
 
             </BootstrapProvider>
 
