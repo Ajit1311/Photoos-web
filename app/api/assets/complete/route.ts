@@ -3,40 +3,52 @@ import { createClient } from "@supabase/supabase-js";
 
 export const maxDuration = 30;
 
-function getSupabaseAdmin(token?: string) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder-project.supabase.co";
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+function getServerSupabase() {
+  const url =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_SUPABASE_PROJECT_URL ||
+    process.env.SUPABASE_URL ||
+    "https://placeholder-project.supabase.co";
 
-  if (serviceKey) {
-    return createClient(url, serviceKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    });
+  const serviceKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.SUPABASE_ANON_KEY;
+
+  if (!serviceKey) {
+    throw new Error("Supabase service key is not configured.");
   }
 
-  return createClient(url, anonKey, {
+  return createClient(url, serviceKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
     },
-    global: token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
   });
+}
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: corsHeaders });
 }
 
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.json().catch(() => ({}));
-    const authHeader = req.headers.get("Authorization") || "";
-    const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-
-    const supabaseAdmin = getSupabaseAdmin(token);
+    const supabaseAdmin = getServerSupabase();
 
     const assetId = rawBody.asset_id || rawBody.assetId;
     if (!assetId) {
-      return NextResponse.json({ success: false, error: "asset_id is required." }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "asset_id is required." },
+        { status: 400, headers: corsHeaders }
+      );
     }
 
     const updateFields: Record<string, any> = {
@@ -70,7 +82,10 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       console.error("[/api/assets/complete] Update error:", error);
-      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 500, headers: corsHeaders }
+      );
     }
 
     return NextResponse.json({
@@ -89,9 +104,12 @@ export async function POST(req: NextRequest) {
         height: updated.height,
         processing_status: updated.processing_status,
       },
-    });
+    }, { status: 200, headers: corsHeaders });
   } catch (err: any) {
     console.error("[/api/assets/complete] Error:", err);
-    return NextResponse.json({ success: false, error: err?.message || "Internal error" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: err?.message || "Internal error" },
+      { status: 500, headers: corsHeaders }
+    );
   }
 }

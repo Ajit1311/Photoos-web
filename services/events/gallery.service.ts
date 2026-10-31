@@ -810,6 +810,21 @@ class GalleryService {
       throw new Error("Event ID and Asset ID are required.");
     }
 
+    // 1. Primary: Server-side API route (runs with supabaseAdmin, bypasses all RLS)
+    try {
+      const res = await fetch(`/api/events/${encodeURIComponent(eventId)}/gallery-link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ asset_id: assetId }),
+      });
+      if (res.ok) {
+        const json = await res.json().catch(() => null);
+        if (json?.success) return;
+      }
+    } catch (apiErr) {
+      console.warn("[addAssetToMainGallery] API route notice, falling back:", apiErr);
+    }
+
     try {
       const { data: galleryData, error: galleryError } = await this.client.rpc(
         "list_event_galleries",

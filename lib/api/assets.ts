@@ -141,6 +141,8 @@ export type PreparedAsset = {
   height: number | null;
   checksum: string | null;
   status: string;
+  upload_url?: string | null;
+  uploadUrl?: string | null;
 };
 
 export type CompletedAsset = {
@@ -260,6 +262,8 @@ export async function prepareAsset(
           height,
           checksum: payload.checksum ?? null,
           status: "uploading",
+          upload_url: d.upload_url || null,
+          uploadUrl: d.upload_url || null,
         };
       }
     }
@@ -307,6 +311,8 @@ export async function prepareAsset(
           height,
           checksum: payload.checksum ?? null,
           status: "uploading",
+          upload_url: null,
+          uploadUrl: null,
         };
       }
     }
@@ -345,6 +351,8 @@ export async function prepareAsset(
           height,
           checksum: payload.checksum ?? null,
           status: "uploading",
+          upload_url: null,
+          uploadUrl: null,
         };
       }
     } else if (rpcError) {

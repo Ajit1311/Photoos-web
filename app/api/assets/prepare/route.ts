@@ -1,60 +1,83 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getCurrentUser } from "@/lib/auth/session";
 
 export const maxDuration = 30;
 
-function getSupabaseAdmin(token?: string) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder-project.supabase.co";
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+function getServerSupabase() {
+  const url =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_SUPABASE_PROJECT_URL ||
+    process.env.SUPABASE_URL ||
+    "https://placeholder-project.supabase.co";
 
-  if (serviceKey) {
-    return createClient(url, serviceKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    });
+  const serviceKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.SUPABASE_ANON_KEY;
+
+  if (!serviceKey) {
+    throw new Error("Supabase service key is not configured.");
   }
 
-  return createClient(url, anonKey, {
+  return createClient(url, serviceKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
     },
-    global: token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
   });
+}
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: corsHeaders });
 }
 
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.json().catch(() => ({}));
-    const authHeader = req.headers.get("Authorization") || "";
-    const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-
-    const supabaseAdmin = getSupabaseAdmin(token);
+    const supabaseAdmin = getServerSupabase();
 
     const albumId = rawBody.album_id || rawBody.albumId;
     if (!albumId) {
-      return NextResponse.json({ success: false, error: "album_id is required." }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "album_id is required." },
+        { status: 400, headers: corsHeaders }
+      );
     }
 
     // Lookup album to get studio_id and project_id
     const { data: albumRow, error: albumErr } = await supabaseAdmin
       .from("albums")
-      .select("id, studio_id, project_id, studios(organization_id)")
+      .select("id, studio_id, project_id")
       .eq("id", albumId)
       .maybeSingle();
 
     if (albumErr || !albumRow) {
-      return NextResponse.json({ success: false, error: "Album not found." }, { status: 404 });
+      console.warn("[/api/assets/prepare] Album lookup warning:", albumErr);
     }
 
-    const studioId = rawBody.studio_id || rawBody.studioId || albumRow.studio_id;
-    const projId = albumRow.project_id || studioId;
-    const studioObj = albumRow.studios as unknown as { organization_id?: string } | undefined;
-    const orgId = studioObj?.organization_id || studioId;
+    const studioId = rawBody.studio_id || rawBody.studioId || albumRow?.studio_id;
+    const projId = albumRow?.project_id || studioId;
+    let orgId = studioId;
+
+    if (studioId) {
+      try {
+        const { data: std } = await supabaseAdmin
+          .from("studios")
+          .select("organization_id")
+          .eq("id", studioId)
+          .maybeSingle();
+        if (std?.organization_id) {
+          orgId = std.organization_id;
+        }
+      } catch {}
+    }
 
     const originalFilename = rawBody.original_filename || rawBody.originalFilename || "image.jpg";
     const mimeType = rawBody.mime_type || rawBody.mimeType || "image/jpeg";
@@ -94,6 +117,29 @@ export async function POST(req: NextRequest) {
     const storageFilename = `${Date.now()}-${safeName}`;
     const storagePath = `${orgId}/${studioId}/${projId}/${albumId}/${assetId}/original/${storageFilename}`;
 
+    // Ensure assets bucket exists
+    try {
+      await supabaseAdmin.storage.createBucket("assets", { public: true });
+    } catch {}
+
+    // Generate signed upload URL so client can stream PUT directly to Supabase Storage without RLS errors
+    let uploadUrl: string | null = null;
+    let uploadToken: string | null = null;
+    try {
+      const { data: signedUpload, error: signError } = await supabaseAdmin.storage
+        .from("assets")
+        .createSignedUploadUrl(storagePath);
+
+      if (signedUpload?.signedUrl) {
+        uploadUrl = signedUpload.signedUrl;
+        uploadToken = signedUpload.token || null;
+      } else if (signError) {
+        console.warn("[/api/assets/prepare] createSignedUploadUrl warning:", signError);
+      }
+    } catch (signErr) {
+      console.warn("[/api/assets/prepare] createSignedUploadUrl exception:", signErr);
+    }
+
     const { data: inserted, error: insertError } = await supabaseAdmin
       .from("assets")
       .insert({
@@ -124,7 +170,10 @@ export async function POST(req: NextRequest) {
 
     if (insertError) {
       console.error("[/api/assets/prepare] Insert error:", insertError);
-      return NextResponse.json({ success: false, error: insertError.message }, { status: 500 });
+      return NextResponse.json(
+        { success: false, error: insertError.message },
+        { status: 500, headers: corsHeaders }
+      );
     }
 
     return NextResponse.json({
@@ -143,10 +192,16 @@ export async function POST(req: NextRequest) {
         height: inserted.height,
         checksum: inserted.checksum,
         status: "uploading",
+        upload_url: uploadUrl,
+        uploadUrl: uploadUrl,
+        upload_token: uploadToken,
       },
-    });
+    }, { status: 200, headers: corsHeaders });
   } catch (err: any) {
     console.error("[/api/assets/prepare] Error:", err);
-    return NextResponse.json({ success: false, error: err?.message || "Internal error" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: err?.message || "Internal error" },
+      { status: 500, headers: corsHeaders }
+    );
   }
 }

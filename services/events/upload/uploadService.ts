@@ -617,6 +617,10 @@ export class UploadService {
                       request.file.type ||
                       uploadMetadata.mimeType,
 
+                    uploadUrl:
+                      preparedAsset?.upload_url ||
+                      (preparedAsset as any)?.uploadUrl,
+
                     signal,
                   },
                 );
