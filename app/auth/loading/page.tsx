@@ -64,11 +64,13 @@ function LoadingContent() {
         // -------------------------------------------------------------------
         // STEP 1: CHECK EMAIL OTP VERIFICATION
         // -------------------------------------------------------------------
-        // The user's Supabase session app_metadata holds photoos_email_otp_verified_at
-        // set by the official PhotoOS email-otp edge function.
-        let isOtpVerified = Boolean(
-          user.app_metadata?.photoos_email_otp_verified_at,
-        );
+        const sessionOtpVerified =
+          typeof window !== "undefined" &&
+          Boolean(sessionStorage.getItem("photoos_session_otp_verified"));
+
+        let isOtpVerified =
+          sessionOtpVerified ||
+          Boolean(user.app_metadata?.photoos_email_otp_verified_at);
 
         // If not in session, attempt a fast refresh to hydrate freshly verified sessions
         if (!isOtpVerified) {
@@ -76,6 +78,15 @@ function LoadingContent() {
           if (refreshed?.session?.user?.app_metadata?.photoos_email_otp_verified_at) {
             isOtpVerified = true;
           }
+        }
+
+        // If user is not yet OTP verified in session, gate on OTP
+        if (!sessionOtpVerified && !isOtpVerified) {
+          if (!cancelled) {
+            const emailParam = user.email ? `&email=${encodeURIComponent(user.email)}` : "";
+            router.replace(`/auth/email-otp${planSuffix ? `${planSuffix}${emailParam}` : `?${emailParam.slice(1)}`}`);
+          }
+          return;
         }
 
         // Check if user is an existing studio owner who already completed onboarding
@@ -102,14 +113,6 @@ function LoadingContent() {
           (activeSub?.status === "active" ||
             (activeSub?.status === "trial" &&
               new Date(activeSub.trial_end_at).getTime() > Date.now()));
-
-        // If user is not yet OTP verified and not an already established member, gate on OTP
-        if (!isOtpVerified && !isAlreadyOnboardedStudio) {
-          if (!cancelled) {
-            router.replace(`/auth/email-otp${planSuffix}`);
-          }
-          return;
-        }
 
         // -------------------------------------------------------------------
         // STEP 2: CHECK LEGAL COMPLIANCE

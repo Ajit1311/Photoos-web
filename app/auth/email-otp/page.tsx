@@ -55,17 +55,25 @@ function EmailOtpContent() {
 
   const callOtp = useCallback(
     async (action: "send" | "verify", code?: string) => {
-      const user = await getCurrentUser();
-      if (!user) {
-        throw new Error("Your session has expired. Please sign in again.");
-      }
+      let user = null;
+      let accessToken = null;
+      try {
+        user = await getCurrentUser();
+        accessToken = await getAccessToken();
+      } catch {}
 
-      const accessToken = await getAccessToken();
+      const userEmail =
+        email.trim() ||
+        user?.email ||
+        (typeof window !== "undefined" ? sessionStorage.getItem("photoos_login_email") : "") ||
+        "";
 
-      const userEmail = user.email || email.trim();
       if (!userEmail) {
         throw new Error("A valid email address is required.");
       }
+
+      const savedOtpToken =
+        typeof window !== "undefined" ? sessionStorage.getItem("photoos_otp_token") : null;
 
       const response = await fetch("/api/auth/otp", {
         method: "POST",
@@ -76,8 +84,8 @@ function EmailOtpContent() {
         body: JSON.stringify({
           action,
           email: userEmail,
-          purpose: "Studio Workspace Authentication",
-          ...(action === "verify" ? { otp: code } : {}),
+          purpose: mode === "corporate" ? "Corporate Office Authentication" : "Studio Workspace Authentication",
+          ...(action === "verify" ? { otp: code, token: savedOtpToken } : {}),
         }),
       });
 
@@ -90,9 +98,15 @@ function EmailOtpContent() {
         throw new Error(errMsg);
       }
 
+      if (data?.token && typeof window !== "undefined") {
+        try {
+          sessionStorage.setItem("photoos_otp_token", data.token);
+        } catch {}
+      }
+
       return data;
     },
-    [email]
+    [email, mode]
   );
 
   // Initialize and dispatch OTP on mount
@@ -101,24 +115,26 @@ function EmailOtpContent() {
 
     async function init() {
       try {
-        const user = await getCurrentUser();
-        if (!user) {
+        let resolvedEmail = searchParams.get("email") || "";
+        if (!resolvedEmail && typeof window !== "undefined") {
+          resolvedEmail = sessionStorage.getItem("photoos_login_email") || "";
+        }
+
+        let user = null;
+        try {
+          user = await getCurrentUser();
+          if (user?.email) resolvedEmail = user.email;
+        } catch {}
+
+        if (!resolvedEmail && !user) {
           const qs = buildPlanQueryString();
           router.replace(`/login${qs ? `?${qs}` : ""}`);
           return;
         }
 
-        const userEmail = user.email ?? searchParams.get("email") ?? "";
         if (!cancelled) {
-          setEmail(userEmail);
+          setEmail(resolvedEmail);
           setLoading(false);
-        }
-
-        // Check if user is already verified
-        if (user.app_metadata?.photoos_email_otp_verified_at) {
-          const qs = buildPlanQueryString();
-          router.replace(`/auth/loading${qs ? `?${qs}` : ""}`);
-          return;
         }
 
         // Auto-send OTP once on mount
@@ -127,7 +143,7 @@ function EmailOtpContent() {
           try {
             const result = await callOtp("send");
             if (!cancelled) {
-              setMessage("A 6-digit verification code has been sent to your email.");
+              setMessage(`A 6-digit verification code has been sent to ${resolvedEmail}. Please check your inbox.`);
               if (result?.retry_after_seconds) {
                 setCountdown(Number(result.retry_after_seconds));
               } else {
@@ -181,12 +197,20 @@ function EmailOtpContent() {
         throw new Error("Verification code is invalid or expired.");
       }
 
-      // Refresh session to hydrate updated app_metadata
-      await supabase.auth.refreshSession();
+      // Mark session verified
+      if (typeof window !== "undefined") {
+        try {
+          const user = await getCurrentUser().catch(() => null);
+          sessionStorage.setItem("photoos_session_otp_verified", user?.id || "verified");
+        } catch {}
+      }
 
-      // Proceed to central onboarding resolver
+      // Refresh session to hydrate updated app_metadata
+      await supabase.auth.refreshSession().catch(() => {});
+
+      // Proceed directly to Legal Compliance as required
       const qs = buildPlanQueryString();
-      router.replace(`/auth/loading${qs ? `?${qs}` : ""}`);
+      router.replace(`/legal-compliance${qs ? `?${qs}` : ""}`);
     } catch (err) {
       console.error("[EmailOTP] Verification error:", err);
       setError(

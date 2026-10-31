@@ -120,6 +120,57 @@ function AuthCallbackContent() {
           throw new Error("Authentication session could not be established.");
         }
 
+        if (mounted && session?.user?.email) {
+          const userEmail = session.user.email;
+          if (typeof window !== "undefined") {
+            try {
+              sessionStorage.setItem("photoos_login_email", userEmail);
+              sessionStorage.removeItem("photoos_session_otp_verified");
+            } catch {}
+          }
+
+          // Trigger OTP send via Resend
+          try {
+            const otpRes = await fetch("/api/auth/otp", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({
+                action: "send",
+                email: userEmail,
+                purpose: "PhotoOS Account Authentication",
+              }),
+            });
+            const otpData = await otpRes.json().catch(() => null);
+            if (otpData?.token && typeof window !== "undefined") {
+              sessionStorage.setItem("photoos_otp_token", otpData.token);
+            }
+          } catch (otpErr) {
+            console.warn("[AuthCallback] Google OAuth OTP dispatch notice:", otpErr);
+          }
+
+          // Preserve query parameters and onboarding state
+          const p = new URLSearchParams();
+          const planId = searchParams.get("planId");
+          const planCode = searchParams.get("planCode");
+          const billingCycle = searchParams.get("billingCycle");
+          const mode = searchParams.get("mode");
+          const nextTarget = searchParams.get("next");
+
+          if (planId) p.set("planId", planId);
+          if (planCode) p.set("planCode", planCode);
+          if (billingCycle) p.set("billingCycle", billingCycle);
+          if (mode) p.set("mode", mode);
+          if (nextTarget) p.set("next", nextTarget);
+          p.set("email", userEmail);
+
+          const destination = `/auth/email-otp?${p.toString()}`;
+          router.replace(destination);
+          return;
+        }
+
         if (mounted) {
           const destination = next
             ? getSafeRedirectUrl(next, "/auth/loading")

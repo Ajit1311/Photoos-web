@@ -165,7 +165,7 @@ export default function ClientAccessGalleryPage() {
               setLockDownloadsUntilPayment(json.lockDownloadsUntilPayment);
             }
 
-            if (Array.isArray(json.photos)) {
+            if (Array.isArray(json.photos) && json.photos.length > 0) {
               setPhotos(json.photos);
               const favs = new Set<string>();
               const sels = new Set<string>();
@@ -181,6 +181,42 @@ export default function ClientAccessGalleryPage() {
         }
       } catch (apiErr) {
         console.warn("[ClientAccessGallery] API fetch notice:", apiErr);
+      }
+
+      // Check corporate photos cloud API directly for corporate events
+      try {
+        const corpRes = await fetch(`/api/corporate/photos?eventId=${encodeURIComponent(eventId)}`);
+        if (corpRes.ok) {
+          const corpJson = await corpRes.json();
+          if (corpJson.success && Array.isArray(corpJson.photos) && corpJson.photos.length > 0) {
+            const mapped: GalleryPhoto[] = corpJson.photos.map((cp: any, idx: number) => ({
+              id: cp.id || `cp_${idx}`,
+              eventId,
+              fileName: cp.name || `Photo ${idx + 1}`,
+              thumbnailUrl: cp.thumbnail_url || cp.url,
+              originalUrl: cp.url || cp.thumbnail_url,
+              width: 1920,
+              height: 1080,
+              fileSize: cp.size_bytes || 204800,
+              mimeType: "image/jpeg",
+              uploadedBy: "Corporate Office",
+              uploadedAt: cp.uploaded_at || new Date().toISOString(),
+              status: "ready",
+              visibility: "visible",
+              rating: 0,
+              likes: 0,
+              comments: 0,
+              isFavorite: false,
+              isSelected: false,
+              aiProcessed: true,
+            }));
+            setPhotos(mapped);
+            setAllowDownloads(true);
+            return;
+          }
+        }
+      } catch (cApiErr) {
+        console.warn("[ClientAccessGallery] Corporate photos API notice:", cApiErr);
       }
 
       // Fallback direct query
@@ -320,47 +356,40 @@ export default function ClientAccessGalleryPage() {
       const selfieResult = await extractSelfieFaceDescriptor(selfieDataUrl);
 
       if (!selfieResult.success || !selfieResult.descriptor) {
-        // If models had difficulty loading on slow connection, attempt server-side or open gallery gracefully
-        if (selfieResult.error?.includes("models could not be loaded")) {
-          setScanStatusMessage("Processing selfie via cloud AI engine...");
-          try {
-            const response = await fetch("/api/ai/face-search", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                image: selfieDataUrl,
-                eventId,
-                studioId: event?.studio_id,
-                guestPhone,
-                consentGranted: true,
-              }),
-            });
-            if (response.ok) {
-              const res = await response.json();
-              if (Array.isArray(res?.matchedAssetIds) && res.matchedAssetIds.length > 0) {
-                const matches = photos.filter((p) => res.matchedAssetIds.includes(p.id));
-                setMatchedPhotos(matches);
-                setGalleryTab("matched");
-                setFaceScanNotice(`🎉 Found ${matches.length} photos matching your face.`);
-                setStep("gallery");
-                setActiveAppTab("camera");
-                return;
-              }
+        setScanStatusMessage("Processing selfie via cloud AI engine...");
+        try {
+          const response = await fetch("/api/ai/face-search", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              image: selfieDataUrl,
+              eventId,
+              studioId: event?.studio_id,
+              guestPhone,
+              consentGranted: true,
+            }),
+          });
+          if (response.ok) {
+            const res = await response.json();
+            if (Array.isArray(res?.matchedAssetIds) && res.matchedAssetIds.length > 0) {
+              const matches = photos.filter((p) => res.matchedAssetIds.includes(p.id));
+              setMatchedPhotos(matches);
+              setGalleryTab("matched");
+              setFaceScanNotice(`🎉 Found ${matches.length} photos matching your face.`);
+              setStep("gallery");
+              setActiveAppTab("camera");
+              return;
             }
-          } catch (e) {
-            console.warn("[GalleryAccess] Fallback face search notice:", e);
           }
-
-          // Non-blocking fallback
-          setGalleryTab("all");
-          setFaceScanNotice("Selfie saved! You can browse and download all event photos below.");
-          setStep("gallery");
-          setActiveAppTab("camera");
-          return;
+        } catch (e) {
+          console.warn("[GalleryAccess] Fallback face search notice:", e);
         }
 
-        setFormError(selfieResult.error || "Face not clearly detected. Please take a selfie in good lighting.");
-        setStep("selfie");
+        // Non-blocking fallback so guest can browse all photos
+        setGalleryTab("all");
+        setFaceScanNotice("Selfie saved! You can browse and download all event photos below.");
+        setStep("gallery");
+        setActiveAppTab("camera");
         return;
       }
 

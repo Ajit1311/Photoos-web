@@ -18,6 +18,7 @@ import Link from "next/link";
 import {
   sendPasswordResetEmail,
   signInWithPassword,
+  signUp,
 } from "@/lib/auth/auth.service";
 import { publishableKey, supabaseUrl } from "@/lib/supabase/config";
 import { getSafeRedirectUrl } from "@/lib/security/safe-redirect";
@@ -58,15 +59,43 @@ export function LoginForm() {
         );
       }
 
-      const data = await signInWithPassword(
-        email,
-        password,
-      );
+      const cleanEmail = email.trim().toLowerCase();
+      let authUser = null;
+      let authSession = null;
 
-      if (!data.user || !data.session) {
-        throw new Error(
-          "Authentication session could not be established.",
-        );
+      try {
+        const data = await signInWithPassword(cleanEmail, password);
+        authUser = data.user;
+        authSession = data.session;
+      } catch (signInErr: any) {
+        const code = String(signInErr?.code || signInErr?.message || "");
+        // If credentials invalid or user not found, try signing up the new user
+        if (code.includes("invalid_credentials") || code.includes("invalid_grant") || code.includes("user_not_found")) {
+          try {
+            const signupData = await signUp(cleanEmail, password);
+            if (signupData.session) {
+              authUser = signupData.user;
+              authSession = signupData.session;
+            } else {
+              // Try signing in again if confirmation not required
+              try {
+                const retryData = await signInWithPassword(cleanEmail, password);
+                authUser = retryData.user;
+                authSession = retryData.session;
+              } catch {
+                authUser = signupData.user;
+              }
+            }
+          } catch (signUpErr: any) {
+            const signMsg = String(signUpErr?.message || "");
+            if (signMsg.toLowerCase().includes("already registered") || signMsg.toLowerCase().includes("exists")) {
+              throw new Error("The password entered is incorrect. Click 'Forgot password?' above to reset.");
+            }
+            throw signUpErr;
+          }
+        } else {
+          throw signInErr;
+        }
       }
 
       const params = new URLSearchParams();
@@ -80,11 +109,47 @@ export function LoginForm() {
       if (planCode) params.set("planCode", planCode);
       if (billingCycle) params.set("billingCycle", billingCycle);
       if (mode) params.set("mode", mode);
+      if (next) params.set("next", next);
 
+      // Track login email and reset session OTP verification
+      if (typeof window !== "undefined") {
+        try {
+          sessionStorage.setItem("photoos_login_email", cleanEmail);
+          sessionStorage.removeItem("photoos_session_otp_verified");
+          if (mode === "corporate") {
+            localStorage.setItem("photoos_login_mode", "corporate");
+          }
+        } catch {}
+      }
+
+      // Trigger OTP dispatch immediately via PhotoOS Resend service
+      try {
+        const token = authSession?.access_token;
+        const otpRes = await fetch("/api/auth/otp", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            action: "send",
+            email: cleanEmail,
+            purpose: mode === "corporate" ? "Corporate Office Authentication" : "PhotoOS Studio Authentication",
+          }),
+        });
+        const otpData = await otpRes.json().catch(() => null);
+        if (otpData?.token && typeof window !== "undefined") {
+          sessionStorage.setItem("photoos_otp_token", otpData.token);
+        }
+      } catch (otpErr) {
+        console.warn("[LoginForm] Initial OTP dispatch notice:", otpErr);
+      }
+
+      params.set("email", cleanEmail);
       const qs = params.toString();
-      const fallbackTarget = qs ? `/auth/loading?${qs}` : "/auth/loading";
+      const targetOtp = `/auth/email-otp?${qs}`;
 
-      window.location.href = getSafeRedirectUrl(next, fallbackTarget);
+      window.location.href = targetOtp;
     } catch (err) {
       console.error(
         "[SupabaseLogin]",

@@ -115,6 +115,7 @@ export async function POST(req: NextRequest) {
           success: true,
           message: `Verification code sent to ${cleanEmail}. Please check your inbox.`,
           retry_after_seconds: 60,
+          token: encryptedToken,
         },
         { status: 200, headers: corsHeaders }
       );
@@ -143,7 +144,9 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const cookieToken = req.cookies.get("photoos_otp_session")?.value;
+      const cookieToken =
+        req.cookies.get("photoos_otp_session")?.value ||
+        (typeof body.token === "string" ? body.token : "");
       let matched = false;
 
       // Check standard test bypass codes
