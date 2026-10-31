@@ -691,7 +691,95 @@ export async function getEventWorkspace(
   studioId: string,
   eventId: string,
 ): Promise<EventWorkspaceResponse> {
-  // 1. Try edge function first
+  // 1. Primary: Server-side API route /api/events/[eventId]/workspace
+  try {
+    const accessToken = await getAccessToken();
+    const headers: Record<string, string> = {};
+    if (accessToken) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+
+    const res = await fetch(`/api/events/${eventId}/workspace`, {
+      method: "GET",
+      headers,
+    });
+
+    if (res.ok) {
+      const json = await res.json().catch(() => null);
+      if (json?.success && json?.data?.workspace) {
+        const workspaceData = json.data.workspace;
+        const resolvedWorkspaceId =
+          workspaceData.workspace_id ??
+          workspaceData.workspaceId ??
+          workspaceData.studio_id ??
+          workspaceData.studioId ??
+          eventId;
+
+        return {
+          workspace: {
+            workspace_id: resolvedWorkspaceId,
+            workspaceId: resolvedWorkspaceId,
+            studio_id: workspaceData.studio_id ?? studioId ?? resolvedWorkspaceId,
+            studioId: workspaceData.studioId ?? studioId ?? resolvedWorkspaceId,
+            event: mapApiEvent(workspaceData.event as Record<string, unknown>),
+            project: workspaceData.project ?? null,
+            client: workspaceData.client ?? null,
+            lead_photographer: workspaceData.lead_photographer ?? null,
+            finance: workspaceData.finance ?? null,
+          },
+          dashboard: json.data.dashboard ?? {},
+          timeline: json.data.timeline ?? [],
+          summary: json.data.summary ?? null,
+        };
+      }
+    }
+  } catch (apiErr) {
+    console.warn("[getEventWorkspace] Workspace API route notice, falling back:", apiErr);
+  }
+
+  // Also try /api/events/${eventId}
+  try {
+    const accessToken = await getAccessToken();
+    const headers: Record<string, string> = {};
+    if (accessToken) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+
+    const res = await fetch(`/api/events/${eventId}`, {
+      method: "GET",
+      headers,
+    });
+
+    if (res.ok) {
+      const json = await res.json().catch(() => null);
+      if (json?.success && json?.data) {
+        const rawEvent = json.data.event || json.data;
+        if (rawEvent && rawEvent.id) {
+          const resolvedStudioId = rawEvent.studio_id ?? studioId;
+          return {
+            workspace: {
+              workspace_id: eventId,
+              workspaceId: eventId,
+              studio_id: resolvedStudioId,
+              studioId: resolvedStudioId,
+              event: mapApiEvent(rawEvent as Record<string, unknown>),
+              project: json.data.project ?? null,
+              client: json.data.client ?? null,
+              lead_photographer: null,
+              finance: (rawEvent.metadata?.finance as EventWorkspaceFinance) ?? null,
+            },
+            dashboard: json.data.dashboard ?? {},
+            timeline: json.data.timeline ?? [],
+            summary: json.data.summary ?? null,
+          };
+        }
+      }
+    }
+  } catch (apiErr) {
+    console.warn("[getEventWorkspace] Direct event API notice, falling back:", apiErr);
+  }
+
+  // 2. Try edge function fallback
   try {
     const headers = await getHeaders(studioId);
     const { data, error } = await supabase.functions.invoke(
@@ -736,7 +824,7 @@ export async function getEventWorkspace(
     console.warn("[getEventWorkspace] Edge function notice, falling back to direct DB:", edgeErr);
   }
 
-  // 2. Direct Supabase DB query fallback
+  // 3. Direct Supabase DB query fallback
   try {
     let query = supabase.from("events").select("*").eq("id", eventId);
     if (studioId) {

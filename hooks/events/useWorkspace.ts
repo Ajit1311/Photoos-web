@@ -7,6 +7,10 @@ import {
 } from "@/context/BootstrapContext";
 
 import {
+  useStudioId,
+} from "@/hooks/useStudioId";
+
+import {
   getEventWorkspace,
 } from "@/lib/api/events";
 
@@ -24,15 +28,23 @@ export function useWorkspace(
   eventId: string,
 ) {
 
+  const { studioId } = useStudioId();
+
   const {
     data: bootstrap,
     loading: bootstrapLoading,
   } =
     useBootstrapContext();
 
-
-  const studioId =
-    bootstrap?.workspace?.membership?.studioId;
+  const effectiveStudioId =
+    studioId ??
+    bootstrap?.workspace?.membership?.studioId ??
+    bootstrap?.workspace?.studio?.id ??
+    (typeof window !== "undefined"
+      ? localStorage.getItem("photoos_active_studio_id") ||
+        localStorage.getItem("photoos_studio_id")
+      : null) ??
+    "";
 
 
   const query =
@@ -43,28 +55,17 @@ export function useWorkspace(
 
       queryKey: [
         ...WORKSPACE_QUERY_KEY,
-        studioId,
+        effectiveStudioId,
         eventId,
       ],
 
 
       enabled:
-        !bootstrapLoading &&
-        Boolean(studioId) &&
         Boolean(eventId),
 
 
       queryFn:
         async () => {
-
-          if (!studioId) {
-
-            throw new Error(
-              "Active studio ID is missing.",
-            );
-
-          }
-
 
           if (!eventId) {
 
@@ -76,7 +77,7 @@ export function useWorkspace(
 
 
           return getEventWorkspace(
-            studioId,
+            effectiveStudioId,
             eventId,
           );
 

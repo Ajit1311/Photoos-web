@@ -44,13 +44,9 @@ export async function GET(
       user = tokenUser?.user ?? null;
     }
 
-    if (!user) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-    }
-
     const { data: event, error } = await supabaseAdmin
       .from("events")
-      .select("*, projects(id, title)")
+      .select("*, projects(*)")
       .eq("id", eventId)
       .maybeSingle();
 
@@ -58,9 +54,41 @@ export async function GET(
       return NextResponse.json({ success: false, error: "Event not found." }, { status: 404 });
     }
 
+    let project = event.projects || null;
+    let client = null;
+    if (project?.client_id) {
+      const { data: cli } = await supabaseAdmin
+        .from("clients")
+        .select("*")
+        .eq("id", project.client_id)
+        .maybeSingle();
+      client = cli ?? null;
+    }
+
+    const workspace = {
+      workspace_id: event.id,
+      workspaceId: event.id,
+      studio_id: event.studio_id,
+      studioId: event.studio_id,
+      event: event,
+      project: project,
+      client: client,
+      lead_photographer: null,
+      finance: (event.metadata?.finance as any) ?? null,
+    };
+
     return NextResponse.json({
       success: true,
-      data: event,
+      data: {
+        ...event,
+        event: event,
+        project: project,
+        client: client,
+        workspace: workspace,
+        dashboard: {},
+        timeline: [],
+        summary: null,
+      },
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err?.message || "Internal error" }, { status: 500 });
