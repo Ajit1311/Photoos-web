@@ -111,11 +111,14 @@ export function LoginForm() {
       if (mode) params.set("mode", mode);
       if (next) params.set("next", next);
 
-      // Track login email and reset session OTP verification
+      // Track login email, reset session OTP verification, and clear stale unscoped compliance keys
       if (typeof window !== "undefined") {
         try {
           sessionStorage.setItem("photoos_login_email", cleanEmail);
           sessionStorage.removeItem("photoos_session_otp_verified");
+          localStorage.removeItem("photoos_legal_accepted_all");
+          localStorage.removeItem("photoos_legal_last_accepted_version");
+          localStorage.removeItem("photoos_corporate_compliance_accepted");
           if (mode === "corporate") {
             localStorage.setItem("photoos_login_mode", "corporate");
           }

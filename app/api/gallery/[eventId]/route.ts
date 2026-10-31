@@ -170,10 +170,47 @@ export async function GET(
         );
       } catch (corpErr) {
         console.warn("[GalleryRoute] Corporate handler notice:", corpErr);
+        return NextResponse.json(
+          {
+            success: true,
+            event: {
+              id: targetId,
+              name: "Corporate Event",
+              shoot_date: new Date().toISOString().slice(0, 10),
+              venue: "Office Headquarters",
+              studio_id: "corporate",
+            },
+            studio: {
+              id: "corporate",
+              name: "Corporate Office",
+              brand_name: "Corporate Office",
+              contact_phone: null,
+            },
+            allowDownloads: true,
+            lockDownloadsUntilPayment: false,
+            photos: [],
+            count: 0,
+          },
+          { status: 200, headers: corsHeaders }
+        );
       }
     }
 
-    // 1. Resolve Event Details
+    // STRICT ISOLATION: A corporate event ID must NEVER query studio event tables
+    if (targetId.startsWith("ev_corp_") || targetId.startsWith("corp_")) {
+      return NextResponse.json(
+        {
+          success: true,
+          event: { id: targetId, name: "Corporate Event" },
+          studio: { id: "corporate", name: "Corporate Office" },
+          photos: [],
+          count: 0,
+        },
+        { status: 200, headers: corsHeaders }
+      );
+    }
+
+    // 1. Resolve Event Details (Strictly for Studio Events)
     let event: any = null;
     let resolvedEventId = targetId;
 

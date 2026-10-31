@@ -120,13 +120,12 @@ function LoadingContent() {
               new Date(activeSub.trial_end_at).getTime() > Date.now()));
 
         // -------------------------------------------------------------------
-        // STEP 2: CHECK LEGAL COMPLIANCE
+        // STEP 2: CHECK LEGAL COMPLIANCE (STRICTLY SCOPED TO CURRENT USER)
         // -------------------------------------------------------------------
         const isLocallyAccepted =
           typeof window !== "undefined" &&
-          (localStorage.getItem("photoos_legal_accepted_all") === "true" ||
-           localStorage.getItem("photoos_legal_last_accepted_version") === LEGAL_CONFIG.version ||
-           localStorage.getItem("photoos_corporate_compliance_accepted") === "true");
+          (Boolean(user?.id && localStorage.getItem(`photoos_user_${user.id}_legal_accepted_v${LEGAL_CONFIG.version}`) === "true") ||
+           (mode === "corporate" && localStorage.getItem("photoos_corporate_compliance_accepted") === "true"));
 
         // Check statutory DPDP user_consents table for all 3 required documents
         const { data: consents } = await supabase

@@ -116,13 +116,8 @@ function OnboardingStudioPage() {
     setSubmitting(true);
     setError(null);
 
-    if (typeof window !== "undefined") {
-      if (skipped) {
-        localStorage.setItem("photoos_studio_setup_skipped", "true");
-      }
-      localStorage.setItem("photoos_legal_accepted_all", "true");
-      localStorage.setItem("photoos_legal_last_accepted_version", "0.0.1");
-      localStorage.setItem("photoos_accepted_legal_version", "0.0.1");
+    if (typeof window !== "undefined" && skipped) {
+      localStorage.setItem("photoos_studio_setup_skipped", "true");
     }
 
     try {
@@ -130,6 +125,10 @@ function OnboardingStudioPage() {
       if (!session?.user) {
         router.replace("/login");
         return;
+      }
+
+      if (typeof window !== "undefined" && session.user.id) {
+        localStorage.setItem(`photoos_user_${session.user.id}_legal_accepted_v0.0.1`, "true");
       }
 
       // 1. Resolve or bootstrap studio workspace

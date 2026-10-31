@@ -144,12 +144,134 @@ export default function ClientAccessGalleryPage() {
   const [newWishMessage, setNewWishMessage] = useState("");
 
   // Load Event, Studio, and Photos
+  // Strict isolation: Corporate events and Studio events must NEVER mix data
   const loadGalleryData = useCallback(async () => {
     if (!eventId) return;
 
     try {
       setLoading(true);
+      const isCorporate = eventId.startsWith("ev_corp_") || eventId.startsWith("corp_");
 
+      // =======================================================================
+      // CASE 1: CORPORATE EVENT - STRICT CORPORATE ISOLATION
+      // =======================================================================
+      if (isCorporate) {
+        // 1. Try Corporate Photos Cloud API
+        try {
+          const corpRes = await fetch(`/api/corporate/photos?eventId=${encodeURIComponent(eventId)}`);
+          if (corpRes.ok) {
+            const corpJson = await corpRes.json();
+            if (corpJson.success && Array.isArray(corpJson.photos) && corpJson.photos.length > 0) {
+              const mapped: GalleryPhoto[] = corpJson.photos.map((cp: any, idx: number) => ({
+                id: cp.id || `cp_${idx}`,
+                eventId,
+                fileName: cp.name || `Photo ${idx + 1}`,
+                thumbnailUrl: cp.thumbnail_url || cp.url,
+                originalUrl: cp.url || cp.thumbnail_url,
+                width: 1920,
+                height: 1080,
+                fileSize: cp.size_bytes || 204800,
+                mimeType: "image/jpeg",
+                uploadedBy: "Corporate Office",
+                uploadedAt: cp.uploaded_at || new Date().toISOString(),
+                status: "ready",
+                visibility: "visible",
+                rating: 0,
+                likes: 0,
+                comments: 0,
+                isFavorite: false,
+                isSelected: false,
+                aiProcessed: true,
+              }));
+              setPhotos(mapped);
+              setAllowDownloads(true);
+              setEvent({
+                id: eventId,
+                name: "Corporate Event",
+                shoot_date: new Date().toISOString().slice(0, 10),
+                venue: "Office Headquarters",
+                studio_id: "corporate",
+              });
+              setStudio({
+                id: "corporate",
+                name: "Corporate Office",
+                brand_name: "Corporate Office",
+              });
+              return;
+            }
+          }
+        } catch (cApiErr) {
+          console.warn("[ClientAccessGallery] Corporate cloud photos API notice:", cApiErr);
+        }
+
+        // 2. Try Corporate Local Storage fallback
+        if (typeof window !== "undefined") {
+          try {
+            const rawCorp = window.localStorage.getItem(`photoos_corporate_photos_${eventId}`);
+            if (rawCorp) {
+              const corpPhotos = JSON.parse(rawCorp);
+              if (Array.isArray(corpPhotos) && corpPhotos.length > 0) {
+                const mapped: GalleryPhoto[] = corpPhotos.map((cp: any) => ({
+                  id: cp.id,
+                  eventId,
+                  fileName: cp.name,
+                  thumbnailUrl: cp.thumbnail_url || cp.url,
+                  originalUrl: cp.url,
+                  width: cp.width || 1200,
+                  height: cp.height || 800,
+                  fileSize: cp.size_bytes || 500000,
+                  mimeType: "image/jpeg",
+                  uploadedBy: "Corporate Office",
+                  uploadedAt: cp.uploaded_at,
+                  status: "ready",
+                  visibility: "visible",
+                  rating: 0,
+                  likes: 0,
+                  comments: 0,
+                  isFavorite: false,
+                  isSelected: false,
+                  aiProcessed: true,
+                }));
+                setPhotos(mapped);
+                setAllowDownloads(true);
+
+                const rawComp = window.localStorage.getItem("photoos_corporate_company");
+                if (rawComp) {
+                  const comp = JSON.parse(rawComp);
+                  setStudio({
+                    id: comp.id || "corp_office",
+                    name: comp.name || "Corporate Office",
+                    brand_name: comp.name || "Corporate Office",
+                  });
+                }
+                return;
+              }
+            }
+          } catch (e) {
+            console.warn("[ClientAccessGallery] corp photos fallback error:", e);
+          }
+        }
+
+        // Corporate event with 0 photos currently: set clean corporate defaults
+        setPhotos([]);
+        setEvent({
+          id: eventId,
+          name: "Corporate Event",
+          shoot_date: new Date().toISOString().slice(0, 10),
+          venue: "Office Headquarters",
+          studio_id: "corporate",
+        });
+        setStudio({
+          id: "corporate",
+          name: "Corporate Office",
+          brand_name: "Corporate Office",
+        });
+        return;
+      }
+
+      // =======================================================================
+      // CASE 2: STUDIO EVENT - STRICT STUDIO ISOLATION (NEVER TOUCH CORPORATE)
+      // =======================================================================
       // Public API endpoint bypasses RLS for guest QR scans
       try {
         const res = await fetch(`/api/gallery/${encodeURIComponent(eventId)}`);
@@ -165,7 +287,7 @@ export default function ClientAccessGalleryPage() {
               setLockDownloadsUntilPayment(json.lockDownloadsUntilPayment);
             }
 
-            if (Array.isArray(json.photos) && json.photos.length > 0) {
+            if (Array.isArray(json.photos)) {
               setPhotos(json.photos);
               const favs = new Set<string>();
               const sels = new Set<string>();
@@ -175,51 +297,15 @@ export default function ClientAccessGalleryPage() {
               });
               setFavoriteIds(favs);
               setSelectedIds(sels);
-              return;
+              if (json.photos.length > 0) return;
             }
           }
         }
       } catch (apiErr) {
-        console.warn("[ClientAccessGallery] API fetch notice:", apiErr);
+        console.warn("[ClientAccessGallery] Studio API fetch notice:", apiErr);
       }
 
-      // Check corporate photos cloud API directly for corporate events
-      try {
-        const corpRes = await fetch(`/api/corporate/photos?eventId=${encodeURIComponent(eventId)}`);
-        if (corpRes.ok) {
-          const corpJson = await corpRes.json();
-          if (corpJson.success && Array.isArray(corpJson.photos) && corpJson.photos.length > 0) {
-            const mapped: GalleryPhoto[] = corpJson.photos.map((cp: any, idx: number) => ({
-              id: cp.id || `cp_${idx}`,
-              eventId,
-              fileName: cp.name || `Photo ${idx + 1}`,
-              thumbnailUrl: cp.thumbnail_url || cp.url,
-              originalUrl: cp.url || cp.thumbnail_url,
-              width: 1920,
-              height: 1080,
-              fileSize: cp.size_bytes || 204800,
-              mimeType: "image/jpeg",
-              uploadedBy: "Corporate Office",
-              uploadedAt: cp.uploaded_at || new Date().toISOString(),
-              status: "ready",
-              visibility: "visible",
-              rating: 0,
-              likes: 0,
-              comments: 0,
-              isFavorite: false,
-              isSelected: false,
-              aiProcessed: true,
-            }));
-            setPhotos(mapped);
-            setAllowDownloads(true);
-            return;
-          }
-        }
-      } catch (cApiErr) {
-        console.warn("[ClientAccessGallery] Corporate photos API notice:", cApiErr);
-      }
-
-      // Fallback direct query
+      // Fallback direct studio query
       const { data: eventData } = await supabase
         .from("events")
         .select("id, name, shoot_date, venue, studio_id, metadata")
@@ -236,54 +322,6 @@ export default function ClientAccessGalleryPage() {
 
         if (studioData) {
           setStudio(studioData as StudioData);
-        }
-      }
-
-      // Check corporate storage fallback for corporate events
-      if (typeof window !== "undefined") {
-        try {
-          const rawCorp = window.localStorage.getItem(`photoos_corporate_photos_${eventId}`);
-          if (rawCorp) {
-            const corpPhotos = JSON.parse(rawCorp);
-            if (Array.isArray(corpPhotos) && corpPhotos.length > 0) {
-              const mapped: GalleryPhoto[] = corpPhotos.map((cp: any) => ({
-                id: cp.id,
-                eventId,
-                fileName: cp.name,
-                thumbnailUrl: cp.thumbnail_url || cp.url,
-                originalUrl: cp.url,
-                width: cp.width || 1200,
-                height: cp.height || 800,
-                fileSize: cp.size_bytes || 500000,
-                mimeType: "image/jpeg",
-                uploadedBy: "Corporate Office",
-                uploadedAt: cp.uploaded_at,
-                status: "ready",
-                visibility: "visible",
-                rating: 0,
-                likes: 0,
-                comments: 0,
-                isFavorite: false,
-                isSelected: false,
-                aiProcessed: true,
-              }));
-              setPhotos(mapped);
-              setAllowDownloads(true);
-
-              const rawComp = window.localStorage.getItem("photoos_corporate_company");
-              if (rawComp) {
-                const comp = JSON.parse(rawComp);
-                setStudio({
-                  id: comp.id || "corp_office",
-                  name: comp.name || "Corporate Office",
-                  brand_name: comp.name || "Corporate Office",
-                });
-              }
-              return;
-            }
-          }
-        } catch (e) {
-          console.warn("[ClientAccessGallery] corp photos fallback error:", e);
         }
       }
     } catch (err) {

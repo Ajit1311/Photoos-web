@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase/client";
 import { getAccessToken, getCurrentUser } from "@/lib/auth/session";
 import { LEGAL_CONFIG } from "@/config/legal";
+export { LEGAL_CONFIG };
 import { 
   TERMS_CONTENT, 
   PRIVACY_CONTENT, 
@@ -37,20 +38,15 @@ export async function getCurrentMemberComplianceStatus(
     throw new Error("You must be signed in to continue.");
   }
 
-  // 1. Check local acceptance specifically for the active legal version (0.0.1)
+  const sessionUser = await getCurrentUser().catch(() => null);
+  const userId = sessionUser?.id;
+
+  // 1. Check user-scoped local acceptance specifically for this user and active legal version
   let isCompliant = false;
-  if (typeof window !== "undefined") {
-    const acceptedVersion = localStorage.getItem(`photoos_legal_version_${studioId}`);
-    const globalVersion = localStorage.getItem("photoos_legal_last_accepted_version");
-    const globalAcceptedAll = localStorage.getItem("photoos_legal_accepted_all");
-    if (
-      acceptedVersion === LEGAL_CONFIG.version ||
-      globalVersion === LEGAL_CONFIG.version ||
-      globalAcceptedAll === "true"
-    ) {
+  if (typeof window !== "undefined" && userId) {
+    const userAccepted = localStorage.getItem(`photoos_user_${userId}_legal_accepted_v${LEGAL_CONFIG.version}`);
+    if (userAccepted === "true") {
       isCompliant = true;
-      localStorage.setItem(`photoos_legal_version_${studioId}`, LEGAL_CONFIG.version);
-      localStorage.setItem(`photoos_legal_accepted_${studioId}`, "true");
     }
   }
 
@@ -78,6 +74,9 @@ export async function getCurrentMemberComplianceStatus(
         // If DB has accepted the current version
         if (data.compliance.is_compliant && data.compliance.agreement_version === LEGAL_CONFIG.version) {
           isCompliant = true;
+          if (typeof window !== "undefined" && userId) {
+            localStorage.setItem(`photoos_user_${userId}_legal_accepted_v${LEGAL_CONFIG.version}`, "true");
+          }
         }
       }
     } catch (err) {
@@ -85,25 +84,26 @@ export async function getCurrentMemberComplianceStatus(
     }
   }
 
-  // 3. Check database user_consents table
-  if (!isCompliant) {
+  // 3. Check database user_consents table for all 3 required DPDP documents for this user
+  if (!isCompliant && userId) {
     try {
-      const sessionUser = await getCurrentUser();
-      if (sessionUser?.id) {
-        const { data: consents } = await supabase
-          .from("user_consents")
-          .select("id")
-          .eq("user_id", sessionUser.id)
-          .eq("version", LEGAL_CONFIG.version)
-          .is("withdrawn_at", null)
-          .limit(3);
+      const { data: consents } = await supabase
+        .from("user_consents")
+        .select("document_type")
+        .eq("user_id", userId)
+        .eq("version", LEGAL_CONFIG.version)
+        .is("withdrawn_at", null);
 
-        if (consents && consents.length >= 3) {
-          isCompliant = true;
-          if (typeof window !== "undefined") {
-            localStorage.setItem(`photoos_legal_version_${studioId}`, LEGAL_CONFIG.version);
-            localStorage.setItem(`photoos_legal_accepted_${studioId}`, "true");
-          }
+      const hasTerms = consents?.some((c) => c.document_type === "terms_of_service");
+      const hasPrivacy = consents?.some((c) => c.document_type === "privacy_policy");
+      const hasPlatform = consents?.some((c) => c.document_type === "platform_agreement");
+
+      if (hasTerms && hasPrivacy && hasPlatform) {
+        isCompliant = true;
+        if (typeof window !== "undefined") {
+          localStorage.setItem(`photoos_user_${userId}_legal_accepted_v${LEGAL_CONFIG.version}`, "true");
+          localStorage.setItem(`photoos_legal_version_${studioId}`, LEGAL_CONFIG.version);
+          localStorage.setItem(`photoos_legal_accepted_${studioId}`, "true");
         }
       }
     } catch (dbErr) {
@@ -154,14 +154,15 @@ export async function acceptCurrentMemberLegalCompliance(
   if (typeof window !== "undefined") {
     localStorage.setItem(`photoos_legal_accepted_${studioId}`, "true");
     localStorage.setItem(`photoos_legal_version_${studioId}`, LEGAL_CONFIG.version);
-    localStorage.setItem("photoos_legal_last_accepted_version", LEGAL_CONFIG.version);
-    localStorage.setItem("photoos_legal_accepted_all", "true");
   }
 
   // Record user consent in statutory DPDP user_consents table
   try {
     const sessionUser = await getCurrentUser();
     if (sessionUser?.id) {
+      if (typeof window !== "undefined") {
+        localStorage.setItem(`photoos_user_${sessionUser.id}_legal_accepted_v${LEGAL_CONFIG.version}`, "true");
+      }
       const consentEntries: Array<{
         document_type: "terms_of_service" | "privacy_policy" | "platform_agreement";
         consent_type: "terms" | "privacy" | "platform_agreement";

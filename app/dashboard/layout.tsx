@@ -30,6 +30,7 @@ import {
 
 import {
   getCurrentMemberComplianceStatus,
+  LEGAL_CONFIG,
 } from "@/lib/api/legal-compliance";
 
 
@@ -203,10 +204,10 @@ export default function Layout({
           }
 
 
+          const currentUserId = session?.user?.id;
           const isLocallyAccepted =
             typeof window !== "undefined" &&
-            (localStorage.getItem("photoos_legal_accepted_all") === "true" ||
-             Boolean(localStorage.getItem("photoos_legal_last_accepted_version")));
+            Boolean(currentUserId && localStorage.getItem(`photoos_user_${currentUserId}_legal_accepted_v${LEGAL_CONFIG.version}`) === "true");
 
           /*
            * Member already accepted the current agreement or accepted during onboarding.

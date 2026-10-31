@@ -887,16 +887,14 @@ export default function LegalCompliancePage() {
         }
 
 
-        // Auto-redirect if user has already accepted the legal compliance agreements
+        // Auto-redirect ONLY if this specific user has genuinely accepted the legal compliance agreements
         const isLocallyAccepted =
           typeof window !== "undefined" &&
-          (localStorage.getItem("photoos_legal_accepted_all") === "true" ||
-           localStorage.getItem("photoos_legal_last_accepted_version") === LEGAL_CONFIG.version ||
+          (Boolean(sessionUser?.id && localStorage.getItem(`photoos_user_${sessionUser.id}_legal_accepted_v${LEGAL_CONFIG.version}`) === "true") ||
            (corporateMode && localStorage.getItem("photoos_corporate_compliance_accepted") === "true"));
 
         const isCompliantNow =
-          compliance.is_compliant === true ||
-          compliance.compliance_required === false ||
+          (compliance.is_compliant === true && compliance.compliance_required === false) ||
           isLocallyAccepted;
 
         if (isCompliantNow) {
@@ -1241,8 +1239,9 @@ export default function LegalCompliancePage() {
       }
 
       if (typeof window !== "undefined") {
-        localStorage.setItem("photoos_legal_last_accepted_version", LEGAL_CONFIG.version);
-        localStorage.setItem("photoos_legal_accepted_all", "true");
+        if (currentUser?.id) {
+          localStorage.setItem(`photoos_user_${currentUser.id}_legal_accepted_v${LEGAL_CONFIG.version}`, "true");
+        }
         localStorage.setItem("photoos_corporate_compliance_accepted", "true");
         if (studioId) {
           localStorage.setItem(`photoos_legal_accepted_${studioId}`, "true");
