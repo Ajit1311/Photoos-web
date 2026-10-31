@@ -57,41 +57,44 @@ export default function CorporateDashboardPage() {
   return (
     <CorporateShell>
       <div className="space-y-8">
-        {/* Executive Header Banner - Minimalist Clean Style */}
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-6 sm:p-8 text-slate-900 shadow-[0_1px_3px_rgba(0,0,0,0.04)] dark:border-slate-800 dark:bg-slate-900/90 dark:text-white">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        {/* Executive Header Banner - PhotoOS Gradient Style */}
+        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-[#061826] via-[#0A3F61] to-[#041522] p-6 sm:p-8 text-white shadow-xl">
+          <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#3495A1]/20 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-[#EF8619]/15 blur-3xl" />
+
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-2.5">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-300">
-                  <Building2 className="h-3 w-3 text-slate-500" />
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-sky-200 backdrop-blur-md">
+                  <Building2 className="h-3.5 w-3.5 text-[#3495A1]" />
                   Corporate Portal
                 </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-300">
-                  <Clock className="h-3 w-3 text-slate-500" />
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-sky-200 backdrop-blur-md">
+                  <Clock className="h-3.5 w-3.5 text-[#EF8619]" />
                   {company?.subscription?.days_remaining ?? 7} Days Trial Active
                 </span>
               </div>
 
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
                 {company?.name || "Corporate Office Dashboard"}
               </h1>
-              <p className="mt-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-xl leading-relaxed">
+              <p className="mt-1 text-xs sm:text-sm text-sky-100/80 max-w-xl leading-relaxed">
                 Manage your office events, generate reception Standee QRs, and let employees instantly discover their candid photos with AI selfie matching.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="relative z-10 flex flex-wrap items-center gap-3">
               <Link
                 href="/corporate/standee-qr"
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-800/80 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors shadow-xs"
+                className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-xs font-semibold text-white hover:bg-white/20 transition-all backdrop-blur-md shadow-sm"
               >
-                <QrCode className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                <QrCode className="h-4 w-4 text-sky-300" />
                 Standee QR Poster
               </Link>
 
               <Link
                 href="/corporate/events/new"
-                className="inline-flex items-center gap-2 rounded-xl bg-[#0A3F61] px-5 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-[#072c44] transition-all"
+                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#EF8619] to-amber-500 hover:from-amber-500 hover:to-[#EF8619] px-5 py-2.5 text-xs font-bold text-slate-950 shadow-lg shadow-orange-500/20 transition-all hover:scale-[1.02]"
               >
                 <Plus className="h-4 w-4" />
                 Create Corporate Event
@@ -102,10 +105,13 @@ export default function CorporateDashboardPage() {
 
         {/* Enterprise Metrics Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] dark:border-slate-800 dark:bg-slate-900/80">
+          <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm hover:shadow-md transition-all dark:border-slate-800 dark:bg-slate-900/80">
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-[#0A3F61] via-[#3495A1] to-[#EF8619]" />
             <div className="flex items-center justify-between text-slate-400">
-              <span className="text-xs font-medium uppercase tracking-wider">Corporate Events</span>
-              <CalendarDays className="h-4 w-4 text-slate-400" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Corporate Events</span>
+              <div className="h-8 w-8 rounded-lg bg-[#0A3F61]/10 text-[#0A3F61] dark:bg-sky-500/10 dark:text-sky-300 flex items-center justify-center">
+                <CalendarDays className="h-4 w-4" />
+              </div>
             </div>
             <p className="mt-3 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
               {events.length}
@@ -115,10 +121,13 @@ export default function CorporateDashboardPage() {
             </p>
           </div>
 
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] dark:border-slate-800 dark:bg-slate-900/80">
+          <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm hover:shadow-md transition-all dark:border-slate-800 dark:bg-slate-900/80">
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-[#0A3F61] via-[#3495A1] to-[#EF8619]" />
             <div className="flex items-center justify-between text-slate-400">
-              <span className="text-xs font-medium uppercase tracking-wider">Event Photos</span>
-              <ImageIcon className="h-4 w-4 text-slate-400" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Event Photos</span>
+              <div className="h-8 w-8 rounded-lg bg-[#3495A1]/10 text-[#3495A1] dark:bg-teal-500/10 dark:text-teal-300 flex items-center justify-center">
+                <ImageIcon className="h-4 w-4" />
+              </div>
             </div>
             <p className="mt-3 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
               {totalPhotos.toLocaleString()}
@@ -128,10 +137,13 @@ export default function CorporateDashboardPage() {
             </p>
           </div>
 
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] dark:border-slate-800 dark:bg-slate-900/80">
+          <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm hover:shadow-md transition-all dark:border-slate-800 dark:bg-slate-900/80">
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-[#0A3F61] via-[#3495A1] to-[#EF8619]" />
             <div className="flex items-center justify-between text-slate-400">
-              <span className="text-xs font-medium uppercase tracking-wider">AI Faces Indexed</span>
-              <ScanFace className="h-4 w-4 text-slate-400" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">AI Faces Indexed</span>
+              <div className="h-8 w-8 rounded-lg bg-[#EF8619]/10 text-[#EF8619] dark:bg-amber-500/10 dark:text-amber-300 flex items-center justify-center">
+                <ScanFace className="h-4 w-4" />
+              </div>
             </div>
             <p className="mt-3 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
               {totalFaces.toLocaleString()}
@@ -141,10 +153,13 @@ export default function CorporateDashboardPage() {
             </p>
           </div>
 
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] dark:border-slate-800 dark:bg-slate-900/80">
+          <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm hover:shadow-md transition-all dark:border-slate-800 dark:bg-slate-900/80">
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-[#0A3F61] via-[#3495A1] to-[#EF8619]" />
             <div className="flex items-center justify-between text-slate-400">
-              <span className="text-xs font-medium uppercase tracking-wider">Employee Privacy</span>
-              <ShieldCheck className="h-4 w-4 text-slate-400" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Employee Privacy</span>
+              <div className="h-8 w-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                <ShieldCheck className="h-4 w-4" />
+              </div>
             </div>
             <p className="mt-3 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
               100%
@@ -243,7 +258,7 @@ export default function CorporateDashboardPage() {
                   <div className="flex items-center gap-2 self-end sm:self-center">
                     <Link
                       href={`/corporate/events/${ev.id}`}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-[#0A3F61] px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-[#072c44] transition-all"
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#0A3F61] to-[#0d5583] hover:from-[#0d5583] hover:to-[#0A3F61] px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition-all"
                     >
                       <Upload className="h-3.5 w-3.5" />
                       Manage & Upload

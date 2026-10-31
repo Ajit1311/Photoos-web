@@ -219,38 +219,57 @@ export default function CorporateEventDetailsPage() {
           throw new Error("Storage service did not return an upload URL.");
         }
 
-        // Step 2: Stream binary file DIRECTLY to Supabase Storage
-        // No Vercel payload limits apply here!
-        await new Promise<void>((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          item.xhr = xhr;
-          xhr.open("PUT", uploadUrl, true);
-          xhr.setRequestHeader("Content-Type", item.file.type || "image/jpeg");
+        // Step 2: Stream binary file to Supabase Storage (Presigned PUT with Server Proxy fallback)
+        let uploadSucceeded = false;
+        try {
+          await new Promise<void>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            item.xhr = xhr;
+            xhr.open("PUT", uploadUrl, true);
+            xhr.setRequestHeader("Content-Type", item.file.type || "image/jpeg");
 
-          xhr.upload.onprogress = (e) => {
-            if (e.lengthComputable) {
-              const pct = Math.round((e.loaded / e.total) * 100);
-              updateItem(item.id, {
-                progress: Math.min(99, pct),
-                transferredBytes: e.loaded,
-                totalBytes: e.total,
-              });
-            }
-          };
+            xhr.upload.onprogress = (e) => {
+              if (e.lengthComputable) {
+                const pct = Math.round((e.loaded / e.total) * 100);
+                updateItem(item.id, {
+                  progress: Math.min(95, pct),
+                  transferredBytes: e.loaded,
+                  totalBytes: e.total,
+                });
+              }
+            };
 
-          xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              resolve();
-            } else {
-              reject(new Error(`Storage error ${xhr.status}: ${xhr.statusText}`));
-            }
-          };
+            xhr.onload = () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                uploadSucceeded = true;
+                resolve();
+              } else {
+                reject(new Error(`Storage error ${xhr.status}: ${xhr.statusText}`));
+              }
+            };
 
-          xhr.onerror = () => reject(new Error("Network connection error to storage server."));
-          xhr.onabort = () => reject(new Error("Upload cancelled."));
+            xhr.onerror = () => reject(new Error("Network connection error to storage server."));
+            xhr.onabort = () => reject(new Error("Upload cancelled."));
 
-          xhr.send(item.file);
-        });
+            xhr.send(item.file);
+          });
+        } catch (directErr) {
+          console.warn("[UploadSingleItem] Direct presigned PUT failed, falling back to server upload proxy:", directErr);
+          const fd = new FormData();
+          fd.append("file", item.file);
+          fd.append("path", storagePath);
+          fd.append("bucket", "assets");
+
+          const proxyRes = await fetch("/api/storage/upload", {
+            method: "POST",
+            body: fd,
+          });
+
+          if (!proxyRes.ok) {
+            throw new Error("Both direct storage and proxy upload failed.");
+          }
+          uploadSucceeded = true;
+        }
 
         // Step 3: Processing step (facial indexing)
         updateItem(item.id, { status: "processing", progress: 99 });
@@ -596,59 +615,62 @@ export default function CorporateEventDetailsPage() {
           </span>
         </div>
 
-        {/* Event Workspace Header Banner */}
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-6 dark:border-slate-800 dark:bg-slate-900/90 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        {/* Event Workspace Header Banner - PhotoOS Signature Gradient Style */}
+        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-[#061826] via-[#0A3F61] to-[#041522] p-6 sm:p-8 text-white shadow-xl">
+          <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#3495A1]/20 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-[#EF8619]/15 blur-3xl" />
+
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
               <div className="flex flex-wrap items-center gap-2.5 mb-2.5">
-                <span className="rounded-full border border-slate-200/80 bg-slate-50 px-3 py-0.5 text-xs font-medium text-slate-700 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-300">
+                <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-sky-200 backdrop-blur-md">
                   {event?.event_type}
                 </span>
-                <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                  <CalendarDays className="h-3.5 w-3.5 text-slate-400" />
+                <span className="inline-flex items-center gap-1.5 text-xs text-sky-200/80">
+                  <CalendarDays className="h-3.5 w-3.5 text-[#3495A1]" />
                   {event?.date}
                 </span>
-                <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                  <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                <span className="inline-flex items-center gap-1.5 text-xs text-sky-200/80">
+                  <MapPin className="h-3.5 w-3.5 text-[#EF8619]" />
                   {event?.location}
                 </span>
               </div>
 
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
                 {event?.name}
               </h1>
 
               {event?.description && (
-                <p className="mt-1.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-2xl leading-relaxed">
+                <p className="mt-1.5 text-xs sm:text-sm text-sky-100/80 max-w-2xl leading-relaxed">
                   {event.description}
                 </p>
               )}
             </div>
 
             {/* Quick Action Buttons */}
-            <div className="flex flex-wrap items-center gap-2.5">
+            <div className="relative z-10 flex flex-wrap items-center gap-2.5">
               <button
                 type="button"
                 onClick={() => setActiveTab("qrcode")}
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-800/80 dark:text-slate-300 shadow-xs transition-colors"
+                className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-3.5 py-2 text-xs font-semibold text-white hover:bg-white/20 backdrop-blur-md shadow-sm transition-all"
               >
-                <QrCode className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                <QrCode className="h-4 w-4 text-sky-300" />
                 Standee QR
               </button>
 
               <Link
                 href={`/gallery/${eventId}/access`}
                 target="_blank"
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-800/80 dark:text-slate-300 shadow-xs transition-colors"
+                className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-3.5 py-2 text-xs font-semibold text-white hover:bg-white/20 backdrop-blur-md shadow-sm transition-all"
               >
-                <ExternalLink className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                <ExternalLink className="h-4 w-4 text-sky-300" />
                 Mobile View
               </Link>
 
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="inline-flex items-center gap-2 rounded-xl bg-[#0A3F61] px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#072c44] transition-all"
+                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#EF8619] to-amber-500 hover:from-amber-500 hover:to-[#EF8619] px-4.5 py-2 text-xs font-bold text-slate-950 shadow-lg shadow-orange-500/20 transition-all hover:scale-[1.02]"
               >
                 <UploadCloud className="h-4 w-4" />
                 <span>Upload Photos</span>
@@ -657,28 +679,28 @@ export default function CorporateEventDetailsPage() {
           </div>
 
           {/* Quick Metrics Strip */}
-          <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800/80 grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="relative z-10 mt-6 pt-5 border-t border-white/15 grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div>
-              <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Total Photos</span>
-              <p className="text-xl font-bold text-slate-900 dark:text-white mt-0.5">
+              <span className="text-[11px] font-semibold text-sky-200/70 uppercase tracking-wider">Total Photos</span>
+              <p className="text-2xl font-black text-white mt-0.5">
                 {photos.length}
               </p>
             </div>
             <div>
-              <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">AI Faces Indexed</span>
-              <p className="text-xl font-bold text-slate-900 dark:text-white mt-0.5">
+              <span className="text-[11px] font-semibold text-sky-200/70 uppercase tracking-wider">AI Faces Indexed</span>
+              <p className="text-2xl font-black text-white mt-0.5">
                 {photos.reduce((acc, p) => acc + (p.ai_faces_detected || 1), 0)}
               </p>
             </div>
             <div>
-              <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Storage Architecture</span>
-              <p className="text-xl font-bold text-slate-800 dark:text-slate-200 mt-0.5">
+              <span className="text-[11px] font-semibold text-sky-200/70 uppercase tracking-wider">Storage Security</span>
+              <p className="text-xl font-bold text-sky-200 mt-0.5">
                 Encrypted Cloud
               </p>
             </div>
             <div>
-              <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Download Access</span>
-              <p className="text-xl font-bold text-slate-900 dark:text-white mt-0.5">
+              <span className="text-[11px] font-semibold text-sky-200/70 uppercase tracking-wider">Download Access</span>
+              <p className="text-xl font-bold text-sky-200 mt-0.5">
                 High-Resolution
               </p>
             </div>
@@ -782,7 +804,7 @@ export default function CorporateEventDetailsPage() {
                 Studio-grade direct upload with automatic facial indexing. Supports JPG, PNG, WEBP, and RAW formats.
               </p>
               <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
-                <span className="inline-flex items-center gap-2 rounded-xl bg-[#0A3F61] px-5 py-2.5 text-xs font-semibold text-white shadow-xs group-hover:bg-[#072c44] transition-colors">
+                <span className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#0A3F61] via-[#0d5583] to-[#0A3F61] hover:brightness-110 px-5 py-2.5 text-xs font-bold text-white shadow-md group-hover:scale-[1.02] transition-all">
                   <UploadCloud className="h-4 w-4" />
                   Select Photos to Upload
                 </span>
@@ -985,7 +1007,7 @@ export default function CorporateEventDetailsPage() {
                   <button
                     type="button"
                     onClick={handleCopyLink}
-                    className="inline-flex items-center gap-1 rounded-lg bg-[#0A3F61] px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-[#072c44]"
+                    className="inline-flex items-center gap-1 rounded-lg bg-gradient-to-r from-[#0A3F61] to-[#0d5583] hover:from-[#0d5583] hover:to-[#0A3F61] px-3.5 py-1.5 text-xs font-bold text-white shadow-xs transition-all"
                   >
                     {copied ? (
                       <>

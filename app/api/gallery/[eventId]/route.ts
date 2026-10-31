@@ -78,6 +78,26 @@ export async function GET(
           }
         } catch {}
 
+        // Auto-discovery fallback from storage folder
+        if (corpPhotos.length === 0) {
+          try {
+            const { data: folderFiles } = await supabaseAdmin.storage
+              .from("assets")
+              .list(`corporate/${targetId}/photos`, { limit: 200 });
+            if (Array.isArray(folderFiles) && folderFiles.length > 0) {
+              corpPhotos = folderFiles
+                .filter((f) => f.name && !f.name.startsWith("."))
+                .map((f, idx) => ({
+                  id: f.id || `cphoto_${idx}_${f.name}`,
+                  name: f.name.replace(/^cphoto_[^_]+_/, ""),
+                  storage_path: `corporate/${targetId}/photos/${f.name}`,
+                  size_bytes: f.metadata?.size || 0,
+                  uploaded_at: f.created_at || new Date().toISOString(),
+                }));
+            }
+          } catch {}
+        }
+
         const evName = corpEventData?.name || "Corporate Event";
         const compName = corpEventData?.company_name || "Corporate Office";
 

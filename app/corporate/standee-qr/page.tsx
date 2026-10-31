@@ -200,7 +200,7 @@ export default function CorporateStandeeQRPage() {
           <div className="flex items-center gap-2.5">
             <button
               onClick={handleDownloadStandee}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#0A3F61] px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#072c44] transition-all"
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#0A3F61] via-[#0d5583] to-[#0A3F61] hover:brightness-110 px-4.5 py-2.5 text-xs font-bold text-white shadow-md transition-all"
             >
               <Download className="h-4 w-4" />
               Download Standee (PNG)
