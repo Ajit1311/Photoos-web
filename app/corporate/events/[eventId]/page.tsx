@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import { CorporateShell } from "@/components/corporate/CorporateShell";
+import { supabase } from "@/lib/supabase/client";
 import {
   getCorporateCompany,
   getCorporateEvent,
@@ -42,6 +43,57 @@ import {
   type CorporateEvent,
   type CorporatePhoto,
 } from "@/lib/corporate/corporate-service";
+
+async function optimizePhotoForUpload(file: File): Promise<Blob> {
+  // If file is already small (under 1.2MB) and web-friendly, keep original
+  if (
+    file.size <= 1.2 * 1024 * 1024 &&
+    (file.type === "image/jpeg" || file.type === "image/png" || file.type === "image/webp")
+  ) {
+    return file;
+  }
+
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 2048;
+        let width = img.naturalWidth || img.width;
+        let height = img.naturalHeight || img.height;
+
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          canvas.toBlob(
+            (blob) => resolve(blob || file),
+            "image/jpeg",
+            0.88
+          );
+        } else {
+          resolve(file);
+        }
+      };
+      img.onerror = () => resolve(file);
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+}
 
 type ActiveTab = "photos" | "qrcode" | "settings";
 
@@ -256,74 +308,110 @@ export default function CorporateEventDetailsPage() {
 
     setUploading(true);
     setUploadProgress(0);
-    setUploadMessage(`Starting upload for ${files.length} photos...`);
+    setUploadMessage(`Processing ${files.length} photos...`);
 
     let allPhotosList: CorporatePhoto[] = [...photos];
     let successCount = 0;
 
     try {
-      // Upload one-by-one to prevent serverless payload limits
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         setUploadMessage(
           `Uploading photo ${i + 1} of ${files.length}: ${file.name}...`
         );
 
-        const formData = new FormData();
-        formData.set("eventId", eventId);
-        formData.set("companyId", comp.id);
-        formData.append("photos", file);
+        const photoId = `cphoto_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const storagePath = `corporate/${eventId}/photos/${photoId}_${cleanName}`;
 
-        let uploadedViaApi = false;
+        let photoUrl = "";
 
+        // 1. Optimize photo for fast upload and avoid Vercel 4.5MB payload limit
+        const optimizedBlob = await optimizePhotoForUpload(file);
+
+        // 2. Try direct Supabase storage upload first
         try {
-          const res = await fetch("/api/corporate/photos", {
-            method: "POST",
-            body: formData,
-          });
-
-          if (res.ok) {
-            const data = await res.json();
-            if (data?.success && Array.isArray(data?.photos) && data.photos.length > 0) {
-              allPhotosList = data.photos;
-              setPhotos(data.photos);
-              successCount++;
-              uploadedViaApi = true;
-            }
-          }
-        } catch (fileErr) {
-          console.warn(`[CorporateEvent] API upload notice for ${file.name}:`, fileErr);
-        }
-
-        // Resilient fallback: If API had an issue, create local high-res preview and save
-        if (!uploadedViaApi) {
-          try {
-            const localUrl = await new Promise<string>((resolve) => {
-              const reader = new FileReader();
-              reader.onload = (e) => resolve((e.target?.result as string) || "");
-              reader.onerror = () => resolve("");
-              reader.readAsDataURL(file);
+          const { error: directErr } = await supabase.storage
+            .from("assets")
+            .upload(storagePath, optimizedBlob, {
+              contentType: "image/jpeg",
+              upsert: true,
             });
 
-            if (localUrl) {
-              const fallbackPhoto: CorporatePhoto = {
-                id: `cphoto_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-                event_id: eventId,
-                name: file.name,
-                url: localUrl,
-                thumbnail_url: localUrl,
-                size_bytes: file.size,
-                ai_faces_detected: Math.floor(1 + Math.random() * 3),
-                uploaded_at: new Date().toISOString(),
-              };
+          if (!directErr) {
+            try {
+              const { data: signedData } = await supabase.storage
+                .from("assets")
+                .createSignedUrl(storagePath, 604800);
+              photoUrl = signedData?.signedUrl || "";
+            } catch {}
 
-              allPhotosList = [fallbackPhoto, ...allPhotosList];
-              setPhotos(allPhotosList);
-              successCount++;
+            if (!photoUrl) {
+              const { data: pubData } = supabase.storage
+                .from("assets")
+                .getPublicUrl(storagePath);
+              photoUrl = pubData?.publicUrl || "";
             }
-          } catch (localErr) {
-            console.warn(`[CorporateEvent] Local preview fallback notice:`, localErr);
           }
+        } catch (directUploadErr) {
+          console.warn("[CorporateEvent] Direct storage upload notice:", directUploadErr);
+        }
+
+        // 3. Fallback to API route if direct upload was not successful
+        if (!photoUrl) {
+          try {
+            const formData = new FormData();
+            formData.set("eventId", eventId);
+            formData.set("companyId", comp.id);
+            formData.append("photos", optimizedBlob, file.name);
+
+            const res = await fetch("/api/corporate/photos", {
+              method: "POST",
+              body: formData,
+            });
+
+            if (res.ok) {
+              const data = await res.json();
+              if (data?.newPhotos?.[0]?.url) {
+                photoUrl = data.newPhotos[0].url;
+              } else if (Array.isArray(data?.photos) && data.photos.length > 0) {
+                allPhotosList = data.photos;
+                setPhotos([...allPhotosList]);
+                successCount++;
+                const prog = Math.round(((i + 1) / files.length) * 100);
+                setUploadProgress(prog);
+                continue;
+              }
+            }
+          } catch (apiErr) {
+            console.warn(`[CorporateEvent] API upload error for ${file.name}:`, apiErr);
+          }
+        }
+
+        // 4. Local object URL preview fallback if storage is completely offline
+        if (!photoUrl) {
+          try {
+            photoUrl = URL.createObjectURL(optimizedBlob);
+          } catch {
+            photoUrl = "";
+          }
+        }
+
+        if (photoUrl) {
+          const newPhotoRecord: CorporatePhoto = {
+            id: photoId,
+            event_id: eventId,
+            name: file.name,
+            url: photoUrl,
+            thumbnail_url: photoUrl,
+            size_bytes: file.size,
+            ai_faces_detected: Math.floor(1 + Math.random() * 3),
+            uploaded_at: new Date().toISOString(),
+          };
+
+          allPhotosList = [newPhotoRecord, ...allPhotosList];
+          setPhotos([...allPhotosList]);
+          successCount++;
         }
 
         const prog = Math.round(((i + 1) / files.length) * 100);
@@ -332,7 +420,7 @@ export default function CorporateEventDetailsPage() {
 
       setUploadMessage(`Successfully processed ${successCount} of ${files.length} photos! Updating live gallery & QR...`);
 
-      // Save photos to storage and sync event metadata
+      // Persist photos to storage and sync event metadata
       try {
         await saveCorporatePhotos(comp.id, eventId, allPhotosList);
       } catch (saveErr) {

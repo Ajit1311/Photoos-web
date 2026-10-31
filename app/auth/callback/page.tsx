@@ -144,8 +144,11 @@ function AuthCallbackContent() {
               }),
             });
             const otpData = await otpRes.json().catch(() => null);
-            if (otpData?.token && typeof window !== "undefined") {
-              sessionStorage.setItem("photoos_otp_token", otpData.token);
+            if (typeof window !== "undefined") {
+              sessionStorage.setItem("photoos_otp_dispatched_at", Date.now().toString());
+              if (otpData?.token) {
+                sessionStorage.setItem("photoos_otp_token", otpData.token);
+              }
             }
           } catch (otpErr) {
             console.warn("[AuthCallback] Google OAuth OTP dispatch notice:", otpErr);
@@ -165,6 +168,7 @@ function AuthCallbackContent() {
           if (mode) p.set("mode", mode);
           if (nextTarget) p.set("next", nextTarget);
           p.set("email", userEmail);
+          p.set("sent", "1");
 
           const destination = `/auth/email-otp?${p.toString()}`;
           router.replace(destination);

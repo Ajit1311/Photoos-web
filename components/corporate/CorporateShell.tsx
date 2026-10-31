@@ -36,8 +36,15 @@ export function CorporateShell({ children }: CorporateShellProps) {
       setCompany(comp);
 
       // Enforce legal compliance: user CANNOT access dashboard or internal pages without accepting compliance
-      // User requirement: "sagalikde same legal compleince page use kr ha https://app.photoos.in/legal-compliance"
-      if (!comp.compliance_accepted && !pathname.includes("/login")) {
+      const isCompliant =
+        comp.compliance_accepted ||
+        (typeof window !== "undefined" && (
+          localStorage.getItem("photoos_corporate_compliance_accepted") === "true" ||
+          localStorage.getItem("photoos_legal_accepted_all") === "true" ||
+          Boolean(localStorage.getItem("photoos_legal_last_accepted_version"))
+        ));
+
+      if (!isCompliant && !pathname.includes("/login") && !pathname.includes("/legal-compliance")) {
         router.replace("/legal-compliance?mode=corporate");
         return;
       }

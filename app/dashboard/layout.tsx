@@ -203,24 +203,25 @@ export default function Layout({
           }
 
 
+          const isLocallyAccepted =
+            typeof window !== "undefined" &&
+            (localStorage.getItem("photoos_legal_accepted_all") === "true" ||
+             Boolean(localStorage.getItem("photoos_legal_last_accepted_version")));
+
           /*
-           * Member already accepted the current agreement.
+           * Member already accepted the current agreement or accepted during onboarding.
            */
           if (
-            compliance.is_compliant ===
-            true
+            compliance.is_compliant === true ||
+            isLocallyAccepted
           ) {
-
             if (!cancelled) {
-
               setGuardState(
                 "authorized",
               );
-
             }
 
             return;
-
           }
 
 

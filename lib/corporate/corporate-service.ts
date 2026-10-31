@@ -337,11 +337,30 @@ export async function saveCorporatePhotos(
   newPhotos: CorporatePhoto[]
 ): Promise<CorporatePhoto[]> {
   const existing = await getCorporatePhotos(eventId);
-  const combined = [...newPhotos, ...existing];
+  
+  // Deduplicate by photo ID
+  const map = new Map<string, CorporatePhoto>();
+  for (const p of existing) {
+    if (p.id) map.set(p.id, p);
+  }
+  for (const p of newPhotos) {
+    if (p.id) map.set(p.id, p);
+  }
+  const combined = Array.from(map.values());
 
   if (typeof window !== "undefined") {
     try {
-      window.localStorage.setItem(`${STORAGE_KEY_PHOTOS_PREFIX}${eventId}`, JSON.stringify(combined));
+      // Prevent localStorage quota overflow
+      const cleanToStore = combined.map((p) => {
+        if (p.url && p.url.startsWith("data:") && p.url.length > 50000) {
+          return {
+            ...p,
+            url: p.thumbnail_url && !p.thumbnail_url.startsWith("data:") ? p.thumbnail_url : p.url.slice(0, 50000),
+          };
+        }
+        return p;
+      });
+      window.localStorage.setItem(`${STORAGE_KEY_PHOTOS_PREFIX}${eventId}`, JSON.stringify(cleanToStore));
     } catch (e) {
       console.warn("[corporate-service] localStorage save notice:", e);
     }

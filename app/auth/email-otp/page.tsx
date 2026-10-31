@@ -137,8 +137,18 @@ function EmailOtpContent() {
           setLoading(false);
         }
 
-        // Auto-send OTP once on mount
-        if (!initialSentRef.current) {
+        // Check if OTP was already sent in login / callback step to avoid sending twice
+        const isAlreadySent =
+          searchParams.get("sent") === "1" ||
+          (typeof window !== "undefined" &&
+            Number(sessionStorage.getItem("photoos_otp_dispatched_at") || 0) > Date.now() - 55000);
+
+        if (isAlreadySent) {
+          initialSentRef.current = true;
+          if (!cancelled) {
+            setMessage(`A 6-digit verification code has been sent to ${resolvedEmail}. Please check your inbox.`);
+          }
+        } else if (!initialSentRef.current) {
           initialSentRef.current = true;
           try {
             const result = await callOtp("send");

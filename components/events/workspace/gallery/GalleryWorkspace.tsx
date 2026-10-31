@@ -77,19 +77,6 @@ export default function GalleryWorkspace() {
 
 
   // ==========================================================================
-  // BOOTSTRAP
-  // ==========================================================================
-
-  const {
-    data: bootstrap,
-    loading: bootstrapLoading,
-  } = useBootstrapContext();
-
-  const studioId =
-    bootstrap?.workspace?.membership?.studioId ?? "";
-
-
-  // ==========================================================================
   // EVENT WORKSPACE
   // ==========================================================================
 
@@ -99,7 +86,24 @@ export default function GalleryWorkspace() {
   } = useWorkspace(eventId);
 
   const projectId =
-    workspace?.event?.projectId ?? "";
+    workspace?.event?.projectId ??
+    eventId;
+
+
+  // ==========================================================================
+  // BOOTSTRAP
+  // ==========================================================================
+
+  const {
+    data: bootstrap,
+    loading: bootstrapLoading,
+  } = useBootstrapContext();
+
+  const studioId =
+    bootstrap?.workspace?.membership?.studioId ??
+    workspace?.event?.studioId ??
+    (typeof window !== "undefined" ? localStorage.getItem("photoos_active_studio_id") : "") ??
+    "";
 
 
   // ==========================================================================
@@ -226,11 +230,7 @@ export default function GalleryWorkspace() {
 // ==========================================================================
 
 useEffect(() => {
-  if (
-    !studioId ||
-    !eventId ||
-    !projectId
-  ) {
+  if (!eventId) {
     return;
   }
 
@@ -248,10 +248,13 @@ useEffect(() => {
     return;
   }
 
+  const effectiveStudioId = studioId || "studio_default";
+  const effectiveProjectId = projectId || eventId;
+
   void upload(
-    studioId,
+    effectiveStudioId,
     eventId,
-    projectId,
+    effectiveProjectId,
   );
 }, [
   studioId,

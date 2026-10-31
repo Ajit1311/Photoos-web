@@ -1235,39 +1235,39 @@ export default function LegalCompliancePage() {
 
       if (typeof window !== "undefined") {
         localStorage.setItem("photoos_legal_last_accepted_version", LEGAL_CONFIG.version);
+        localStorage.setItem("photoos_legal_accepted_all", "true");
+        localStorage.setItem("photoos_corporate_compliance_accepted", "true");
         if (studioId) {
           localStorage.setItem(`photoos_legal_accepted_${studioId}`, "true");
           localStorage.setItem(`photoos_legal_version_${studioId}`, LEGAL_CONFIG.version);
         }
 
         // Record compliance acceptance for corporate portal
-        if (isCorporateMode) {
-          try {
-            const raw = localStorage.getItem("photoos_corporate_company");
-            if (raw) {
-              const comp = JSON.parse(raw);
-              comp.compliance_accepted = true;
-              comp.compliance_accepted_at = new Date().toISOString();
-              localStorage.setItem("photoos_corporate_company", JSON.stringify(comp));
-            } else {
-              localStorage.setItem(
-                "photoos_corporate_company",
-                JSON.stringify({
-                  id: "corp_enterprise",
-                  name: "Corporate Office",
-                  compliance_accepted: true,
-                  compliance_accepted_at: new Date().toISOString(),
-                  subscription: {
-                    plan_name: "Corporate Enterprise (7-Day Trial)",
-                    status: "trialing",
-                    days_remaining: 7,
-                  },
-                })
-              );
-            }
-          } catch (corpErr) {
-            console.warn("[legal-compliance] corporate compliance sync notice:", corpErr);
+        try {
+          const raw = localStorage.getItem("photoos_corporate_company");
+          if (raw) {
+            const comp = JSON.parse(raw);
+            comp.compliance_accepted = true;
+            comp.compliance_accepted_at = new Date().toISOString();
+            localStorage.setItem("photoos_corporate_company", JSON.stringify(comp));
+          } else {
+            localStorage.setItem(
+              "photoos_corporate_company",
+              JSON.stringify({
+                id: "corp_enterprise",
+                name: "Corporate Office",
+                compliance_accepted: true,
+                compliance_accepted_at: new Date().toISOString(),
+                subscription: {
+                  plan_name: "Corporate Enterprise (7-Day Trial)",
+                  status: "trialing",
+                  days_remaining: 7,
+                },
+              })
+            );
           }
+        } catch (corpErr) {
+          console.warn("[legal-compliance] corporate compliance sync notice:", corpErr);
         }
       }
 

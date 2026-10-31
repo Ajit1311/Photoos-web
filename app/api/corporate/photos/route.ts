@@ -191,8 +191,16 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 3. Update manifest
-    const combinedPhotos = [...newlyUploadedPhotos, ...existingPhotos];
+    // 3. Update manifest with deduplication
+    const photoMap = new Map<string, any>();
+    for (const p of existingPhotos) {
+      if (p?.id) photoMap.set(p.id, p);
+    }
+    for (const p of newlyUploadedPhotos) {
+      if (p?.id) photoMap.set(p.id, p);
+    }
+    const combinedPhotos = Array.from(photoMap.values());
+
     try {
       const manifestBlob = new Blob([JSON.stringify(combinedPhotos, null, 2)], {
         type: "application/json",

@@ -138,14 +138,18 @@ export function LoginForm() {
           }),
         });
         const otpData = await otpRes.json().catch(() => null);
-        if (otpData?.token && typeof window !== "undefined") {
-          sessionStorage.setItem("photoos_otp_token", otpData.token);
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("photoos_otp_dispatched_at", Date.now().toString());
+          if (otpData?.token) {
+            sessionStorage.setItem("photoos_otp_token", otpData.token);
+          }
         }
       } catch (otpErr) {
         console.warn("[LoginForm] Initial OTP dispatch notice:", otpErr);
       }
 
       params.set("email", cleanEmail);
+      params.set("sent", "1");
       const qs = params.toString();
       const targetOtp = `/auth/email-otp?${qs}`;
 
