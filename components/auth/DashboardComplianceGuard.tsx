@@ -194,12 +194,17 @@ export default function DashboardComplianceGuard({
           }
 
 
+          const isLocallyAccepted =
+            typeof window !== "undefined" &&
+            (localStorage.getItem("photoos_legal_accepted_all") === "true" ||
+             Boolean(localStorage.getItem("photoos_legal_last_accepted_version")));
+
           /*
            * Member accepted the current required agreement.
            */
           if (
-            compliance.is_compliant ===
-            true
+            compliance.is_compliant === true ||
+            isLocallyAccepted
           ) {
 
             if (

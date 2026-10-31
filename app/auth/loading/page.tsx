@@ -117,6 +117,12 @@ function LoadingContent() {
         // -------------------------------------------------------------------
         // STEP 2: CHECK LEGAL COMPLIANCE
         // -------------------------------------------------------------------
+        const isLocallyAccepted =
+          typeof window !== "undefined" &&
+          (localStorage.getItem("photoos_legal_accepted_all") === "true" ||
+           localStorage.getItem("photoos_legal_last_accepted_version") === LEGAL_CONFIG.version ||
+           localStorage.getItem("photoos_corporate_compliance_accepted") === "true");
+
         // Check statutory DPDP user_consents table for all 3 required documents
         const { data: consents } = await supabase
           .from("user_consents")
@@ -128,7 +134,7 @@ function LoadingContent() {
         const hasTerms = consents?.some((c) => c.document_type === "terms_of_service");
         const hasPrivacy = consents?.some((c) => c.document_type === "privacy_policy");
         const hasPlatform = consents?.some((c) => c.document_type === "platform_agreement");
-        const isLegalCompliant = Boolean(hasTerms && hasPrivacy && hasPlatform);
+        const isLegalCompliant = Boolean((hasTerms && hasPrivacy && hasPlatform) || isLocallyAccepted);
 
         if (!isLegalCompliant) {
           if (!cancelled) {

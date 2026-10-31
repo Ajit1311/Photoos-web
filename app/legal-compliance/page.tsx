@@ -617,7 +617,8 @@ export default function LegalCompliancePage() {
         const safeNext =
           requestedNext &&
           requestedNext.startsWith("/") &&
-          !requestedNext.startsWith("//")
+          !requestedNext.startsWith("//") &&
+          !requestedNext.startsWith("/legal-compliance")
             ? requestedNext
             : corporateMode
               ? "/corporate/onboarding"
@@ -886,14 +887,20 @@ export default function LegalCompliancePage() {
         }
 
 
-        /*
-         * Note: If compliance is already met and the user came from an automated flow without
-         * explicit intent to review, they can proceed. However, when visiting /legal-compliance
-         * directly, we always render the published legal documents for transparent review.
-         */
-        const searchParams = new URLSearchParams(window.location.search);
-        const autoRedirect = searchParams.get("auto_redirect") === "true";
-        if (autoRedirect && compliance.compliance_required === false) {
+        // Auto-redirect if user has already accepted the legal compliance agreements
+        const isLocallyAccepted =
+          typeof window !== "undefined" &&
+          (localStorage.getItem("photoos_legal_accepted_all") === "true" ||
+           localStorage.getItem("photoos_legal_last_accepted_version") === LEGAL_CONFIG.version ||
+           (corporateMode && localStorage.getItem("photoos_corporate_compliance_accepted") === "true"));
+
+        const isCompliantNow =
+          compliance.is_compliant === true ||
+          compliance.compliance_required === false ||
+          isLocallyAccepted;
+
+        if (isCompliantNow) {
+          console.log("[legal-compliance] User already accepted legal agreements, navigating to:", safeNext);
           router.replace(safeNext);
           return;
         }
@@ -1272,10 +1279,28 @@ export default function LegalCompliancePage() {
       }
 
       let effectiveNext = nextPath;
-      if (isCorporateMode) {
+      const searchParams =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search)
+          : new URLSearchParams();
+      const planParams = new URLSearchParams();
+      for (const key of ["planId", "planCode", "billingCycle", "mode"]) {
+        const val = searchParams.get(key);
+        if (val) planParams.set(key, val);
+      }
+      const qs = planParams.toString();
+      const planSuffix = qs ? `?${qs}` : "";
+
+      if (!effectiveNext || effectiveNext.startsWith("/legal-compliance")) {
+        effectiveNext = isCorporateMode
+          ? "/corporate/onboarding"
+          : studioId
+            ? "/dashboard"
+            : `/onboarding/studio${planSuffix}`;
+      } else if (isCorporateMode) {
         effectiveNext = nextPath.includes("corporate") ? nextPath : "/corporate/onboarding";
       } else if (!studioId && !nextPath.includes("/onboarding/studio")) {
-        effectiveNext = "/onboarding/studio";
+        effectiveNext = `/onboarding/studio${planSuffix}`;
       }
 
       router.replace(

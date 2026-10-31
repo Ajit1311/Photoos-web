@@ -41,8 +41,16 @@ export async function getCurrentMemberComplianceStatus(
   let isCompliant = false;
   if (typeof window !== "undefined") {
     const acceptedVersion = localStorage.getItem(`photoos_legal_version_${studioId}`);
-    if (acceptedVersion === LEGAL_CONFIG.version) {
+    const globalVersion = localStorage.getItem("photoos_legal_last_accepted_version");
+    const globalAcceptedAll = localStorage.getItem("photoos_legal_accepted_all");
+    if (
+      acceptedVersion === LEGAL_CONFIG.version ||
+      globalVersion === LEGAL_CONFIG.version ||
+      globalAcceptedAll === "true"
+    ) {
       isCompliant = true;
+      localStorage.setItem(`photoos_legal_version_${studioId}`, LEGAL_CONFIG.version);
+      localStorage.setItem(`photoos_legal_accepted_${studioId}`, "true");
     }
   }
 
@@ -147,6 +155,7 @@ export async function acceptCurrentMemberLegalCompliance(
     localStorage.setItem(`photoos_legal_accepted_${studioId}`, "true");
     localStorage.setItem(`photoos_legal_version_${studioId}`, LEGAL_CONFIG.version);
     localStorage.setItem("photoos_legal_last_accepted_version", LEGAL_CONFIG.version);
+    localStorage.setItem("photoos_legal_accepted_all", "true");
   }
 
   // Record user consent in statutory DPDP user_consents table
