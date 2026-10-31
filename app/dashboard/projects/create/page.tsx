@@ -18,6 +18,10 @@ import {
 } from "@/context/BootstrapContext";
 
 import {
+  useStudioId,
+} from "@/hooks/useStudioId";
+
+import {
   useClients,
 } from "@/hooks/useClients";
 
@@ -33,12 +37,13 @@ function CreateProjectContent() {
     searchParams.get("clientId") ?? "";
 
   const {
+    studioId,
+  } = useStudioId();
+
+  const {
     data: bootstrap,
   } =
     useBootstrapContext();
-
-  const studioId =
-    bootstrap?.workspace?.studio?.id ?? "";
 
   const {
     clients,
@@ -86,7 +91,7 @@ function CreateProjectContent() {
 
       <ProjectForm
 
-        studioId={studioId}
+        studioId={studioId ?? ""}
 
         clients={clients}
 

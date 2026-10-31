@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { FormProvider } from "react-hook-form";
 
 import { Input } from "@/components/ui/input";
@@ -67,6 +68,12 @@ export function ProjectForm({
 
     });
 
+    useEffect(() => {
+        if (clients.length > 0 && !form.getValues("client_id")) {
+            form.setValue("client_id", clients[0].id);
+        }
+    }, [clients, form]);
+
     return (
         <FormProvider {...form}>
             <form
@@ -119,14 +126,23 @@ export function ProjectForm({
                     </Label>
 
                     {clients.length === 0 ? (
-                        <div className="rounded-lg border border-dashed p-6 text-center">
-                            <p className="text-sm font-medium">
-                                No clients found
+                        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center">
+                            <p className="text-sm font-medium text-slate-800">
+                                No clients created yet
                             </p>
 
-                            <p className="mt-2 text-sm text-muted-foreground">
-                                You need to create your first client before creating a project.
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                A default client will automatically be assigned, or you can create one now.
                             </p>
+
+                            <div className="mt-3">
+                                <Link
+                                    href="/dashboard/clients/create"
+                                    className="inline-flex items-center text-xs font-semibold text-[#0A3F61] hover:underline"
+                                >
+                                    + Add New Client First
+                                </Link>
+                            </div>
                         </div>
                     ) : (
                         <>
@@ -289,20 +305,12 @@ export function ProjectForm({
                         </Button>
                     )}
 
-                    {clients.length === 0 ? (
-                        <Link href="/dashboard/clients/create">
-                            <Button type="button">
-                                Create First Client
-                            </Button>
-                        </Link>
-                    ) : (
-                        <Button
-                            type="submit"
-                            disabled={loading}
-                        >
-                            {loading ? "Saving..." : submitLabel}
-                        </Button>
-                    )}
+                    <Button
+                        type="submit"
+                        disabled={loading}
+                    >
+                        {loading ? "Saving..." : submitLabel}
+                    </Button>
                 </div>
             </form>
         </FormProvider>

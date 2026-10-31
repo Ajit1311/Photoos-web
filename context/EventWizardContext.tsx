@@ -117,11 +117,6 @@ export function EventWizardProvider({ children, initialProjectId }: Props) {
     // Validation
     // -----------------------------------------------------------------------------
 
-    if (!data.projectId.trim()) {
-      setError("Please select a project.");
-      return;
-    }
-
     if (!data.title.trim()) {
       setError("Please enter an event title.");
       return;
@@ -176,20 +171,14 @@ export function EventWizardProvider({ children, initialProjectId }: Props) {
 
     // -----------------------------------------------------------------------------
 
-    if (!bootstrap) {
-      throw new Error("Bootstrap data not loaded.");
-    }
-
     const studioId =
-      bootstrap.workspace?.membership?.studioId ??
+      bootstrap?.workspace?.membership?.studioId ??
+      bootstrap?.workspace?.studio?.id ??
       (typeof window !== "undefined"
         ? localStorage.getItem("photoos_active_studio_id") ||
           localStorage.getItem("photoos_studio_id")
-        : null);
-
-    if (!studioId) {
-      throw new Error("Studio not found.");
-    }
+        : null) ??
+      "";
 
     setSubmitting(true);
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
 import { useEventWizard } from "@/context/EventWizardContext";
 import { useProjects } from "@/hooks/useProjects";
@@ -19,7 +19,13 @@ export default function StepOneBasicDetails() {
     [projectsResponse],
   );
 
-  const projectLocked = data.projectId.trim().length > 0;
+  useEffect(() => {
+    if (projects.length > 0 && !data.projectId) {
+      setField("projectId", projects[0].id);
+    }
+  }, [projects, data.projectId, setField]);
+
+  const projectLocked = data.projectId.trim().length > 0 && Boolean(projects.find(p => p.id === data.projectId));
 
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
@@ -49,27 +55,37 @@ export default function StepOneBasicDetails() {
               className="w-full rounded-2xl border border-slate-200 bg-slate-100 p-3"
             />
           ) : (
-            <select
-              value={data.projectId}
-              onChange={(event) =>
-                setField("projectId", event.target.value)
-              }
-              disabled={projectsLoading}
-              className="w-full rounded-2xl border border-slate-200 p-3"
-            >
-              <option value="">
-                Select Project
-              </option>
-
-              {projects.map((project) => (
-                <option
-                  key={project.id}
-                  value={project.id}
-                >
-                  {project.title}
+            <div>
+              <select
+                value={data.projectId}
+                onChange={(event) =>
+                  setField("projectId", event.target.value)
+                }
+                disabled={projectsLoading}
+                className="w-full rounded-2xl border border-slate-200 p-3"
+              >
+                <option value="">
+                  {projectsLoading ? "Loading projects..." : (projects.length === 0 ? "Auto-create project for this event" : "Select Project")}
                 </option>
-              ))}
-            </select>
+
+                {projects.map((project) => (
+                  <option
+                    key={project.id}
+                    value={project.id}
+                  >
+                    {project.title}
+                  </option>
+                ))}
+              </select>
+              {projects.length === 0 && !projectsLoading && (
+                <p className="mt-1 text-xs text-slate-500">
+                  No existing project selected. A project will be created automatically, or{" "}
+                  <a href="/dashboard/projects/create" className="font-semibold text-[#0A3F61] underline">
+                    create a project here
+                  </a>.
+                </p>
+              )}
+            </div>
           )}
         </div>
 

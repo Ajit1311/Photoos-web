@@ -27,7 +27,7 @@ event_date:
   z.string().nullable(),
 
     client_id:
-      uuid,
+      z.string().optional().or(z.literal("")),
 
     project_manager_id:
   z.string().uuid().nullable(),

@@ -69,7 +69,37 @@ export async function getEvents(
   studioId: string,
   projectId?: string | null,
 ): Promise<Event[]> {
-  // 1. Try Edge function first
+  // 1. Primary: Server-side API route
+  try {
+    const accessToken = await getAccessToken();
+    const headers: Record<string, string> = {};
+    if (accessToken) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+
+    const params = new URLSearchParams({
+      studioId: studioId || "",
+    });
+    if (projectId) {
+      params.append("projectId", projectId);
+    }
+
+    const res = await fetch(`/api/events?${params.toString()}`, {
+      method: "GET",
+      headers,
+    });
+
+    if (res.ok) {
+      const data = await res.json().catch(() => null);
+      if (data?.success && Array.isArray(data?.data?.events)) {
+        return (data.data.events as Record<string, unknown>[]).map(mapApiEvent);
+      }
+    }
+  } catch (apiErr) {
+    console.warn("[getEvents] API route notice, falling back:", apiErr);
+  }
+
+  // 2. Try Edge function fallback
   try {
     const headers = await getHeaders(studioId);
     const { data, error } = await supabase.functions.invoke(
@@ -90,7 +120,7 @@ export async function getEvents(
     console.warn("[getEvents] Edge function notice, falling back to direct DB:", edgeErr);
   }
 
-  // 2. Direct Supabase DB query fallback
+  // 3. Direct Supabase DB query fallback
   try {
     let query = supabase
       .from("events")
@@ -110,7 +140,7 @@ export async function getEvents(
     console.warn("[getEvents] DB fallback error:", dbErr);
   }
 
-  // 3. Resilient empty fallback
+  // 4. Resilient empty fallback
   return [];
 }
 
@@ -123,7 +153,30 @@ export async function getEvent(
   studioId: string,
   eventId: string,
 ): Promise<Event> {
-  // 1. Try edge function first
+  // 1. Primary: Server-side API route
+  try {
+    const accessToken = await getAccessToken();
+    const headers: Record<string, string> = {};
+    if (accessToken) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+
+    const res = await fetch(`/api/events/${eventId}`, {
+      method: "GET",
+      headers,
+    });
+
+    if (res.ok) {
+      const data = await res.json().catch(() => null);
+      if (data?.success && data?.data) {
+        return mapApiEvent(data.data as Record<string, unknown>);
+      }
+    }
+  } catch (apiErr) {
+    console.warn("[getEvent] API route notice, falling back:", apiErr);
+  }
+
+  // 2. Try edge function fallback
   try {
     const headers = await getHeaders(studioId);
     const { data, error } = await supabase.functions.invoke(
@@ -141,7 +194,7 @@ export async function getEvent(
     console.warn("[getEvent] Edge function notice, falling back to direct DB:", edgeErr);
   }
 
-  // 2. Direct Supabase DB query fallback
+  // 3. Direct Supabase DB query fallback
   try {
     const { data: dbEvent, error: dbError } = await supabase
       .from("events")
@@ -169,7 +222,51 @@ export async function createEvent(
   studioId: string,
   payload: EventCreateInput,
 ): Promise<Event> {
-  // 1. Try edge function first
+  // 1. Primary: Server-side API route (handles studio lookup, default project creation & service-role insert)
+  try {
+    const accessToken = await getAccessToken();
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (accessToken) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+
+    const res = await fetch("/api/events", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        studio_id: studioId,
+        project_id: payload.projectId,
+        name: payload.name,
+        shoot_date: payload.shootDate,
+        start_time: payload.startTime ?? null,
+        end_time: payload.endTime ?? null,
+        venue: payload.venue ?? null,
+        location: payload.location ?? null,
+        timezone: payload.timezone ?? "Asia/Kolkata",
+        lead_photographer_id: payload.leadPhotographerId ?? null,
+        notes: payload.notes ?? null,
+        metadata: payload.metadata ?? {},
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json().catch(() => null);
+      if (data?.success && data?.data) {
+        return mapApiEvent(data.data as Record<string, unknown>);
+      }
+    } else {
+      const errData = await res.json().catch(() => null);
+      if (errData?.error) {
+        console.warn("[createEvent] API route error response:", errData.error);
+      }
+    }
+  } catch (apiErr) {
+    console.warn("[createEvent] API route notice, falling back:", apiErr);
+  }
+
+  // 2. Try edge function fallback
   try {
     const headers = await getHeaders(studioId);
     const { data, error } = await supabase.functions.invoke(
@@ -200,9 +297,9 @@ export async function createEvent(
     console.warn("[createEvent] Edge function notice, falling back to direct DB:", edgeErr);
   }
 
-  // 2. Direct Supabase DB insert fallback
+  // 3. Direct Supabase DB insert fallback
   try {
-    // 2.1 Calculate next event number for project
+    // 3.1 Calculate next event number for project
     let nextEventNumber = 1;
     try {
       const { data: existingEvents } = await supabase
@@ -479,7 +576,46 @@ export async function updateEvent(
   eventId: string,
   payload: EventUpdateInput,
 ): Promise<Event> {
-  // 1. Try edge function first
+  // 1. Primary: Server-side API route
+  try {
+    const accessToken = await getAccessToken();
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (accessToken) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+
+    const res = await fetch(`/api/events/${eventId}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({
+        studio_id: studioId,
+        name: payload.name,
+        shoot_date: payload.shootDate,
+        start_time: payload.startTime,
+        end_time: payload.endTime,
+        venue: payload.venue,
+        location: payload.location,
+        timezone: payload.timezone,
+        status: payload.status,
+        lead_photographer_id: payload.leadPhotographerId,
+        notes: payload.notes,
+        metadata: payload.metadata,
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json().catch(() => null);
+      if (data?.success && data?.data) {
+        return mapApiEvent(data.data as Record<string, unknown>);
+      }
+    }
+  } catch (apiErr) {
+    console.warn("[updateEvent] API route notice, falling back:", apiErr);
+  }
+
+  // 2. Try edge function fallback
   try {
     const headers = await getHeaders(studioId);
     const { data, error } = await supabase.functions.invoke(
@@ -511,7 +647,7 @@ export async function updateEvent(
     console.warn("[updateEvent] Edge function notice, falling back to direct DB:", edgeErr);
   }
 
-  // 2. Direct Supabase DB update fallback
+  // 3. Direct Supabase DB update fallback
   try {
     const updateFields: Record<string, unknown> = {
       updated_at: new Date().toISOString(),

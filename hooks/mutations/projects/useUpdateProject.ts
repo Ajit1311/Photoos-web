@@ -40,12 +40,16 @@ export function useUpdateProject() {
     UpdateProjectVariables
   >({
     mutationFn: async ({ projectId, payload }) => {
-      if (!studioId) {
-        throw new Error("Studio ID is required.");
-      }
+      const effectiveStudioId =
+        studioId ||
+        (typeof window !== "undefined"
+          ? localStorage.getItem("photoos_active_studio_id") ||
+            localStorage.getItem("photoos_studio_id") ||
+            ""
+          : "");
 
       return projectsRepository.update(
-        studioId,
+        effectiveStudioId,
         projectId,
         payload,
       );

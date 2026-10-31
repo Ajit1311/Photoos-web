@@ -130,9 +130,10 @@ const error =
 
       } else {
 
-        await createMutation.mutateAsync(
-          values,
-        );
+        await createMutation.mutateAsync({
+          ...values,
+          client_id: values.client_id ?? null,
+        });
 
         form.reset();
 

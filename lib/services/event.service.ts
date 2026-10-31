@@ -160,23 +160,6 @@ class EventService {
     data: EventWizardData,
   ): Promise<Event> {
 
-
-    // ------------------------------------------------------------------------
-    // Project validation
-    // ------------------------------------------------------------------------
-
-    if (
-      !data.projectId ||
-      !data.projectId.trim()
-    ) {
-
-      throw new Error(
-        "Project is required to create an event.",
-      );
-
-    }
-
-
     // ------------------------------------------------------------------------
     // Event title validation
     // ------------------------------------------------------------------------
@@ -259,23 +242,6 @@ class EventService {
   private mapWizardToCreateEvent(
     data: EventWizardData,
   ): EventCreateInput {
-
-
-    // ------------------------------------------------------------------------
-    // Required project
-    // ------------------------------------------------------------------------
-
-    if (
-      !data.projectId ||
-      !data.projectId.trim()
-    ) {
-
-      throw new Error(
-        "Project is required to create an event.",
-      );
-
-    }
-
 
     // ------------------------------------------------------------------------
     // Required event title

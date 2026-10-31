@@ -66,7 +66,37 @@ export async function getProjects(
 ): Promise<GetProjectsResponse> {
   const offset = (page - 1) * limit;
 
-  // 1. Try edge function first
+  // 1. Primary: Server-side API route
+  try {
+    const accessToken = await getAccessToken();
+    const headers: Record<string, string> = {};
+    if (accessToken) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+
+    const params = new URLSearchParams({
+      studioId: studioId || "",
+      page: String(page),
+      limit: String(limit),
+      search: search.trim(),
+    });
+
+    const res = await fetch(`/api/projects?${params.toString()}`, {
+      method: "GET",
+      headers,
+    });
+
+    if (res.ok) {
+      const data = await res.json().catch(() => null);
+      if (data?.success && data?.data) {
+        return data.data as GetProjectsResponse;
+      }
+    }
+  } catch (apiErr) {
+    console.warn("[getProjects] API route notice, falling back:", apiErr);
+  }
+
+  // 2. Try edge function fallback
   try {
     const headers = await getHeaders(studioId);
     const { data, error } = await supabase.functions.invoke(
@@ -106,7 +136,7 @@ export async function getProjects(
     console.warn("[getProjects] Edge function notice, falling back to direct DB:", edgeErr);
   }
 
-  // 2. Direct Supabase DB query fallback
+  // 3. Direct Supabase DB query fallback
   try {
     let query = supabase
       .from("projects")
@@ -141,7 +171,7 @@ export async function getProjects(
     console.warn("[getProjects] DB fallback error:", dbErr);
   }
 
-  // 3. Resilient empty state fallback
+  // 4. Resilient empty state fallback
   return {
     projects: [],
     pagination: {
@@ -162,7 +192,30 @@ export async function getProject(
   studioId: string,
   projectId: string,
 ): Promise<ProjectDto> {
-  // 1. Try edge function first
+  // 1. Primary: Server-side API route
+  try {
+    const accessToken = await getAccessToken();
+    const headers: Record<string, string> = {};
+    if (accessToken) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+
+    const res = await fetch(`/api/projects/${projectId}`, {
+      method: "GET",
+      headers,
+    });
+
+    if (res.ok) {
+      const data = await res.json().catch(() => null);
+      if (data?.success && data?.data) {
+        return data.data as ProjectDto;
+      }
+    }
+  } catch (apiErr) {
+    console.warn("[getProject] API route notice, falling back:", apiErr);
+  }
+
+  // 2. Try edge function fallback
   try {
     const headers = await getHeaders(studioId);
     const { data, error } = await supabase.functions.invoke(
@@ -183,7 +236,7 @@ export async function getProject(
     console.warn("[getProject] Edge function notice, falling back to direct DB:", edgeErr);
   }
 
-  // 2. Direct Supabase DB query fallback
+  // 3. Direct Supabase DB query fallback
   try {
     const { data: dbProject, error: dbError } = await supabase
       .from("projects")
@@ -211,7 +264,41 @@ export async function createProject(
   studioId: string,
   payload: CreateProjectRequest,
 ): Promise<ProjectDto> {
-  // 1. Try edge function first
+  // 1. Primary: Server-side API route (handles studio resolution, default client & service-role insert)
+  try {
+    const accessToken = await getAccessToken();
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (accessToken) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+
+    const res = await fetch("/api/projects", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        studio_id: studioId,
+        ...payload,
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json().catch(() => null);
+      if (data?.success && data?.data) {
+        return data.data as ProjectDto;
+      }
+    } else {
+      const errData = await res.json().catch(() => null);
+      if (errData?.error) {
+        console.warn("[createProject] API route error response:", errData.error);
+      }
+    }
+  } catch (apiErr) {
+    console.warn("[createProject] API route notice, falling back:", apiErr);
+  }
+
+  // 2. Try edge function fallback
   try {
     const headers = await getHeaders(studioId);
     const { data, error } = await supabase.functions.invoke(
@@ -230,7 +317,7 @@ export async function createProject(
     console.warn("[createProject] Edge function notice, falling back to direct DB:", edgeErr);
   }
 
-  // 2. Direct Supabase DB insert fallback
+  // 3. Direct Supabase DB insert fallback
   try {
     const randomPart = typeof crypto !== "undefined" && crypto.randomUUID
       ? crypto.randomUUID().slice(0, 8).toUpperCase()
@@ -278,7 +365,36 @@ export async function updateProject(
   projectId: string,
   payload: UpdateProjectRequest,
 ): Promise<ProjectDto> {
-  // 1. Try edge function first
+  // 1. Primary: Server-side API route
+  try {
+    const accessToken = await getAccessToken();
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (accessToken) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+
+    const res = await fetch(`/api/projects/${projectId}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({
+        studio_id: studioId,
+        ...payload,
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json().catch(() => null);
+      if (data?.success && data?.data) {
+        return data.data as ProjectDto;
+      }
+    }
+  } catch (apiErr) {
+    console.warn("[updateProject] API route notice, falling back:", apiErr);
+  }
+
+  // 2. Try edge function fallback
   try {
     const headers = await getHeaders(studioId);
     const { data, error } = await supabase.functions.invoke(
@@ -300,7 +416,7 @@ export async function updateProject(
     console.warn("[updateProject] Edge function notice, falling back to direct DB:", edgeErr);
   }
 
-  // 2. Direct Supabase DB update fallback
+  // 3. Direct Supabase DB update fallback
   try {
     const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString(),

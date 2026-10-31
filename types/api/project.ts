@@ -68,7 +68,7 @@ export type CreateProjectRequest = {
 
   priority?: string | null;
 
-  client_id: string;
+  client_id?: string | null;
 
   project_manager_id: string | null;
 
