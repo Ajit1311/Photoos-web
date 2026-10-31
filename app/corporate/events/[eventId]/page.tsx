@@ -256,13 +256,18 @@ export default function CorporateEventDetailsPage() {
         updateItem(item.id, { status: "processing", progress: 99 });
 
         // Step 4: Register photo metadata in corporate manifest
-        const finalUrl = photoUrl || uploadUrl.split("?")[0];
+        const safePhotoUrl =
+          photoUrl && !photoUrl.includes("127.0.0.1") && !photoUrl.includes("localhost") && !photoUrl.includes("/upload/sign/")
+            ? photoUrl
+            : `/api/corporate/photos/file?path=${encodeURIComponent(storagePath)}`;
+
         const newPhotoRecord: CorporatePhoto = {
           id: photoId || `cphoto_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
           event_id: eventId,
           name: item.file.name,
-          url: finalUrl,
-          thumbnail_url: finalUrl,
+          storage_path: storagePath,
+          url: safePhotoUrl,
+          thumbnail_url: safePhotoUrl,
           size_bytes: item.file.size,
           ai_faces_detected: Math.floor(1 + Math.random() * 3),
           uploaded_at: new Date().toISOString(),
@@ -843,6 +848,12 @@ export default function CorporateEventDetailsPage() {
                       <img
                         src={photo.thumbnail_url || photo.url}
                         alt={photo.name}
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          if (photo.storage_path && !target.src.includes("/api/corporate/photos/file")) {
+                            target.src = `/api/corporate/photos/file?path=${encodeURIComponent(photo.storage_path)}`;
+                          }
+                        }}
                         className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                       />
 
@@ -1390,8 +1401,14 @@ export default function CorporateEventDetailsPage() {
 
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={previewPhoto.url}
+                src={previewPhoto.url || previewPhoto.thumbnail_url}
                 alt={previewPhoto.name}
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (previewPhoto.storage_path && !target.src.includes("/api/corporate/photos/file")) {
+                    target.src = `/api/corporate/photos/file?path=${encodeURIComponent(previewPhoto.storage_path)}`;
+                  }
+                }}
                 className="max-h-[80vh] max-w-full rounded-xl object-contain shadow-2xl"
               />
 

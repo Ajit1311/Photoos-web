@@ -292,6 +292,7 @@ export type CorporatePhoto = {
   name: string;
   url: string;
   thumbnail_url: string;
+  storage_path?: string;
   size_bytes: number;
   width?: number;
   height?: number;

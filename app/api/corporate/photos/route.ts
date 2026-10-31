@@ -38,6 +38,51 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders });
 }
 
+async function resolvePhotoUrls(supabase: any, photo: any, eventId: string) {
+  let storagePath = photo.storage_path;
+  if (!storagePath && photo.url) {
+    const match = photo.url.match(/corporate\/[^?#]+/);
+    if (match) storagePath = match[0];
+  }
+  if (!storagePath && photo.name && photo.id) {
+    const cleanName = photo.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    storagePath = `corporate/${eventId}/photos/${photo.id}_${cleanName}`;
+  }
+
+  let resolvedUrl = photo.url || "";
+
+  if (storagePath) {
+    try {
+      const { data: signedData } = await supabase.storage
+        .from("assets")
+        .createSignedUrl(storagePath, 86400 * 30); // 30 days
+      if (
+        signedData?.signedUrl &&
+        !signedData.signedUrl.includes("127.0.0.1") &&
+        !signedData.signedUrl.includes("localhost")
+      ) {
+        resolvedUrl = signedData.signedUrl;
+      }
+    } catch {}
+
+    if (
+      !resolvedUrl ||
+      resolvedUrl.includes("127.0.0.1") ||
+      resolvedUrl.includes("localhost") ||
+      resolvedUrl.includes("/upload/sign/")
+    ) {
+      resolvedUrl = `/api/corporate/photos/file?path=${encodeURIComponent(storagePath)}`;
+    }
+  }
+
+  return {
+    ...photo,
+    storage_path: storagePath || photo.storage_path,
+    url: resolvedUrl,
+    thumbnail_url: resolvedUrl,
+  };
+}
+
 // GET /api/corporate/photos?eventId=...
 export async function GET(req: NextRequest) {
   try {
@@ -68,9 +113,14 @@ export async function GET(req: NextRequest) {
 
     const text = await fileData.text();
     const photos = JSON.parse(text);
+    const photoList = Array.isArray(photos) ? photos : [];
+
+    const resolvedPhotos = await Promise.all(
+      photoList.map((p: any) => resolvePhotoUrls(supabase, p, eventId))
+    );
 
     return NextResponse.json(
-      { success: true, photos: Array.isArray(photos) ? photos : [] },
+      { success: true, photos: resolvedPhotos },
       { status: 200, headers: corsHeaders }
     );
   } catch (err: any) {
@@ -142,8 +192,9 @@ export async function POST(req: NextRequest) {
       }
       for (const p of photoListToRegister) {
         if (p?.id) {
+          const resolvedP = await resolvePhotoUrls(supabase, p, eventId);
           photoMap.set(p.id, {
-            ...p,
+            ...resolvedP,
             event_id: eventId,
             company_id: companyId,
             uploaded_at: p.uploaded_at || new Date().toISOString(),
