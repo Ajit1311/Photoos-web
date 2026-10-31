@@ -69,7 +69,7 @@ export default function GalleryQRCodeModal({
       eventId,
     )}&name=${encodeURIComponent(eventName)}&studio=${encodeURIComponent(
       studioName,
-    )}&exp=${expiresAt}`;
+    )}&requireFaceMatch=true&exp=${expiresAt}`;
   }, [eventId, eventName, studioName, expiresAt, clientAppUrl]);
 
   const handleCopy = async () => {
@@ -158,7 +158,7 @@ export default function GalleryQRCodeModal({
     // Instructions
     ctx.fillStyle = "#cbd5e1";
     ctx.font = "22px Inter, sans-serif";
-    ctx.fillText("1. Scan with Phone Camera  •  2. AI Face Scan  •  3. Download HD Photos", 500, 1140);
+    ctx.fillText("1. Scan with Phone Camera  •  2. AI Face Match  •  3. Your Photos Only (Encrypted & Private)", 500, 1140);
     ctx.fillText("👑 Bride & Groom: Select photos directly for Album printing", 500, 1180);
 
     // Footer

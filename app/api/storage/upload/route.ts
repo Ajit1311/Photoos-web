@@ -52,6 +52,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Anti-Hacker Path Traversal & Injection Protection
+    if (path.includes("..") || path.startsWith("/") || path.startsWith("\\") || path.includes("\0")) {
+      return NextResponse.json(
+        { success: false, error: "Access Denied: Invalid storage path traversal detected." },
+        { status: 403, headers: corsHeaders }
+      );
+    }
+
     const supabaseAdmin = getServerSupabase();
 
     // Ensure bucket exists
@@ -93,3 +101,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+

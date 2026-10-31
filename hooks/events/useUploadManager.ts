@@ -638,175 +638,118 @@ export function useUploadManager() {
         isUploadingRef.current =
           true;
 
+        const CONCURRENCY = 4;
+        const queue = [...queuedItems];
+        const activeWorkers: Promise<void>[] = [];
 
-        try {
-          for (
-            const item of queuedItems
-          ) {
-            const controller =
-              new AbortController();
+        const worker = async () => {
+          while (queue.length > 0) {
+            const item = queue.shift();
+            if (!item) break;
 
-
-            abortControllersRef.current.set(
-              item.id,
-              controller,
-            );
-
+            const controller = new AbortController();
+            abortControllersRef.current.set(item.id, controller);
 
             dispatch({
-              type:
-                "START_UPLOAD",
-              payload:
-                item.id,
+              type: "START_UPLOAD",
+              payload: item.id,
             });
 
-
             try {
-              const result =
-                await uploadServiceRef.current.upload(
-                  {
-                    file:
-                      item.file,
-                    studioId,
-                    eventId,
-                    projectId,
-                    signal:
-                      controller.signal,
-                  },
-                  (
-                    progress,
-                  ) => {
-                    dispatch({
-                      type:
-                        "UPDATE_PROGRESS",
-                      payload: {
-                        id:
-                          item.id,
-                        progress:
-                          progress.progress,
-                        transferredBytes:
-                          progress.transferredBytes,
-                        totalBytes:
-                          progress.totalBytes,
-                      },
-                    });
-                  },
-                );
+              const result = await uploadServiceRef.current.upload(
+                {
+                  file: item.file,
+                  studioId,
+                  eventId,
+                  projectId,
+                  signal: controller.signal,
+                },
+                (progress) => {
+                  dispatch({
+                    type: "UPDATE_PROGRESS",
+                    payload: {
+                      id: item.id,
+                      progress: progress.progress,
+                      transferredBytes: progress.transferredBytes,
+                      totalBytes: progress.totalBytes,
+                    },
+                  });
+                },
+              );
 
-
-              if (
-                result.cancelled
-              ) {
+              if (result.cancelled) {
                 dispatch({
-                  type:
-                    "UPLOAD_CANCELLED",
-                  payload:
-                    item.id,
+                  type: "UPLOAD_CANCELLED",
+                  payload: item.id,
                 });
-
-                abortControllersRef.current.delete(
-                  item.id,
-                );
-
+                abortControllersRef.current.delete(item.id);
                 continue;
               }
 
-
-              if (
-                !result.success
-              ) {
+              if (!result.success) {
                 dispatch({
-                  type:
-                    "UPLOAD_FAILED",
+                  type: "UPLOAD_FAILED",
                   payload: {
-                    id:
-                      item.id,
-                    error:
-                      result.error ??
-                      "Upload failed.",
+                    id: item.id,
+                    error: result.error ?? "Upload failed.",
                   },
                 });
-
-                abortControllersRef.current.delete(
-                  item.id,
-                );
-
+                abortControllersRef.current.delete(item.id);
                 continue;
               }
 
-
               dispatch({
-                type:
-                  "SET_PROCESSING",
+                type: "SET_PROCESSING",
                 payload: {
-                  id:
-                    item.id,
-                  processingStatus:
-                    result.processingStatus ??
-                    "queued",
+                  id: item.id,
+                  processingStatus: result.processingStatus ?? "queued",
                 },
               });
 
-
               dispatch({
-                type:
-                  "UPLOAD_SUCCESS",
+                type: "UPLOAD_SUCCESS",
                 payload: {
-                  id:
-                    item.id,
-                  assetId:
-                    result.assetId,
-                  storagePath:
-                    result.storagePath,
-                  processingStatus:
-                    result.processingStatus,
+                  id: item.id,
+                  assetId: result.assetId,
+                  storagePath: result.storagePath,
+                  processingStatus: result.processingStatus,
                 },
               });
 
-
-              abortControllersRef.current.delete(
-                item.id,
-              );
-            } catch (
-              error
-            ) {
-              abortControllersRef.current.delete(
-                item.id,
-              );
-
+              abortControllersRef.current.delete(item.id);
+            } catch (error) {
+              abortControllersRef.current.delete(item.id);
 
               if (
-                error instanceof
-                  DOMException &&
-                error.name ===
-                  "AbortError"
+                error instanceof DOMException &&
+                error.name === "AbortError"
               ) {
                 dispatch({
-                  type:
-                    "UPLOAD_CANCELLED",
-                  payload:
-                    item.id,
+                  type: "UPLOAD_CANCELLED",
+                  payload: item.id,
                 });
-
                 continue;
               }
 
-
               dispatch({
-                type:
-                  "UPLOAD_FAILED",
+                type: "UPLOAD_FAILED",
                 payload: {
-                  id:
-                    item.id,
+                  id: item.id,
                   error:
-                    error instanceof
-                    Error
+                    error instanceof Error
                       ? error.message
                       : "Upload failed.",
                 },
               });
             }
           }
+        };
+
+        try {
+          for (let i = 0; i < Math.min(CONCURRENCY, queuedItems.length); i++) {
+            activeWorkers.push(worker());
+          }
+          await Promise.all(activeWorkers);
         } finally {
           isUploadingRef.current =
             false;

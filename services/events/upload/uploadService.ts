@@ -33,6 +33,8 @@ import {
   galleryService,
 } from "@/services/events/gallery.service";
 
+const resolvedAlbumCache = new Map<string, { album: { id: string }; projectId: string; studioId: string }>();
+
 export interface UploadProgress {
   progress: number;
 
@@ -317,85 +319,100 @@ export class UploadService {
       let studioId = request.studioId;
       let album: { id: string } | null = null;
 
-      // 1. Primary: Server-side event main album resolver
-      try {
-        const { getAccessToken } = await import("@/lib/auth/session");
-        const accessToken = await getAccessToken();
-        const headers: Record<string, string> = {};
-        if (accessToken) {
-          headers["Authorization"] = `Bearer ${accessToken}`;
-        }
-
-        const res = await fetch(`/api/events/${request.eventId}/main-album`, {
-          method: "GET",
-          headers,
-        });
-
-        if (res.ok) {
-          const json = await res.json().catch(() => null);
-          if (json?.success && json?.data?.album?.id) {
-            album = json.data.album;
-            if (json.data.projectId) projectId = json.data.projectId;
-            if (json.data.studioId) studioId = json.data.studioId;
+      const cachedAlbum = resolvedAlbumCache.get(request.eventId);
+      if (cachedAlbum?.album?.id) {
+        album = cachedAlbum.album;
+        if (cachedAlbum.projectId) projectId = cachedAlbum.projectId;
+        if (cachedAlbum.studioId) studioId = cachedAlbum.studioId;
+      } else {
+        // 1. Primary: Server-side event main album resolver
+        try {
+          const { getAccessToken } = await import("@/lib/auth/session");
+          const accessToken = await getAccessToken();
+          const headers: Record<string, string> = {};
+          if (accessToken) {
+            headers["Authorization"] = `Bearer ${accessToken}`;
           }
-        }
-      } catch (mainAlbumErr) {
-        console.warn("[uploadService] Server main album resolution notice:", mainAlbumErr);
-      }
 
-      // 2. Secondary: Fallback to getOrCreateMainAlbum / direct DB
-      if (!album?.id) {
-        if (!projectId || !studioId || projectId === request.eventId) {
-          const { supabase } = await import("@/lib/supabase/client");
-          const { data: ev } = await supabase
-            .from("events")
-            .select("project_id, studio_id")
-            .eq("id", request.eventId)
-            .maybeSingle();
-          if (ev) {
-            projectId = ev.project_id || projectId;
-            studioId = ev.studio_id || studioId;
+          const res = await fetch(`/api/events/${request.eventId}/main-album`, {
+            method: "GET",
+            headers,
+          });
+
+          if (res.ok) {
+            const json = await res.json().catch(() => null);
+            if (json?.success && json?.data?.album?.id) {
+              album = json.data.album;
+              if (json.data.projectId) projectId = json.data.projectId;
+              if (json.data.studioId) studioId = json.data.studioId;
+            }
           }
+        } catch (mainAlbumErr) {
+          console.warn("[uploadService] Server main album resolution notice:", mainAlbumErr);
         }
 
-        if (projectId && studioId && projectId !== request.eventId) {
-          try {
-            album = await getOrCreateMainAlbum(studioId, projectId);
-          } catch (albumErr) {
-            console.warn("[uploadService] getOrCreateMainAlbum notice:", albumErr);
-          }
-        }
-
-        if (!album?.id && projectId && studioId && projectId !== request.eventId) {
-          const { supabase } = await import("@/lib/supabase/client");
-          const { data: existingAlbum } = await supabase
-            .from("albums")
-            .select("id")
-            .eq("project_id", projectId)
-            .maybeSingle();
-
-          if (existingAlbum?.id) {
-            album = existingAlbum;
-          } else {
-            const randomCode = `ALB_${Date.now().toString(36).toUpperCase()}`;
-            const slug = `main-album-${request.eventId.slice(0, 8)}-${Date.now().toString(36)}`;
-            const { data: createdAlbum } = await supabase
-              .from("albums")
-              .insert({
-                studio_id: studioId,
-                project_id: projectId,
-                title: "Main Album",
-                slug: slug,
-                code: randomCode,
-                sequence: 1,
-                album_type: "standard",
-                visibility: "private",
-                status: "active",
-              })
-              .select("id")
+        // 2. Secondary: Fallback to getOrCreateMainAlbum / direct DB
+        if (!album?.id) {
+          if (!projectId || !studioId || projectId === request.eventId) {
+            const { supabase } = await import("@/lib/supabase/client");
+            const { data: ev } = await supabase
+              .from("events")
+              .select("project_id, studio_id")
+              .eq("id", request.eventId)
               .maybeSingle();
-            album = createdAlbum;
+            if (ev) {
+              projectId = ev.project_id || projectId;
+              studioId = ev.studio_id || studioId;
+            }
           }
+
+          if (projectId && studioId && projectId !== request.eventId) {
+            try {
+              album = await getOrCreateMainAlbum(studioId, projectId);
+            } catch (albumErr) {
+              console.warn("[uploadService] getOrCreateMainAlbum notice:", albumErr);
+            }
+          }
+
+          if (!album?.id && projectId && studioId && projectId !== request.eventId) {
+            const { supabase } = await import("@/lib/supabase/client");
+            const { data: existingAlbum } = await supabase
+              .from("albums")
+              .select("id")
+              .eq("project_id", projectId)
+              .maybeSingle();
+
+            if (existingAlbum?.id) {
+              album = existingAlbum;
+            } else {
+              const randomCode = `ALB_${Date.now().toString(36).toUpperCase()}`;
+              const slug = `main-album-${request.eventId.slice(0, 8)}-${Date.now().toString(36)}`;
+              const { data: createdAlbum } = await supabase
+                .from("albums")
+                .insert({
+                  studio_id: studioId,
+                  project_id: projectId,
+                  title: "Main Album",
+                  slug: slug,
+                  code: randomCode,
+                  sequence: 1,
+                  album_type: "standard",
+                  visibility: "private",
+                  status: "active",
+                })
+                .select("id")
+                .maybeSingle();
+              album = createdAlbum;
+            }
+          }
+        }
+
+        if (album?.id) {
+          resolvedAlbumCache.set(request.eventId, {
+            album,
+            projectId: projectId || request.projectId,
+            studioId: studioId || request.studioId,
+          });
         }
       }
 

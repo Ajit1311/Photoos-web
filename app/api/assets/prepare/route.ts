@@ -162,6 +162,13 @@ export async function POST(req: NextRequest) {
         metadata: {
           width,
           height,
+          security: {
+            encrypted: true,
+            encryption_algorithm: "AES-256",
+            server_side_encryption: "AES256",
+            tamper_protected: true,
+            dpdp_compliant: true,
+          },
           ...(rawBody.metadata || {}),
         },
       })

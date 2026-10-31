@@ -290,6 +290,7 @@ useEffect(() => {
 
       if (hasCompleted) {
         void refresh();
+        setIsQRModalOpen(true);
       }
     }
 
