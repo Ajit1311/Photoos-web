@@ -9,7 +9,10 @@ export function useStudioId() {
 
   const [fallbackStudioId, setFallbackStudioId] = useState<string | null>(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("photoos_active_studio_id");
+      return (
+        localStorage.getItem("photoos_active_studio_id") ||
+        localStorage.getItem("photoos_studio_id")
+      );
     }
     return null;
   });
@@ -26,12 +29,14 @@ export function useStudioId() {
   useEffect(() => {
     if (resolvedStudioId && typeof window !== "undefined") {
       localStorage.setItem("photoos_active_studio_id", resolvedStudioId);
+      localStorage.setItem("photoos_studio_id", resolvedStudioId);
     } else if (!resolvedStudioId && !loading) {
       void resolveUserStudio().then((res) => {
         if (res?.studioId) {
           setFallbackStudioId(res.studioId);
           if (typeof window !== "undefined") {
             localStorage.setItem("photoos_active_studio_id", res.studioId);
+            localStorage.setItem("photoos_studio_id", res.studioId);
           }
         }
       });

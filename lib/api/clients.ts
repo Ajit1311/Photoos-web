@@ -9,36 +9,20 @@ import type {
   UpdateClientRequest,
 } from "@/types/api/client";
 
-
-const LIST_FUNCTION =
-  "client-list-worker";
-
-
-const GET_FUNCTION =
-  "client-get-worker";
-
-
-const CREATE_FUNCTION =
-  "client-create-worker";
-
-
-const UPDATE_FUNCTION =
-  "client-update-worker";
-
+const LIST_FUNCTION = "client-list-worker";
+const GET_FUNCTION = "client-get-worker";
+const CREATE_FUNCTION = "client-create-worker";
+const UPDATE_FUNCTION = "client-update-worker";
 
 type ClientListWorkerItem = {
   client: ClientDto;
-
   projects_count: number;
 };
 
-
 type ClientListWorkerResponse = {
   total: number;
-
   clients: ClientListWorkerItem[];
 };
-
 
 export async function getClients(
   studioId: string,
@@ -48,10 +32,39 @@ export async function getClients(
 ): Promise<ClientListResponse> {
   const offset = (page - 1) * limit;
 
-  // 1. Try edge function first if token is available
+  // 1. Primary: Server-side API route
   try {
     const accessToken = await getAccessToken();
+    const headers: Record<string, string> = {};
+    if (accessToken) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
 
+    const params = new URLSearchParams({
+      studioId: studioId || "",
+      page: String(page),
+      limit: String(limit),
+      search: search.trim(),
+    });
+
+    const res = await fetch(`/api/clients?${params.toString()}`, {
+      method: "GET",
+      headers,
+    });
+
+    if (res.ok) {
+      const data = await res.json().catch(() => null);
+      if (data?.success && data?.data) {
+        return data.data as ClientListResponse;
+      }
+    }
+  } catch (apiErr) {
+    console.warn("[getClients] API route notice, falling back:", apiErr);
+  }
+
+  // 2. Fallback: Edge function
+  try {
+    const accessToken = await getAccessToken();
     if (accessToken) {
       const { data, error } = await supabase.functions.invoke(
         LIST_FUNCTION,
@@ -98,7 +111,7 @@ export async function getClients(
     console.warn("[getClients] Edge function notice, falling back to direct DB:", edgeErr);
   }
 
-  // 2. Direct Supabase DB query fallback
+  // 3. Fallback: Direct Supabase DB query
   try {
     let query = supabase
       .from("clients")
@@ -139,7 +152,6 @@ export async function getClients(
     console.warn("[getClients] DB fallback error:", dbErr);
   }
 
-  // 3. Resilient empty state fallback
   return {
     clients: [],
     pagination: {
@@ -155,7 +167,30 @@ export async function getClient(
   studioId: string,
   clientId: string,
 ): Promise<ClientDetailsResponse> {
-  // 1. Try edge function first
+  // 1. Primary: Server-side API route
+  try {
+    const accessToken = await getAccessToken();
+    const headers: Record<string, string> = {};
+    if (accessToken) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+
+    const res = await fetch(`/api/clients/${encodeURIComponent(clientId)}`, {
+      method: "GET",
+      headers,
+    });
+
+    if (res.ok) {
+      const data = await res.json().catch(() => null);
+      if (data?.success && data?.data) {
+        return data.data as ClientDetailsResponse;
+      }
+    }
+  } catch (apiErr) {
+    console.warn("[getClient] API route notice, falling back:", apiErr);
+  }
+
+  // 2. Fallback: Edge function
   try {
     const accessToken = await getAccessToken();
     if (accessToken) {
@@ -181,7 +216,7 @@ export async function getClient(
     console.warn("[getClient] Edge function notice, falling back to direct DB:", edgeErr);
   }
 
-  // 2. Direct Supabase DB query fallback
+  // 3. Fallback: Direct Supabase DB query
   try {
     const { data: dbClient, error: dbError } = await supabase
       .from("clients")
@@ -209,12 +244,55 @@ export async function getClient(
   throw new Error("Client not found.");
 }
 
-
 export async function createClient(
   studioId: string,
   payload: CreateClientRequest,
 ): Promise<ClientDto> {
-  // 1. Try edge function first
+  let lastError: string | null = null;
+
+  // 1. Primary: Server-side API route (resolves studio, handles service role, bypasses RLS)
+  try {
+    const accessToken = await getAccessToken();
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (accessToken) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+
+    const res = await fetch("/api/clients", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        studio_id: studioId,
+        ...payload,
+      }),
+    });
+
+    const data = await res.json().catch(() => null);
+
+    if (res.ok && data?.success && data?.data) {
+      if (data?.studio_id && typeof window !== "undefined") {
+        localStorage.setItem("photoos_active_studio_id", data.studio_id);
+        localStorage.setItem("photoos_studio_id", data.studio_id);
+      }
+      return data.data as ClientDto;
+    }
+
+    if (data?.error) {
+      if (res.status === 409) {
+        throw new Error(data.error);
+      }
+      lastError = data.error;
+    }
+  } catch (apiErr: any) {
+    if (apiErr?.message && apiErr.message.includes("already exists")) {
+      throw apiErr;
+    }
+    console.warn("[createClient] API route notice, trying fallbacks:", apiErr);
+  }
+
+  // 2. Fallback: Edge function
   try {
     const accessToken = await getAccessToken();
     const { data, error } = await supabase.functions.invoke(
@@ -232,11 +310,18 @@ export async function createClient(
     if (!error && data?.success && data?.data) {
       return data.data as ClientDto;
     }
-  } catch (edgeErr) {
+
+    if (error?.message) {
+      lastError = error.message;
+    }
+  } catch (edgeErr: any) {
     console.warn("[createClient] Edge function notice, falling back to direct DB:", edgeErr);
+    if (edgeErr?.message) {
+      lastError = edgeErr.message;
+    }
   }
 
-  // 2. Direct Supabase DB insert fallback
+  // 3. Fallback: Direct Supabase DB insert
   try {
     const randomPart = typeof crypto !== "undefined" && crypto.randomUUID
       ? crypto.randomUUID().slice(0, 8).toUpperCase()
@@ -263,20 +348,52 @@ export async function createClient(
     if (!dbError && newClient) {
       return newClient as ClientDto;
     }
-  } catch (dbErr) {
+
+    if (dbError?.message) {
+      lastError = dbError.message;
+    }
+  } catch (dbErr: any) {
     console.warn("[createClient] DB fallback error:", dbErr);
+    if (dbErr?.message) {
+      lastError = dbErr.message;
+    }
   }
 
-  throw new Error("Failed to create client.");
+  throw new Error(lastError || "Failed to create client.");
 }
-
 
 export async function updateClient(
   studioId: string,
   clientId: string,
   payload: UpdateClientRequest,
 ): Promise<ClientDto> {
-  // 1. Try edge function first
+  // 1. Primary: Server-side API route
+  try {
+    const accessToken = await getAccessToken();
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (accessToken) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+
+    const res = await fetch(`/api/clients/${encodeURIComponent(clientId)}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok) {
+      const data = await res.json().catch(() => null);
+      if (data?.success && data?.data) {
+        return data.data as ClientDto;
+      }
+    }
+  } catch (apiErr) {
+    console.warn("[updateClient] API route notice, falling back:", apiErr);
+  }
+
+  // 2. Fallback: Edge function
   try {
     const accessToken = await getAccessToken();
     const { data, error } = await supabase.functions.invoke(
@@ -301,7 +418,7 @@ export async function updateClient(
     console.warn("[updateClient] Edge function notice, falling back to direct DB:", edgeErr);
   }
 
-  // 2. Direct Supabase DB update fallback
+  // 3. Fallback: Direct Supabase DB update
   try {
     const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString(),

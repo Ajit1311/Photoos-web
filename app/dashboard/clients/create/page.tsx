@@ -198,12 +198,13 @@ export default function CreateClientPage() {
     // PHONE
     // -------------------------------------------------------------------------
 
+    const sanitizedPhone = cleanPhone.replace(/^(\+91|0)/, "").replace(/[\s-]/g, "");
     if (!cleanPhone) {
       nextErrors.phone =
         "Phone number is required.";
     } else if (
       !/^[6-9]\d{9}$/.test(
-        cleanPhone,
+        sanitizedPhone,
       )
     ) {
       nextErrors.phone =
@@ -256,12 +257,13 @@ export default function CreateClientPage() {
       mutationFn:
         async () => {
 
-          if (!studioId) {
-            throw new Error(
-              "Studio ID is missing.",
-            );
-          }
-
+          const effectiveStudioId =
+            studioId ||
+            (typeof window !== "undefined"
+              ? localStorage.getItem("photoos_active_studio_id") ||
+                localStorage.getItem("photoos_studio_id")
+              : null) ||
+            "active";
 
           const cleanFirstName =
             firstName.trim();
@@ -277,6 +279,9 @@ export default function CreateClientPage() {
 
           const cleanPhone =
             phone.trim();
+
+          const sanitizedPhone =
+            cleanPhone.replace(/^(\+91|0)/, "").replace(/[\s-]/g, "");
 
           const cleanEmail =
             email.trim();
@@ -310,7 +315,7 @@ export default function CreateClientPage() {
           // -------------------------------------------------------------------
 
           return clientsRepository.create(
-            studioId,
+            effectiveStudioId,
             {
               display_name:
                 cleanDisplayName,
@@ -326,6 +331,7 @@ export default function CreateClientPage() {
                 undefined,
 
               phone:
+                sanitizedPhone ||
                 cleanPhone,
 
               email:
