@@ -666,7 +666,7 @@ export default function UserProfile() {
               <p className="truncate text-sm text-slate-500">
 
                 {studioProfile?.contact_email ??
-                  bootstrap.data?.user.email ??
+                  bootstrap.data?.user?.email ??
                   "No email available"}
 
               </p>

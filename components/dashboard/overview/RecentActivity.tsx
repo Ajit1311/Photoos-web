@@ -304,7 +304,7 @@ export default function RecentActivity() {
 
         {!loading &&
           !error &&
-          activities.map(
+          activities.filter((a) => Boolean(a && a.id)).map(
             (activity) => {
 
               const Icon =

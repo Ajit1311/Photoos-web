@@ -22,6 +22,10 @@ export function usePlatformAdminStatus() {
   const bootstrap =
     useBootstrapContext();
 
+  const userId =
+    bootstrap.data?.user?.id ??
+    bootstrap.data?.profile?.id ??
+    null;
 
   const query =
     useAppQuery<
@@ -32,8 +36,7 @@ export function usePlatformAdminStatus() {
       queryKey:
         [
           "platform-admin-status",
-          bootstrap.data?.user.id ??
-          null,
+          userId,
         ],
 
       queryFn:
@@ -85,9 +88,7 @@ export function usePlatformAdminStatus() {
         },
 
       enabled:
-        Boolean(
-          bootstrap.data?.user.id,
-        ) &&
+        Boolean(userId) &&
         !bootstrap.loading,
 
       retry:
@@ -103,9 +104,7 @@ export function usePlatformAdminStatus() {
       true,
 
     loading:
-      Boolean(
-        bootstrap.data?.user.id,
-      ) &&
+      Boolean(userId) &&
       !bootstrap.loading &&
       query.isPending,
 

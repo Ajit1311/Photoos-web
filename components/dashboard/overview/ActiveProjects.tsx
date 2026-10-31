@@ -191,7 +191,7 @@ export default function ActiveProjects() {
                 <div className="space-y-5">
 
                   {
-                    projects.map(
+                    projects.filter((p) => Boolean(p && p.id)).map(
                       (
                         project,
                       ) => (

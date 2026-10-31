@@ -98,6 +98,10 @@ class BootstrapRepository {
       return {
         success: true,
         bootstrapRequired: true,
+        user: {
+          id: userId,
+          email: session.user.email ?? null,
+        },
         profile: {
           id: userId,
           fullName: session.user.user_metadata?.full_name ?? "PhotoOS User",
@@ -119,6 +123,10 @@ class BootstrapRepository {
     return {
       success: true,
       bootstrapRequired: false,
+      user: {
+        id: userId,
+        email: session.user.email ?? null,
+      },
       profile: {
         id: userId,
         fullName: session.user.user_metadata?.full_name ?? "PhotoOS User",
