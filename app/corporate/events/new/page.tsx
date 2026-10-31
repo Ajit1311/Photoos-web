@@ -85,10 +85,10 @@ export default function CreateCorporateEventPage() {
           Back to Events
         </Link>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-8 shadow-[0_1px_3px_rgba(0,0,0,0.04)] dark:border-slate-800 dark:bg-slate-900/90">
           <div className="mb-6">
-            <div className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-3 py-1 text-xs font-semibold text-sky-600 dark:text-sky-400 mb-2">
-              <Sparkles className="h-3 w-3" />
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-300 mb-2">
+              <CalendarDays className="h-3.5 w-3.5 text-slate-500" />
               New Corporate Gathering
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
@@ -100,7 +100,7 @@ export default function CreateCorporateEventPage() {
           </div>
 
           {error && (
-            <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
+            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-400">
               {error}
             </div>
           )}
@@ -116,7 +116,7 @@ export default function CreateCorporateEventPage() {
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Annual Day & Excellence Awards 2026"
                 required
-                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3.5 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3.5 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white focus:border-[#0A3F61] focus:outline-none focus:ring-1 focus:ring-[#0A3F61]"
               />
             </div>
 
@@ -128,7 +128,7 @@ export default function CreateCorporateEventPage() {
                 <select
                   value={eventType}
                   onChange={(e) => setEventType(e.target.value as any)}
-                  className="w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3.5 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  className="w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3.5 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white focus:border-[#0A3F61] focus:outline-none focus:ring-1 focus:ring-[#0A3F61]"
                 >
                   <option value="Townhall">Townhall / All-Hands</option>
                   <option value="Annual Day">Annual Corporate Day</option>
@@ -151,7 +151,7 @@ export default function CreateCorporateEventPage() {
                     type="date"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white focus:border-[#0A3F61] focus:outline-none focus:ring-1 focus:ring-[#0A3F61]"
                   />
                 </div>
               </div>
@@ -169,7 +169,7 @@ export default function CreateCorporateEventPage() {
                   onChange={(e) => setLocation(e.target.value)}
                   placeholder="e.g. Main Auditorium, BKC Office or Grand Hyatt Ballroom"
                   required
-                  className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white focus:border-[#0A3F61] focus:outline-none focus:ring-1 focus:ring-[#0A3F61]"
                 />
               </div>
             </div>
@@ -183,7 +183,7 @@ export default function CreateCorporateEventPage() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Brief summary of the corporate celebration..."
-                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3.5 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3.5 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white focus:border-[#0A3F61] focus:outline-none focus:ring-1 focus:ring-[#0A3F61]"
               />
             </div>
 
@@ -198,7 +198,7 @@ export default function CreateCorporateEventPage() {
                   value={coverImageUrl}
                   onChange={(e) => setCoverImageUrl(e.target.value)}
                   placeholder="https://..."
-                  className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white focus:border-[#0A3F61] focus:outline-none focus:ring-1 focus:ring-[#0A3F61]"
                 />
               </div>
             </div>

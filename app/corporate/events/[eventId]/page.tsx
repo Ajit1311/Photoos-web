@@ -274,15 +274,9 @@ export default function CorporateEventDetailsPage() {
         };
 
         const compId = company?.id || "corporate";
-        await fetch("/api/corporate/photos", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            eventId,
-            companyId: compId,
-            photo: newPhotoRecord,
-          }),
-        });
+
+        // CRITICAL PERSISTENCE: Save photo immediately to LocalStorage and trigger sync via saveCorporatePhotos
+        await saveCorporatePhotos(compId, eventId, [newPhotoRecord]);
 
         // Step 5: Mark Completed
         updateItem(item.id, {
@@ -591,41 +585,41 @@ export default function CorporateEventDetailsPage() {
         <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
           <Link
             href="/corporate/events"
-            className="inline-flex items-center gap-1 hover:text-[#0A3F61] dark:hover:text-sky-400"
+            className="inline-flex items-center gap-1 hover:text-slate-900 dark:hover:text-white transition-colors"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             Corporate Events
           </Link>
-          <span>/</span>
-          <span className="font-semibold text-slate-900 dark:text-white truncate">
+          <span className="text-slate-300 dark:text-slate-600">/</span>
+          <span className="font-medium text-slate-800 dark:text-slate-200 truncate">
             {event?.name}
           </span>
         </div>
 
         {/* Event Workspace Header Banner */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900 shadow-xs">
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-6 dark:border-slate-800 dark:bg-slate-900/90 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
-              <div className="flex flex-wrap items-center gap-2 mb-2">
-                <span className="rounded bg-sky-100 px-2.5 py-0.5 text-xs font-bold text-sky-800 dark:bg-sky-950 dark:text-sky-300">
+              <div className="flex flex-wrap items-center gap-2.5 mb-2.5">
+                <span className="rounded-full border border-slate-200/80 bg-slate-50 px-3 py-0.5 text-xs font-medium text-slate-700 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-300">
                   {event?.event_type}
                 </span>
-                <span className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                   <CalendarDays className="h-3.5 w-3.5 text-slate-400" />
                   {event?.date}
                 </span>
-                <span className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                   <MapPin className="h-3.5 w-3.5 text-slate-400" />
                   {event?.location}
                 </span>
               </div>
 
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
                 {event?.name}
               </h1>
 
               {event?.description && (
-                <p className="mt-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-2xl">
+                <p className="mt-1.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-2xl leading-relaxed">
                   {event.description}
                 </p>
               )}
@@ -636,59 +630,56 @@ export default function CorporateEventDetailsPage() {
               <button
                 type="button"
                 onClick={() => setActiveTab("qrcode")}
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 shadow-xs"
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-800/80 dark:text-slate-300 shadow-xs transition-colors"
               >
-                <QrCode className="h-4 w-4 text-indigo-500" />
-                Event Standee QR
+                <QrCode className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                Standee QR
               </button>
 
               <Link
                 href={`/gallery/${eventId}/access`}
                 target="_blank"
-                className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300 shadow-xs"
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-800/80 dark:text-slate-300 shadow-xs transition-colors"
               >
-                <ExternalLink className="h-4 w-4" />
-                Attendee Mobile View
+                <ExternalLink className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                Mobile View
               </Link>
 
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="inline-flex items-center gap-2 rounded-xl bg-[#0A3F61] px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#072c44] transition-all"
+                className="inline-flex items-center gap-2 rounded-xl bg-[#0A3F61] px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#072c44] transition-all"
               >
                 <UploadCloud className="h-4 w-4" />
                 <span>Upload Photos</span>
-                <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold">
-                  Direct Storage
-                </span>
               </button>
             </div>
           </div>
 
           {/* Quick Metrics Strip */}
-          <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800/80 grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div>
-              <span className="text-[11px] font-medium text-slate-400">Total Uploaded Photos</span>
-              <p className="text-xl font-bold text-slate-900 dark:text-white">
+              <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Total Photos</span>
+              <p className="text-xl font-bold text-slate-900 dark:text-white mt-0.5">
                 {photos.length}
               </p>
             </div>
             <div>
-              <span className="text-[11px] font-medium text-slate-400">AI Faces Indexed</span>
-              <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+              <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">AI Faces Indexed</span>
+              <p className="text-xl font-bold text-slate-900 dark:text-white mt-0.5">
                 {photos.reduce((acc, p) => acc + (p.ai_faces_detected || 1), 0)}
               </p>
             </div>
             <div>
-              <span className="text-[11px] font-medium text-slate-400">Storage Architecture</span>
-              <p className="text-xl font-bold text-[#0A3F61] dark:text-sky-400">
-                Supabase Direct
+              <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Storage Architecture</span>
+              <p className="text-xl font-bold text-slate-800 dark:text-slate-200 mt-0.5">
+                Encrypted Cloud
               </p>
             </div>
             <div>
-              <span className="text-[11px] font-medium text-slate-400">Download Permissions</span>
-              <p className="text-xl font-bold text-slate-900 dark:text-white">
-                Enabled
+              <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Download Access</span>
+              <p className="text-xl font-bold text-slate-900 dark:text-white mt-0.5">
+                High-Resolution
               </p>
             </div>
           </div>
@@ -700,10 +691,10 @@ export default function CorporateEventDetailsPage() {
             type="button"
             onClick={() => setActiveTab("photos")}
             className={[
-              "flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 transition-all",
+              "flex items-center gap-2 py-3 px-4 text-xs font-semibold border-b-2 transition-all",
               activeTab === "photos"
-                ? "border-[#0A3F61] text-[#0A3F61] dark:border-sky-400 dark:text-sky-400"
-                : "border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white",
+                ? "border-[#0A3F61] text-[#0A3F61] dark:border-slate-200 dark:text-white"
+                : "border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200",
             ].join(" ")}
           >
             <ImageIcon className="h-4 w-4" />
@@ -714,10 +705,10 @@ export default function CorporateEventDetailsPage() {
             type="button"
             onClick={() => setActiveTab("qrcode")}
             className={[
-              "flex items-center gap-2 py-3 px-4 text-xs font-bold border-b-2 transition-all",
+              "flex items-center gap-2 py-3 px-4 text-xs font-semibold border-b-2 transition-all",
               activeTab === "qrcode"
-                ? "border-[#0A3F61] text-[#0A3F61] dark:border-sky-400 dark:text-sky-400"
-                : "border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white",
+                ? "border-[#0A3F61] text-[#0A3F61] dark:border-slate-200 dark:text-white"
+                : "border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200",
             ].join(" ")}
           >
             <QrCode className="h-4 w-4" />
@@ -776,24 +767,24 @@ export default function CorporateEventDetailsPage() {
               className={[
                 "rounded-2xl border-2 border-dashed p-8 text-center transition-all cursor-pointer group",
                 isDragOver
-                  ? "border-[#0A3F61] bg-sky-50/60 dark:border-sky-400 dark:bg-sky-950/20 scale-[0.99]"
-                  : "border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-[#0A3F61] dark:hover:border-sky-500",
+                  ? "border-[#0A3F61] bg-slate-100/80 dark:border-slate-400 dark:bg-slate-800/40 scale-[0.99]"
+                  : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 hover:border-slate-300 dark:hover:border-slate-700",
               ].join(" ")}
               onClick={() => fileInputRef.current?.click()}
             >
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-50 text-[#0A3F61] group-hover:scale-110 dark:bg-slate-800 dark:text-sky-400 transition-transform mb-3">
-                <UploadCloud className="h-7 w-7" />
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white border border-slate-200 text-slate-700 group-hover:scale-105 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 transition-transform mb-3 shadow-xs">
+                <UploadCloud className="h-6 w-6" />
               </div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Drag & Drop Event Photos or Click to Upload
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+                Drag & drop photos here or click to browse
               </h3>
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-                Studio-grade direct upload straight into Supabase Storage. Supports JPG, PNG, WEBP, HEIC, and RAW files.
+                Studio-grade direct upload with automatic facial indexing. Supports JPG, PNG, WEBP, and RAW formats.
               </p>
               <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
-                <span className="inline-flex items-center gap-2 rounded-xl bg-[#0A3F61] px-5 py-2.5 text-xs font-bold text-white shadow-xs group-hover:bg-[#072c44] transition-colors">
+                <span className="inline-flex items-center gap-2 rounded-xl bg-[#0A3F61] px-5 py-2.5 text-xs font-semibold text-white shadow-xs group-hover:bg-[#072c44] transition-colors">
                   <UploadCloud className="h-4 w-4" />
-                  Select Multiple Photos
+                  Select Photos to Upload
                 </span>
                 {uploadItems.length > 0 && !uploadPanelOpen && (
                   <button
@@ -803,7 +794,7 @@ export default function CorporateEventDetailsPage() {
                       setUploadPanelOpen(true);
                       setUploadPanelMinimized(false);
                     }}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 transition-colors"
                   >
                     View Upload Queue ({completedCount}/{uploadItems.length})
                   </button>
@@ -813,11 +804,11 @@ export default function CorporateEventDetailsPage() {
 
             {/* Photos Gallery Grid */}
             {photos.length === 0 ? (
-              <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center dark:border-slate-800 dark:bg-slate-900">
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-12 text-center dark:border-slate-800 dark:bg-slate-900/60">
                 <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-400 dark:bg-slate-800 mb-3">
                   <ImageIcon className="h-6 w-6" />
                 </div>
-                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                <h4 className="text-sm font-semibold text-slate-900 dark:text-white">
                   No Photos Uploaded Yet
                 </h4>
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
@@ -831,7 +822,7 @@ export default function CorporateEventDetailsPage() {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="text-[#0A3F61] dark:text-sky-400 font-bold hover:underline"
+                    className="text-[#0A3F61] dark:text-slate-300 font-semibold hover:underline"
                   >
                     + Add More Photos
                   </button>
@@ -841,7 +832,7 @@ export default function CorporateEventDetailsPage() {
                   {photos.map((photo) => (
                     <div
                       key={photo.id}
-                      className="group relative aspect-square rounded-xl bg-slate-100 dark:bg-slate-800 overflow-hidden border border-slate-200 dark:border-slate-700 shadow-xs"
+                      className="group relative aspect-square rounded-xl bg-slate-100 dark:bg-slate-800 overflow-hidden border border-slate-200/80 dark:border-slate-800 shadow-xs"
                     >
                       {/* Thumbnail Image */}
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -858,17 +849,17 @@ export default function CorporateEventDetailsPage() {
                       />
 
                       {/* Face badge */}
-                      <div className="absolute top-2 left-2 rounded bg-black/60 backdrop-blur px-1.5 py-0.5 text-[9px] font-bold text-emerald-300 flex items-center gap-1">
-                        <ScanFace className="h-2.5 w-2.5" />
+                      <div className="absolute top-2 left-2 rounded-md bg-slate-950/70 backdrop-blur-md px-2 py-0.5 text-[10px] font-medium text-slate-200 border border-white/10 flex items-center gap-1">
+                        <ScanFace className="h-2.5 w-2.5 text-slate-300" />
                         <span>{photo.ai_faces_detected || 1} Faces</span>
                       </div>
 
                       {/* Hover Overlay with View & Delete Actions */}
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
+                      <div className="absolute inset-0 bg-slate-950/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
                         <button
                           type="button"
                           onClick={() => setPreviewPhoto(photo)}
-                          className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/90 text-slate-900 hover:bg-white shadow transition-all"
+                          className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/95 text-slate-900 hover:bg-white shadow transition-all"
                           title="Preview Full Size"
                         >
                           <Eye className="h-4 w-4" />
@@ -890,7 +881,7 @@ export default function CorporateEventDetailsPage() {
                       </div>
 
                       {/* Bottom photo name bar */}
-                      <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-1.5 text-[10px] text-white truncate pointer-events-none">
+                      <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-slate-950/80 to-transparent p-1.5 text-[10px] text-white truncate pointer-events-none">
                         {photo.name}
                       </div>
                     </div>

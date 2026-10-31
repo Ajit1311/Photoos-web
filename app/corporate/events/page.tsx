@@ -122,13 +122,13 @@ export default function CorporateEventsListPage() {
                   )}
 
                   <div className="absolute top-3 left-3">
-                    <span className="rounded-lg bg-slate-900/80 backdrop-blur px-2.5 py-1 text-[10px] font-bold text-sky-300 border border-white/10">
+                    <span className="rounded-md bg-slate-950/70 backdrop-blur-md px-2.5 py-1 text-[10px] font-medium text-slate-200 border border-white/10">
                       {ev.event_type}
                     </span>
                   </div>
 
                   <div className="absolute bottom-3 right-3">
-                    <span className="rounded-lg bg-slate-900/80 backdrop-blur px-2.5 py-1 text-[10px] font-bold text-white border border-white/10">
+                    <span className="rounded-md bg-slate-950/70 backdrop-blur-md px-2.5 py-1 text-[10px] font-medium text-white border border-white/10">
                       {ev.photos_count} Photos
                     </span>
                   </div>
@@ -136,14 +136,14 @@ export default function CorporateEventsListPage() {
 
                 {/* Event Details */}
                 <div className="p-5">
-                  <span className="text-[11px] font-semibold text-slate-400">
+                  <span className="text-[11px] font-medium text-slate-400">
                     {ev.date}
                   </span>
-                  <h3 className="mt-1 text-base font-bold text-slate-900 dark:text-white group-hover:text-[#0A3F61] dark:group-hover:text-sky-400 transition-colors line-clamp-1">
+                  <h3 className="mt-1 text-base font-semibold text-slate-900 dark:text-white group-hover:text-[#0A3F61] dark:group-hover:text-slate-200 transition-colors line-clamp-1">
                     {ev.name}
                   </h3>
                   <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                    <MapPin className="h-3.5 w-3.5 shrink-0" />
+                    <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                     <span className="truncate">{ev.location}</span>
                   </p>
                   {ev.description && (
@@ -155,10 +155,10 @@ export default function CorporateEventsListPage() {
               </Link>
 
               {/* Event Actions Footer */}
-              <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+              <div className="p-4 bg-slate-50/70 dark:bg-slate-800/40 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
                 <Link
                   href={`/corporate/events/${ev.id}`}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#0A3F61] py-2 text-xs font-bold text-white hover:bg-[#072c44] shadow-xs transition-all"
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#0A3F61] py-2 text-xs font-semibold text-white hover:bg-[#072c44] shadow-xs transition-all"
                 >
                   <Upload className="h-3.5 w-3.5" />
                   Manage & Upload
@@ -166,20 +166,20 @@ export default function CorporateEventsListPage() {
 
                 <Link
                   href={`/corporate/events/${ev.id}?tab=qrcode`}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 shadow-sm"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 shadow-xs transition-colors"
                   title="View Standee QR"
                 >
-                  <QrCode className="h-3.5 w-3.5 text-indigo-500" />
+                  <QrCode className="h-3.5 w-3.5 text-slate-500" />
                   QR
                 </Link>
 
                 <Link
                   href={`/gallery/${ev.id}/access`}
                   target="_blank"
-                  className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 shadow-sm"
+                  className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-2 text-slate-500 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 shadow-xs transition-colors"
                   title="Open Mobile Employee View"
                 >
-                  <ExternalLink className="h-4 w-4 text-emerald-500" />
+                  <ExternalLink className="h-4 w-4" />
                 </Link>
               </div>
             </div>

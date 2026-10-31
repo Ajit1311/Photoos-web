@@ -165,21 +165,83 @@ export async function saveCorporateCompany(data: Partial<CorporateCompany>): Pro
 
 // Get corporate events
 export async function getCorporateEvents(companyId: string): Promise<CorporateEvent[]> {
+  const eventMap = new Map<string, CorporateEvent>();
+
   if (typeof window !== "undefined") {
     try {
-      const stored = window.localStorage.getItem(`${STORAGE_KEY_EVENTS}_${companyId}`);
-      if (stored) {
-        const evs = JSON.parse(stored) as CorporateEvent[];
-        // Filter out any legacy hardcoded demo events
-        const realEvents = evs.filter((e) => !e.id.startsWith("ev_corp_annual_day") && !e.id.startsWith("ev_corp_townhall") && !e.id.startsWith("ev_corp_diwali"));
-        return realEvents;
+      // 1. Check company specific list
+      const storedComp = window.localStorage.getItem(`${STORAGE_KEY_EVENTS}_${companyId}`);
+      if (storedComp) {
+        const evs = JSON.parse(storedComp) as CorporateEvent[];
+        if (Array.isArray(evs)) {
+          evs.forEach((e) => {
+            if (e?.id && !e.id.startsWith("ev_corp_annual_day") && !e.id.startsWith("ev_corp_townhall") && !e.id.startsWith("ev_corp_diwali")) {
+              eventMap.set(e.id, e);
+            }
+          });
+        }
+      }
+
+      // 2. Check universal events list
+      const storedUniversal = window.localStorage.getItem(STORAGE_KEY_EVENTS);
+      if (storedUniversal) {
+        const evs = JSON.parse(storedUniversal) as CorporateEvent[];
+        if (Array.isArray(evs)) {
+          evs.forEach((e) => {
+            if (e?.id && !e.id.startsWith("ev_corp_annual_day") && !e.id.startsWith("ev_corp_townhall") && !e.id.startsWith("ev_corp_diwali")) {
+              eventMap.set(e.id, e);
+            }
+          });
+        }
+      }
+
+      // 3. Scan any other corporate events key in localStorage
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i);
+        if (key && key.startsWith(STORAGE_KEY_EVENTS) && key !== STORAGE_KEY_EVENTS && key !== `${STORAGE_KEY_EVENTS}_${companyId}`) {
+          try {
+            const val = window.localStorage.getItem(key);
+            if (val) {
+              const list = JSON.parse(val) as CorporateEvent[];
+              if (Array.isArray(list)) {
+                list.forEach((e) => {
+                  if (e?.id && !e.id.startsWith("ev_corp_annual_day")) eventMap.set(e.id, e);
+                });
+              }
+            }
+          } catch {}
+        }
       }
     } catch {
       // fallback
     }
   }
 
-  return [];
+  // 4. Try cloud API
+  try {
+    const res = await fetch(`/api/corporate/events?companyId=${encodeURIComponent(companyId || "corporate")}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.success && Array.isArray(data?.events)) {
+        data.events.forEach((e: CorporateEvent) => {
+          if (e?.id) {
+            const local = eventMap.get(e.id);
+            // Merge, keeping highest photos_count
+            eventMap.set(e.id, {
+              ...e,
+              ...local,
+              photos_count: Math.max(local?.photos_count || 0, e.photos_count || 0),
+            });
+          }
+        });
+      }
+    }
+  } catch {}
+
+  const list = Array.from(eventMap.values());
+  // Sort descending by created_at / date
+  list.sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
+  return list;
 }
 
 // Create new corporate event
@@ -194,10 +256,11 @@ export async function createCorporateEvent(
     cover_image_url?: string;
   }
 ): Promise<CorporateEvent> {
-  const events = await getCorporateEvents(companyId);
+  const actualCompanyId = companyId || DEFAULT_COMPANY_ID;
+  const events = await getCorporateEvents(actualCompanyId);
   const newEvent: CorporateEvent = {
     id: `ev_corp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-    company_id: companyId,
+    company_id: actualCompanyId,
     name: input.name.trim(),
     event_type: input.event_type,
     date: input.date || new Date().toISOString().slice(0, 10),
@@ -214,7 +277,8 @@ export async function createCorporateEvent(
   const updatedEvents = [newEvent, ...events];
   if (typeof window !== "undefined") {
     try {
-      window.localStorage.setItem(`${STORAGE_KEY_EVENTS}_${companyId}`, JSON.stringify(updatedEvents));
+      window.localStorage.setItem(`${STORAGE_KEY_EVENTS}_${actualCompanyId}`, JSON.stringify(updatedEvents));
+      window.localStorage.setItem(STORAGE_KEY_EVENTS, JSON.stringify(updatedEvents));
       // Sync to cloud storage in background
       fetch("/api/corporate/events", {
         method: "POST",
@@ -232,8 +296,33 @@ export async function createCorporateEvent(
 // Get single corporate event
 export async function getCorporateEvent(companyId: string, eventId: string): Promise<CorporateEvent | null> {
   const events = await getCorporateEvents(companyId);
-  const found = events.find((e) => e.id === eventId);
+  let found = events.find((e) => e.id === eventId);
   if (found) return found;
+
+  // Search universal list or any corporate key in localStorage
+  if (typeof window !== "undefined") {
+    try {
+      const universal = window.localStorage.getItem(STORAGE_KEY_EVENTS);
+      if (universal) {
+        const uList = JSON.parse(universal) as CorporateEvent[];
+        found = uList.find((e) => e.id === eventId);
+        if (found) return found;
+      }
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i);
+        if (key && key.startsWith(STORAGE_KEY_EVENTS)) {
+          const val = window.localStorage.getItem(key);
+          if (val) {
+            const list = JSON.parse(val) as CorporateEvent[];
+            if (Array.isArray(list)) {
+              found = list.find((e) => e.id === eventId);
+              if (found) return found;
+            }
+          }
+        }
+      }
+    } catch {}
+  }
 
   // Try fetching from cloud storage
   try {
@@ -255,20 +344,38 @@ export async function updateCorporateEvent(
   eventId: string,
   updates: Partial<CorporateEvent>
 ): Promise<CorporateEvent | null> {
-  const events = await getCorporateEvents(companyId);
+  const actualCompanyId = companyId || DEFAULT_COMPANY_ID;
+  const events = await getCorporateEvents(actualCompanyId);
   const index = events.findIndex((e) => e.id === eventId);
-  if (index === -1) return null;
+  
+  let targetEvent: CorporateEvent;
+  if (index !== -1) {
+    events[index] = { ...events[index], ...updates };
+    targetEvent = events[index];
+  } else {
+    // If not found in list, attempt to fetch and update
+    const single = await getCorporateEvent(actualCompanyId, eventId);
+    if (!single) return null;
+    targetEvent = { ...single, ...updates };
+    events.unshift(targetEvent);
+  }
 
-  events[index] = { ...events[index], ...updates };
   if (typeof window !== "undefined") {
     try {
-      window.localStorage.setItem(`${STORAGE_KEY_EVENTS}_${companyId}`, JSON.stringify(events));
+      window.localStorage.setItem(`${STORAGE_KEY_EVENTS}_${actualCompanyId}`, JSON.stringify(events));
+      window.localStorage.setItem(STORAGE_KEY_EVENTS, JSON.stringify(events));
+      // Background sync to cloud
+      fetch("/api/corporate/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(targetEvent),
+      }).catch(() => {});
     } catch {
       // ignore
     }
   }
 
-  return events[index];
+  return targetEvent;
 }
 
 // Delete corporate event
@@ -278,6 +385,7 @@ export async function deleteCorporateEvent(companyId: string, eventId: string): 
   if (typeof window !== "undefined") {
     try {
       window.localStorage.setItem(`${STORAGE_KEY_EVENTS}_${companyId}`, JSON.stringify(filtered));
+      window.localStorage.setItem(STORAGE_KEY_EVENTS, JSON.stringify(filtered));
       window.localStorage.removeItem(`photoos_corporate_photos_${eventId}`);
     } catch {
       // ignore
@@ -302,33 +410,96 @@ export type CorporatePhoto = {
 
 const STORAGE_KEY_PHOTOS_PREFIX = "photoos_corporate_photos_";
 
-// Get corporate photos for an event
+// Get corporate photos for an event (LOCAL-FIRST + MERGE TO PREVENT ANY WIPEOUT)
 export async function getCorporatePhotos(eventId: string): Promise<CorporatePhoto[]> {
-  // Try cloud storage API first so all devices see the photos
+  if (!eventId) return [];
+
+  // 1. Immediately read local storage so user sees existing photos without delay or wipeout
+  let localPhotos: CorporatePhoto[] = [];
+  if (typeof window !== "undefined") {
+    try {
+      const stored = window.localStorage.getItem(`${STORAGE_KEY_PHOTOS_PREFIX}${eventId}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          localPhotos = parsed;
+        }
+      }
+    } catch (e) {
+      console.warn("[corporate-service] Local storage photos read notice:", e);
+    }
+  }
+
+  // 2. Fetch from cloud storage API in parallel
+  let cloudPhotos: CorporatePhoto[] = [];
   try {
     const res = await fetch(`/api/corporate/photos?eventId=${encodeURIComponent(eventId)}`);
     if (res.ok) {
       const data = await res.json();
-      if (data?.success && Array.isArray(data?.photos) && data.photos.length > 0) {
-        return data.photos as CorporatePhoto[];
+      if (data?.success && Array.isArray(data?.photos)) {
+        cloudPhotos = data.photos as CorporatePhoto[];
       }
     }
   } catch (err) {
     console.warn("[corporate-service] Cloud photos fetch notice:", err);
   }
 
-  // Fallback to local storage
-  if (typeof window !== "undefined") {
-    try {
-      const stored = window.localStorage.getItem(`${STORAGE_KEY_PHOTOS_PREFIX}${eventId}`);
-      if (stored) {
-        return JSON.parse(stored) as CorporatePhoto[];
+  // 3. MERGING LOGIC: Never let an empty cloud response overwrite local photos!
+  const photoMap = new Map<string, CorporatePhoto>();
+  // First add cloud photos
+  for (const p of cloudPhotos) {
+    if (p?.id) photoMap.set(p.id, p);
+  }
+  // Then add local photos (preserving any newly uploaded photos not yet synced to cloud)
+  for (const p of localPhotos) {
+    if (p?.id) {
+      if (!photoMap.has(p.id)) {
+        photoMap.set(p.id, p);
+      } else {
+        // Merge attributes, prefer valid non-empty URLs
+        const existing = photoMap.get(p.id)!;
+        photoMap.set(p.id, {
+          ...existing,
+          ...p,
+          url: p.url || existing.url,
+          thumbnail_url: p.thumbnail_url || existing.thumbnail_url || p.url,
+          storage_path: p.storage_path || existing.storage_path,
+        });
       }
-    } catch {
-      // fallback
     }
   }
-  return [];
+
+  const combined = Array.from(photoMap.values());
+
+  // 4. If local had photos that cloud didn't have, trigger background sync
+  if (localPhotos.length > 0 && cloudPhotos.length < localPhotos.length) {
+    try {
+      fetch("/api/corporate/photos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventId,
+          companyId: "corporate",
+          photos: combined,
+        }),
+      }).catch(() => {});
+    } catch {}
+  }
+
+  // 5. Update local cache with combined clean data
+  if (combined.length > 0 && typeof window !== "undefined") {
+    try {
+      const cleanToStore = combined.map((p) => ({
+        ...p,
+        url: p.url && p.url.startsWith("data:") && p.url.length > 50000 ? (p.thumbnail_url || "") : p.url,
+      }));
+      window.localStorage.setItem(`${STORAGE_KEY_PHOTOS_PREFIX}${eventId}`, JSON.stringify(cleanToStore));
+    } catch (e) {
+      console.warn("[corporate-service] Cache update notice:", e);
+    }
+  }
+
+  return combined;
 }
 
 // Save corporate photos for an event
@@ -337,58 +508,68 @@ export async function saveCorporatePhotos(
   eventId: string,
   newPhotos: CorporatePhoto[]
 ): Promise<CorporatePhoto[]> {
-  const existing = await getCorporatePhotos(eventId);
-  
+  if (!eventId || !Array.isArray(newPhotos) || newPhotos.length === 0) {
+    return getCorporatePhotos(eventId);
+  }
+
+  // Read existing photos from local storage
+  let existing: CorporatePhoto[] = [];
+  if (typeof window !== "undefined") {
+    try {
+      const stored = window.localStorage.getItem(`${STORAGE_KEY_PHOTOS_PREFIX}${eventId}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) existing = parsed;
+      }
+    } catch {}
+  }
+
   // Deduplicate by photo ID
   const map = new Map<string, CorporatePhoto>();
   for (const p of existing) {
-    if (p.id) map.set(p.id, p);
+    if (p?.id) map.set(p.id, p);
   }
   for (const p of newPhotos) {
-    if (p.id) map.set(p.id, p);
+    if (p?.id) map.set(p.id, p);
   }
   const combined = Array.from(map.values());
 
+  // IMMEDIATELY save to localStorage so page refresh NEVER loses photos!
   if (typeof window !== "undefined") {
     try {
-      // Prevent localStorage quota overflow
-      const cleanToStore = combined.map((p) => {
-        if (p.url && p.url.startsWith("data:") && p.url.length > 50000) {
-          return {
-            ...p,
-            url: p.thumbnail_url && !p.thumbnail_url.startsWith("data:") ? p.thumbnail_url : p.url.slice(0, 50000),
-          };
-        }
-        return p;
-      });
+      const cleanToStore = combined.map((p) => ({
+        ...p,
+        url: p.url && p.url.startsWith("data:") && p.url.length > 50000 ? (p.thumbnail_url || "") : p.url,
+      }));
       window.localStorage.setItem(`${STORAGE_KEY_PHOTOS_PREFIX}${eventId}`, JSON.stringify(cleanToStore));
     } catch (e) {
       console.warn("[corporate-service] localStorage save notice:", e);
     }
   }
 
-  // Sync to Supabase storage manifest in background
-  try {
-    fetch("/api/corporate/photos", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        eventId,
-        companyId,
-        photos: newPhotos,
-      }),
-    }).catch((e) => console.warn("[corporate-service] Cloud photos sync notice:", e));
-  } catch (err) {
-    // Non-blocking
-  }
-
   // Update photos count on the event
+  const actualCompanyId = companyId || DEFAULT_COMPANY_ID;
   const totalFaces = combined.reduce((acc, p) => acc + (p.ai_faces_detected || 1), 0);
-  await updateCorporateEvent(companyId, eventId, {
+  await updateCorporateEvent(actualCompanyId, eventId, {
     photos_count: combined.length,
     ai_faces_indexed: totalFaces,
     cover_image_url: combined[0]?.url,
   });
+
+  // Sync to Supabase storage manifest in background or await
+  try {
+    await fetch("/api/corporate/photos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        eventId,
+        companyId: actualCompanyId,
+        photos: combined,
+      }),
+    });
+  } catch (err) {
+    console.warn("[corporate-service] Cloud photos sync notice:", err);
+  }
 
   return combined;
 }
@@ -399,6 +580,7 @@ export async function deleteCorporatePhoto(
   eventId: string,
   photoId: string
 ): Promise<boolean> {
+  const actualCompanyId = companyId || DEFAULT_COMPANY_ID;
   // Call cloud storage API to delete
   try {
     await fetch(`/api/corporate/photos?eventId=${encodeURIComponent(eventId)}&photoId=${encodeURIComponent(photoId)}`, {
@@ -408,6 +590,7 @@ export async function deleteCorporatePhoto(
     console.warn("[corporate-service] Cloud photo delete notice:", e);
   }
 
+  // Remove from localStorage
   const existing = await getCorporatePhotos(eventId);
   const remaining = existing.filter((p) => p.id !== photoId);
 
@@ -421,7 +604,7 @@ export async function deleteCorporatePhoto(
 
   // Update photos count on the event
   const totalFaces = remaining.reduce((acc, p) => acc + (p.ai_faces_detected || 1), 0);
-  await updateCorporateEvent(companyId, eventId, {
+  await updateCorporateEvent(actualCompanyId, eventId, {
     photos_count: remaining.length,
     ai_faces_indexed: totalFaces,
     cover_image_url: remaining[0]?.url,

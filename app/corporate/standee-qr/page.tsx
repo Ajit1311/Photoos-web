@@ -365,19 +365,19 @@ export default function CorporateStandeeQRPage() {
                 </p>
                 <div className="text-xs text-slate-200 space-y-1.5">
                   <div className="flex items-center gap-2">
-                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-sky-500 text-[10px] font-bold text-slate-950">
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-white/20 text-[10px] font-semibold text-white">
                       1
                     </span>
                     <span>Scan this QR code with your phone camera</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-sky-500 text-[10px] font-bold text-slate-950">
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-white/20 text-[10px] font-semibold text-white">
                       2
                     </span>
                     <span>Snap a quick 2-second selfie</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-sky-500 text-[10px] font-bold text-slate-950">
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-white/20 text-[10px] font-semibold text-white">
                       3
                     </span>
                     <span>AI instantly finds all your photos</span>
@@ -387,7 +387,7 @@ export default function CorporateStandeeQRPage() {
 
               {/* Footer */}
               <div className="flex items-center justify-center gap-2 text-[10px] text-slate-400">
-                <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+                <ShieldCheck className="h-3.5 w-3.5 text-slate-400" />
                 <span>PhotoOS Enterprise · 100% DPDP Private</span>
               </div>
             </div>

@@ -51,6 +51,22 @@ async function resolvePhotoUrls(supabase: any, photo: any, eventId: string) {
 
   let resolvedUrl = photo.url || "";
 
+  // If photo already has a valid cloud URL that isn't localhost or signing token, keep it directly
+  if (
+    resolvedUrl &&
+    (resolvedUrl.startsWith("http://") || resolvedUrl.startsWith("https://") || resolvedUrl.startsWith("/api/corporate/photos/file")) &&
+    !resolvedUrl.includes("127.0.0.1") &&
+    !resolvedUrl.includes("localhost") &&
+    !resolvedUrl.includes("/upload/sign/")
+  ) {
+    return {
+      ...photo,
+      storage_path: storagePath || photo.storage_path,
+      url: resolvedUrl,
+      thumbnail_url: photo.thumbnail_url || resolvedUrl,
+    };
+  }
+
   if (storagePath) {
     try {
       const { data: signedData } = await supabase.storage
@@ -203,17 +219,27 @@ export async function POST(req: NextRequest) {
       }
       const combinedPhotos = Array.from(photoMap.values());
 
-      const manifestBlob = new Blob([JSON.stringify(combinedPhotos, null, 2)], {
-        type: "application/json",
-      });
-      const manifestBuffer = Buffer.from(await manifestBlob.arrayBuffer());
+      const manifestBuffer = Buffer.from(JSON.stringify(combinedPhotos, null, 2), "utf-8");
 
-      await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from("assets")
         .upload(manifestPath, manifestBuffer, {
           contentType: "application/json",
           upsert: true,
         });
+
+      if (uploadError) {
+        // Fallback to update if file exists
+        const { error: updateError } = await supabase.storage
+          .from("assets")
+          .update(manifestPath, manifestBuffer, {
+            contentType: "application/json",
+            upsert: true,
+          });
+        if (updateError) {
+          console.warn("[CorporatePhotosRoute POST] Manifest upload notice:", uploadError?.message, updateError?.message);
+        }
+      }
 
       return NextResponse.json(
         {
@@ -324,17 +350,23 @@ export async function POST(req: NextRequest) {
     const combinedPhotos = Array.from(photoMap.values());
 
     try {
-      const manifestBlob = new Blob([JSON.stringify(combinedPhotos, null, 2)], {
-        type: "application/json",
-      });
-      const manifestBuffer = Buffer.from(await manifestBlob.arrayBuffer());
+      const manifestBuffer = Buffer.from(JSON.stringify(combinedPhotos, null, 2), "utf-8");
 
-      await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from("assets")
         .upload(manifestPath, manifestBuffer, {
           contentType: "application/json",
           upsert: true,
         });
+
+      if (uploadError) {
+        await supabase.storage
+          .from("assets")
+          .update(manifestPath, manifestBuffer, {
+            contentType: "application/json",
+            upsert: true,
+          });
+      }
     } catch (manifestErr) {
       console.warn("[CorporatePhotosRoute POST] Manifest storage save notice:", manifestErr);
     }
@@ -395,17 +427,23 @@ export async function DELETE(req: NextRequest) {
 
     const remainingPhotos = photos.filter((p) => p.id !== photoId);
 
-    const manifestBlob = new Blob([JSON.stringify(remainingPhotos, null, 2)], {
-      type: "application/json",
-    });
-    const manifestBuffer = Buffer.from(await manifestBlob.arrayBuffer());
+    const manifestBuffer = Buffer.from(JSON.stringify(remainingPhotos, null, 2), "utf-8");
 
-    await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from("assets")
       .upload(manifestPath, manifestBuffer, {
         contentType: "application/json",
         upsert: true,
       });
+
+    if (uploadError) {
+      await supabase.storage
+        .from("assets")
+        .update(manifestPath, manifestBuffer, {
+          contentType: "application/json",
+          upsert: true,
+        });
+    }
 
     return NextResponse.json(
       { success: true, photos: remainingPhotos },
